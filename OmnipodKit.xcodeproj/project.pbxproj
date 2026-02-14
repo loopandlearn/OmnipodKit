@@ -995,7 +995,7 @@
 		};
 		D8F83FB32D1563B70005D165 /* XCRemoteSwiftPackageReference "SlideButton" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/no-comment/SlideButton";
+			repositoryURL = "https://github.com/itsmojo/SlideButton";
 			requirement = {
 				branch = main;
 				kind = branch;

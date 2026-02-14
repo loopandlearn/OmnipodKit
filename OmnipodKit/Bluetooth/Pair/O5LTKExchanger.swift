@@ -260,16 +260,13 @@ class O5LTKExchanger {
 
     /// Build and encrypt the SPS2.1 compact proof payload (~634 bytes plaintext -> ~642 encrypted).
     ///
-    /// The real app's SPS2.1 payload structure (from BTSNOOP analysis):
-    ///   1. ECDSA signature over the 171-byte channel-binding transcript (~65 bytes, DER or raw+prefix)
-    ///   2. Extracted public keys from the certificate chain (5 x 65 bytes = 325 bytes uncompressed)
-    ///   3. Certificate metadata (serial numbers, fingerprints, SAN data)
-    ///   4. Hardware attestation data (Android Keystore chain fragments)
+    /// Structure (from BTSNOOP + reverse engineering):
+    ///   1. ECDSA signature over 171-byte channel-binding transcript (64 bytes raw r || s)
+    ///   2. Five extracted public keys from certificate chain (5 × 65 = 325 bytes, uncompressed)
+    ///   3. Registration payload from register/complete (~163 bytes)
+    ///   4. Certificate metadata: pdmid, pdmidExtension, cert fingerprints, SAN data
     ///
-    /// Total plaintext: ~634 bytes. Encrypted: ~642 bytes (+ 8 byte AES-CCM tag).
-    ///
-    /// Signs the channel-binding transcript with the secondary key (ECDSA SHA-256),
-    /// matching the real app behavior.
+    /// Signed with the secondary key (ECDSA SHA-256), matching real app behavior.
     private func o5sps2_1() throws -> Data {
         // Build the channel-binding transcript (171 bytes)
         let transcript = keyExchange.buildChannelBindingTranscript()
@@ -282,42 +279,75 @@ class O5LTKExchanger {
         // Assemble the compact proof payload
         var compactProof = Data()
 
-        // 1. ECDSA signature (64 bytes, r || s raw format)
-        //    The BTSNOOP analysis shows 65 bytes — possibly a 1-byte type prefix before the signature
+        // 1. ECDSA signature (64 bytes, raw r || s)
         compactProof.append(signatureRaw)
 
-        // 2. Public keys from certificate chain (uncompressed, 65 bytes each with 0x04 prefix)
-        //    BTSNOOP shows 5 keys: primary cert, secondary cert, + 3 attestation chain keys
-        //    = 5 x 65 = 325 bytes
-        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
-            compactProof.append(O5CertificateStore.uncompressedPublicKey(primaryPubKey))   // Primary cert key (65 bytes)
-        }
-        compactProof.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw)) // Secondary cert key (65 bytes)
-        // Additional attestation chain public keys would go here (3 more x 65 bytes)
-        // TODO: Extract public keys from secondary attestation chain certs
+        // 2. Five public keys (uncompressed, 65 bytes each with 0x04 prefix)
+        //    Key order: secondary (TLS cert), intermediate CA, root CA, attestation leaf, TEE intermediate
+        //    Pod verifies: pdm_pubkey == extract_public_key(tlsCertificate) — TLS cert key = secondary key
 
-        // 3. Primary certificate (DER-encoded X.509)
-        //    The primary certificate is sent to the pod during SPS2.1
-        if let primaryCert = O5CertificateStore.primaryCertificateDER {
-            // Length-prefix the certificate (2 bytes, big-endian)
-            compactProof.append(UInt8((primaryCert.count >> 8) & 0xFF))
-            compactProof.append(UInt8(primaryCert.count & 0xFF))
-            compactProof.append(primaryCert)
+        // Key 1: Secondary/TLS certificate public key (identity key, used for signing)
+        let secondaryPubKey = certStore.registration.secondaryPublicKeyRaw
+        compactProof.append(O5CertificateStore.uncompressedPublicKey(secondaryPubKey))
+        log.info("  Key 1 (secondary/TLS): %{public}@", secondaryPubKey.hexadecimalString)
+
+        // Key 2: INS02PG1 intermediate CA public key
+        let intermCAPubKey = certStore.registration.intermediateCAPublicKeyRaw
+        compactProof.append(O5CertificateStore.uncompressedPublicKey(intermCAPubKey))
+        log.info("  Key 2 (INS02PG1): %{public}@", intermCAPubKey.hexadecimalString)
+
+        // Key 3: INS00PG1 root CA public key
+        let rootCAPubKey = certStore.registration.rootCAPublicKeyRaw
+        compactProof.append(O5CertificateStore.uncompressedPublicKey(rootCAPubKey))
+        log.info("  Key 3 (INS00PG1): %{public}@", rootCAPubKey.hexadecimalString)
+
+        // Key 4: Attestation leaf public key (cert_0 from secondary attestation chain)
+        if let attestLeafKey = certStore.registration.attestationLeafPublicKeyRaw {
+            compactProof.append(O5CertificateStore.uncompressedPublicKey(attestLeafKey))
+            log.info("  Key 4 (attest leaf): %{public}@", attestLeafKey.hexadecimalString)
+        } else {
+            log.error("Missing attestation leaf public key (cert_0) — compact proof will be short")
+        }
+
+        // Key 5: TEE intermediate public key (cert_1 from secondary attestation chain)
+        if let teeIntermKey = certStore.registration.teeIntermediatePublicKeyRaw {
+            compactProof.append(O5CertificateStore.uncompressedPublicKey(teeIntermKey))
+            log.info("  Key 5 (TEE interm): %{public}@", teeIntermKey.hexadecimalString)
+        } else {
+            log.error("Missing TEE intermediate public key (cert_1) — compact proof will be short")
+        }
+
+        // 3. Registration payload from register/complete (written to pod during setPodUid)
+        if let regPayload = certStore.registration.registrationPayload {
+            compactProof.append(regPayload)
+            log.info("  Registration payload: %{public}d bytes", regPayload.count)
+        } else {
+            log.error("Missing registration payload — compact proof will be short")
         }
 
         // 4. Certificate metadata
         var metadata = Data()
 
-        // PDM identity info
-        var pdmid = O5CertificateStore.pdmid.bigEndian
+        // PDM identity
+        var pdmid = certStore.registration.pdmid.bigEndian
         metadata.append(Data(bytes: &pdmid, count: 4))
 
-        var pdmidExt = O5CertificateStore.pdmidExtension.bigEndian
+        var pdmidExt = certStore.registration.pdmidExtension.bigEndian
         metadata.append(Data(bytes: &pdmidExt, count: 4))
+
+        // TLS certificate SHA-256 fingerprint (pod may use this to look up pre-loaded cert)
+        if let tlsCertDER = certStore.registration.tlsCertificateDER {
+            let fingerprint = Data(SHA256.hash(data: tlsCertDER))
+            metadata.append(fingerprint)
+            log.info("  TLS cert fingerprint: %{public}@", fingerprint.hexadecimalString)
+        }
 
         compactProof.append(metadata)
 
-        log.info("Compact proof assembled (%d bytes): %{public}@", compactProof.count, compactProof.bytes.toHexString())
+        let keysSize = 325 // 5 × 65 (when all present)
+        let metadataSize = compactProof.count - signatureRaw.count - keysSize
+        log.default("Compact proof assembled: %{public}d bytes (sig=%{public}d + keys=%{public}d + metadata=%{public}d, btsnoop expects ~634)",
+                    compactProof.count, signatureRaw.count, keysSize, metadataSize)
 
         // Encrypt with AES-CCM using the derived conf key
         let nonce = keyExchange.getSPSNonce(direction: .write)
@@ -340,10 +370,17 @@ class O5LTKExchanger {
     // MARK: - Pod SPS2.1 Verification
 
     /// Decrypt and verify the pod's SPS2.1 response.
-    /// The pod sends its own compact proof containing:
-    ///   1. ECDSA signature over the pairing transcript
-    ///   2. Pod's public keys (pod cert, pod intermediate CA, root CA)
+    ///
+    /// The pod sends its own compact proof (~634 bytes plaintext) containing:
+    ///   1. ECDSA signature over the pairing transcript (64 bytes raw r || s)
+    ///   2. Pod's public keys (pod cert, INS01PG1, INS00PG1, + 2 attestation keys)
     ///   3. Pod certificate metadata
+    ///
+    /// Key extraction offsets (from btsnoop analysis of pod → phone):
+    ///   - Signature:     bytes 0-63   (64 bytes)
+    ///   - Pod cert key:  offset 64    (65 bytes, uncompressed)
+    ///   - INS01PG1 key:  offset 208   (65 bytes)
+    ///   - INS00PG1 key:  offset 284   (65 bytes)
     private func o5validatePodSps2_1(_ msg: MessagePacket) throws {
         log.debug("Pod SPS2.1 raw message (%{public}d bytes): %{public}@", msg.payload.count, msg.payload.hexadecimalString)
         let payload: Data
@@ -354,11 +391,6 @@ class O5LTKExchanger {
             throw error
         }
         log.default("Received pod SPS2.1: %{public}d bytes (btsnoop expects ~641)", payload.count)
-        log.debug("PDM Private: %{public}@", keyExchange.pdmPrivate.hexadecimalString)
-        log.debug("PDM Public: %{public}@", keyExchange.pdmPublic.hexadecimalString)
-        log.debug("PDM Nonce: %{public}@", keyExchange.pdmNonce.hexadecimalString)
-        log.debug("Pod Public: %{public}@", keyExchange.podPublic.hexadecimalString)
-        log.debug("Pod Nonce: %{public}@", keyExchange.podNonce.hexadecimalString)
 
         // Decrypt the pod's SPS2.1 payload
         let nonce = keyExchange.getSPSNonce(direction: .read)
@@ -376,49 +408,75 @@ class O5LTKExchanger {
         log.info("Decrypted SPS2.1 payload from pod (%d bytes): %{public}@", decryptedPayload.count, decryptedPayload.bytes.toHexString())
         keyExchange.incrementNonce(direction: .read)
 
-        // Extract and verify the pod's compact proof
-        guard decryptedPayload.count >= 64 else {
-            throw PodProtocolError.pairingException("Pod SPS2.1 payload too short: \(decryptedPayload.count) bytes")
+        guard decryptedPayload.count >= 64 + 65 else {
+            throw PodProtocolError.pairingException("Pod SPS2.1 payload too short: \(decryptedPayload.count) bytes (need >= 129)")
         }
 
         // 1. Extract pod's ECDSA signature (first 64 bytes, raw r || s)
         let podSignature = decryptedPayload.subdata(in: 0..<64)
-        log.info("Pod ECDSA signature: %{public}@", podSignature.bytes.toHexString())
+        log.info("Pod signature (64 bytes): %{public}@", podSignature.hexadecimalString)
 
-        // 2. Extract pod's public keys at known offsets
-        //    Each uncompressed key is 65 bytes (0x04 prefix + 64 bytes)
-        let keyStartOffset = 64
-        if decryptedPayload.count >= keyStartOffset + 65 {
-            let podCertPubKey = decryptedPayload.subdata(in: keyStartOffset..<keyStartOffset + 65)
-            log.info("Pod cert public key: %{public}@", podCertPubKey.bytes.toHexString())
+        // 2. Extract pod's identity public key (offset 64, 65 bytes uncompressed)
+        let podCertPubKeyUncompressed = decryptedPayload.subdata(in: 64..<129)
+        log.info("Pod cert key (offset 64): %{public}@", podCertPubKeyUncompressed.hexadecimalString)
 
-            // Extract the raw key (skip 0x04 prefix) for verification
-            if podCertPubKey[0] == 0x04 {
-                let podPubKeyRaw = podCertPubKey.subdata(in: 1..<65)
+        // 3. Extract additional keys at known offsets (from btsnoop analysis)
+        //    The pod response may have metadata between keys at non-contiguous offsets
+        let knownOffsets: [(Int, String)] = [(208, "INS01PG1"), (284, "INS00PG1")]
+        for (offset, label) in knownOffsets {
+            if decryptedPayload.count >= offset + 65 {
+                let extractedKey = decryptedPayload.subdata(in: offset..<(offset + 65))
+                log.info("Pod %{public}@ key (offset %{public}d): %{public}@", label, offset, extractedKey.hexadecimalString)
 
-                // 3. Build the transcript the pod would have signed
-                let transcript = keyExchange.buildChannelBindingTranscript()
-
-                // 4. Verify the pod's signature over the transcript
-                let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
-                if signatureValid {
-                    log.info("Pod SPS2.1 signature verification PASSED")
-                } else {
-                    log.info("Pod SPS2.1 signature verification FAILED - pod may use different transcript format")
-                    // Don't throw here - continue pairing and log for debugging.
-                    // The exact transcript format the pod signs may differ from ours.
+                // Verify against pre-loaded certificates
+                if extractedKey[0] == 0x04 {
+                    let rawKey = extractedKey.subdata(in: 1..<65)
+                    if label == "INS01PG1" {
+                        let expected = certStore.registration.podIntermediateCAPublicKeyRaw
+                        if rawKey == expected {
+                            log.info("  INS01PG1 key matches pre-loaded certificate ✓")
+                        } else {
+                            log.error("  INS01PG1 key MISMATCH: expected %{public}@", expected.hexadecimalString)
+                        }
+                    } else if label == "INS00PG1" {
+                        let expected = certStore.registration.rootCAPublicKeyRaw
+                        if rawKey == expected {
+                            log.info("  INS00PG1 key matches pre-loaded certificate ✓")
+                        } else {
+                            log.error("  INS00PG1 key MISMATCH: expected %{public}@", expected.hexadecimalString)
+                        }
+                    }
                 }
+            } else {
+                log.info("Pod SPS2.1 too short for %{public}@ at offset %{public}d (have %{public}d bytes)", label, offset, decryptedPayload.count)
             }
         }
 
-        // 5. Log additional public keys if present (for debugging and future validation)
-        if decryptedPayload.count >= keyStartOffset + 130 {
-            let key2 = decryptedPayload.subdata(in: (keyStartOffset + 65)..<(keyStartOffset + 130))
-            log.info("Pod compact proof key 2: %{public}@", key2.bytes.toHexString())
+        // 4. Verify the pod's signature over the channel-binding transcript
+        if podCertPubKeyUncompressed[0] == 0x04 {
+            let podPubKeyRaw = podCertPubKeyUncompressed.subdata(in: 1..<65)
+            let transcript = keyExchange.buildChannelBindingTranscript()
+            let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
+            if signatureValid {
+                log.default("Pod SPS2.1 signature verification PASSED")
+            } else {
+                log.error("Pod SPS2.1 signature verification FAILED — pod may use different transcript format")
+                // Don't throw — continue pairing and log for debugging
+            }
         }
-        if decryptedPayload.count >= keyStartOffset + 195 {
-            let key3 = decryptedPayload.subdata(in: (keyStartOffset + 130)..<(keyStartOffset + 195))
-            log.info("Pod compact proof key 3: %{public}@", key3.bytes.toHexString())
+
+        // 5. Log any data between/after keys for reverse engineering
+        if decryptedPayload.count > 129 {
+            let gapStart = 129
+            let gapEnd = min(208, decryptedPayload.count)
+            log.info("Pod SPS2.1 gap data (offset %{public}d-%{public}d, %{public}d bytes): %{public}@",
+                     gapStart, gapEnd, gapEnd - gapStart,
+                     decryptedPayload.subdata(in: gapStart..<gapEnd).hexadecimalString)
+        }
+        if decryptedPayload.count > 349 {
+            log.info("Pod SPS2.1 trailing data (offset 349, %{public}d bytes): %{public}@",
+                     decryptedPayload.count - 349,
+                     decryptedPayload.subdata(in: 349..<decryptedPayload.count).hexadecimalString)
         }
     }
 
@@ -468,11 +526,16 @@ class O5LTKExchanger {
         confirmationData.append(certBinding)                       // variable
         confirmationData.append(confirmationSignature)             // ~70-72 bytes (DER)
 
-        // Public keys (uncompressed, 65 bytes each)
-        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
-            confirmationData.append(O5CertificateStore.uncompressedPublicKey(primaryPubKey))
+        // Public keys (uncompressed, 65 bytes each — same 5 keys as SPS2.1)
+        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.secondaryPublicKeyRaw))
+        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.intermediateCAPublicKeyRaw))
+        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.rootCAPublicKeyRaw))
+        if let attestLeafKey = certStore.registration.attestationLeafPublicKeyRaw {
+            confirmationData.append(O5CertificateStore.uncompressedPublicKey(attestLeafKey))
         }
-        confirmationData.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw))
+        if let teeIntermKey = certStore.registration.teeIntermediatePublicKeyRaw {
+            confirmationData.append(O5CertificateStore.uncompressedPublicKey(teeIntermKey))
+        }
 
         // Session parameters
         confirmationData.append(keyExchange.controllerID)          // 4 bytes
@@ -482,11 +545,9 @@ class O5LTKExchanger {
         confirmationData.append(keyExchange.pdmNonce)              // 16 bytes
         confirmationData.append(keyExchange.podNonce)              // 16 bytes
 
-        // Primary certificate (the pod received it in SPS2.1, but SPS2 may include it again)
-        if let primaryCert = O5CertificateStore.primaryCertificateDER {
-            confirmationData.append(UInt8((primaryCert.count >> 8) & 0xFF))
-            confirmationData.append(UInt8(primaryCert.count & 0xFF))
-            confirmationData.append(primaryCert)
+        // Registration payload (from register/complete)
+        if let regPayload = certStore.registration.registrationPayload {
+            confirmationData.append(regPayload)
         }
 
         // Final integrity CMAC over all confirmation data
@@ -518,19 +579,15 @@ class O5LTKExchanger {
     private func buildCertificateBinding() -> Data {
         var binding = Data()
 
-        // Certificate chain fingerprints (SHA-256 of uncompressed public keys)
-        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
-            let primaryUncompressed = O5CertificateStore.uncompressedPublicKey(primaryPubKey)
-            binding.append(Data(SHA256.hash(data: primaryUncompressed)))
+        // Certificate chain fingerprints (SHA-256 of DER certificates)
+        if let tlsCertDER = certStore.registration.tlsCertificateDER {
+            binding.append(Data(SHA256.hash(data: tlsCertDER)))
         }
-        let secondaryUncompressed = O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw)
-        binding.append(Data(SHA256.hash(data: secondaryUncompressed)))
 
         // PDM identity
-        var pdmid = O5CertificateStore.pdmid.bigEndian
-        binding.append(Data(bytes: &pdmid, count: 4))
+        binding.append(certStore.controllerID)
 
-        var pdmidExt = O5CertificateStore.pdmidExtension.bigEndian
+        var pdmidExt = certStore.registration.pdmidExtension.bigEndian
         binding.append(Data(bytes: &pdmidExt, count: 4))
 
         return binding

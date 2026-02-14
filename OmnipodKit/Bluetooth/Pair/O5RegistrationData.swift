@@ -90,6 +90,22 @@ struct O5RegistrationData {
     var podIntermediateCAPublicKeyRaw: Data { Data(hex: podIntermediateCAPublicKeyHex) }
     var tlsCertificateDER: Data? { Data(base64Encoded: tlsCertificateDERBase64) }
 
+    /// Registration payload from register/complete (written to pod during setPodUid).
+    var registrationPayload: Data? { registrationPayloadBase64.flatMap { Data(base64Encoded: $0) } }
+
+    /// Attestation leaf public key (cert_0, P-256, 64 bytes raw x || y).
+    /// This is the secondary key's attestation leaf certificate's subject key.
+    var attestationLeafPublicKeyRaw: Data? {
+        guard secondaryAttestationChainDERBase64.count > 0 else { return nil }
+        return O5CertificateStore.extractP256PublicKey(fromDERCertBase64: secondaryAttestationChainDERBase64[0])
+    }
+
+    /// TEE intermediate public key (cert_1, P-256, 64 bytes raw x || y).
+    var teeIntermediatePublicKeyRaw: Data? {
+        guard secondaryAttestationChainDERBase64.count > 1 else { return nil }
+        return O5CertificateStore.extractP256PublicKey(fromDERCertBase64: secondaryAttestationChainDERBase64[1])
+    }
+
     var controllerID: Data {
         var value = pdmid.bigEndian
         return Data(bytes: &value, count: 4)

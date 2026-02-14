@@ -101,4 +101,53 @@ class O5CertificateStore {
         result.append(rawKey)
         return result
     }
+
+    // MARK: - DER Certificate Key Extraction
+
+    /// The fixed DER header bytes for a P-256 SubjectPublicKeyInfo + uncompressed point indicator.
+    /// SEQUENCE(89) > SEQUENCE(19) > OID(ecPublicKey) + OID(secp256r1) > BIT STRING(66) > 0x00 > 0x04
+    private static let p256SPKIHeader = Data([
+        0x30, 0x59,                                     // SEQUENCE (89 bytes)
+        0x30, 0x13,                                     // SEQUENCE (19 bytes) - AlgorithmIdentifier
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,  // OID 1.2.840.10045.2.1 (ecPublicKey)
+        0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,  // OID 1.2.840.10045.3.1.7 (secp256r1)
+        0x03, 0x42,                                     // BIT STRING (66 bytes)
+        0x00,                                           // no unused bits
+        0x04                                            // uncompressed EC point
+    ])
+
+    /// Extract the raw P-256 public key (64 bytes, x || y) from a DER-encoded X.509 certificate.
+    ///
+    /// Searches for the known SubjectPublicKeyInfo DER header pattern for P-256 keys,
+    /// then extracts the 64-byte raw EC point (without the 0x04 prefix).
+    ///
+    /// - Parameter certDERBase64: Base64-encoded DER certificate
+    /// - Returns: 64-byte raw public key (x || y), or nil if not found / not P-256
+    static func extractP256PublicKey(fromDERCertBase64 certDERBase64: String) -> Data? {
+        guard let certDER = Data(base64Encoded: certDERBase64) else {
+            return nil
+        }
+        return extractP256PublicKey(fromDERCert: certDER)
+    }
+
+    /// Extract the raw P-256 public key (64 bytes, x || y) from DER certificate data.
+    static func extractP256PublicKey(fromDERCert certDER: Data) -> Data? {
+        let header = p256SPKIHeader
+        let headerLen = header.count
+        let keyLen = 64  // raw x || y
+
+        guard certDER.count >= headerLen + keyLen else {
+            return nil
+        }
+
+        // Search for the SPKI header pattern
+        for i in 0...(certDER.count - headerLen - keyLen) {
+            if certDER.subdata(in: i..<(i + headerLen)) == header {
+                // Found it — the next 64 bytes are the raw public key
+                let keyStart = i + headerLen
+                return certDER.subdata(in: keyStart..<(keyStart + keyLen))
+            }
+        }
+        return nil
+    }
 }
