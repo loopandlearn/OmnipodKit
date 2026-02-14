@@ -47,10 +47,15 @@ enum o5OmnipodCharacteristicUUID: String, CBUUIDRawValue {
     case data =    "1A7E2443-E3ED-4464-8B7E-751E03D0DC5F"       // dashOmnipodServiceUUID.service s/4024/2443/, O5 has 1A7E2443- while DASH has 1A7E2442-
 }
 
-// New Omnipod Five Heartbeat Service
-enum o5Omnipod5NewServiceUUID: String, CBUUIDRawValue {
+// Omnipod 5 Heartbeat Service - used for O5 pod keep-alive
+enum o5Omnipod5HeartbeatServiceUUID: String, CBUUIDRawValue {
     case advertisement = "ECF301E2-674B-4474-94D0-364F3AA653E6"
     case service =       "7DED7A6C-CA72-46A7-A3A2-6061F6FDCAEB"
+}
+
+enum o5Omnipod5HeartbeatCharacteristicUUID: String, CBUUIDRawValue {
+    // The heartbeat characteristic UUID - to be confirmed via BLE service discovery
+    case heartbeat = "7DED7A6D-CA72-46A7-A3A2-6061F6FDCAEB"
 }
 
 extension PeripheralManager.Configuration {
@@ -91,19 +96,26 @@ extension PeripheralManager.Configuration {
         )
     }
 
-    // JJJ probably more work needed to deal with O5 bluetooth handling differences from DASH
     static var omnipod5: PeripheralManager.Configuration {
         return PeripheralManager.Configuration(
             serviceCharacteristics: [
                 o5OmnipodServiceUUID.service.cbUUID: [
                     o5OmnipodCharacteristicUUID.command.cbUUID,
                     o5OmnipodCharacteristicUUID.data.cbUUID,
+                ],
+                // Discover the heartbeat service and its characteristic for O5 keep-alive
+                o5Omnipod5HeartbeatServiceUUID.service.cbUUID: [
+                    o5Omnipod5HeartbeatCharacteristicUUID.heartbeat.cbUUID,
                 ]
             ],
             notifyingCharacteristics: [
                 o5OmnipodServiceUUID.service.cbUUID: [
 //                    o5OmnipodCharacteristicUUID.command.cbUUID,
 //                    o5OmnipodCharacteristicUUID.data.cbUUID,
+                ],
+                // Subscribe to heartbeat notifications for O5 pod keep-alive
+                o5Omnipod5HeartbeatServiceUUID.service.cbUUID: [
+                    o5Omnipod5HeartbeatCharacteristicUUID.heartbeat.cbUUID,
                 ]
             ],
             valueUpdateMacros: [
@@ -124,6 +136,10 @@ extension PeripheralManager.Configuration {
                     manager.dataQueue.append(value)
                     manager.queueLock.signal()
                     manager.queueLock.unlock()
+                },
+                // Handle heartbeat notifications from the pod
+                o5Omnipod5HeartbeatCharacteristicUUID.heartbeat.cbUUID: { (manager: PeripheralManager) in
+                    manager.handleHeartbeat()
                 }
             ]
         )

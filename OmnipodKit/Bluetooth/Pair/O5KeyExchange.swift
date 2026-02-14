@@ -33,12 +33,23 @@ class O5KeyExchange {
     var conf: Data
     var ltk: Data
 
+    /// The certificate-derived controller ID (4 bytes, big-endian)
+    let controllerID: Data
+
     private let keyGenerator: PrivateKeyGenerator
     let randomByteGenerator: RandomByteGenerator
 
-    init(_ keyGenerator: PrivateKeyGenerator, _ randomByteGenerator: RandomByteGenerator) throws {
+    init(_ keyGenerator: PrivateKeyGenerator, _ randomByteGenerator: RandomByteGenerator, controllerID: Data? = nil) throws {
         self.keyGenerator = keyGenerator
         self.randomByteGenerator = randomByteGenerator
+
+        // Use certificate-derived controller ID if provided, otherwise use pdmid from cert store
+        if let controllerID = controllerID {
+            self.controllerID = controllerID
+        } else {
+            var pdmid = O5CertificateStore.pdmid.bigEndian
+            self.controllerID = Data(bytes: &pdmid, count: 4)
+        }
 
         pdmNonce = randomByteGenerator.nextBytes(length: O5KeyExchange.NONCE_SIZE)
         pdmPrivate = keyGenerator.generatePrivateKey()
@@ -66,9 +77,8 @@ class O5KeyExchange {
         var data = Data()
         data.append(withUnsafeBytes(of: UInt64(O5LTKExchanger.FIRMWARE_ID.count).bigEndian, {Data($0)}))
         data.append(O5LTKExchanger.FIRMWARE_ID)
-        let controllerID = Data([0x00, 0x00, 0x00, 0x00])
-        data.append(withUnsafeBytes(of: UInt64(controllerID.count).bigEndian, {Data($0)}))
-        data.append(controllerID)
+        data.append(withUnsafeBytes(of: UInt64(self.controllerID.count).bigEndian, {Data($0)}))
+        data.append(self.controllerID)
         data.append(withUnsafeBytes(of: UInt64(self.pdmPublic.count).bigEndian, {Data($0)}))
         data.append(self.pdmPublic)
         data.append(withUnsafeBytes(of: UInt64(self.podPublic.count).bigEndian, {Data($0)}))
@@ -106,6 +116,46 @@ class O5KeyExchange {
             self.podNonce = Data(podNonce.to(UInt64.self) + 1)
             break
         }
+    }
+
+    /// Build the 171-byte channel-binding transcript for SPS2.1 signing.
+    ///
+    /// Verified against real btsnoop capture (SPS21_KEYS_PRIMARY.md Section 6):
+    /// ```
+    /// Byte  0:       0x01          — version/type
+    /// Bytes 1-6:     9b0ab96a76f4  — FIRMWARE_ID (fixed, NOT session nonce)
+    /// Bytes 7-10:    00000000      — flags/counter
+    /// Bytes 11-26:   phone nonce   — pdmNonce (16 bytes)
+    /// Bytes 27-90:   phone EC X,Y  — pdmPublic (64 bytes, ephemeral ECDH)
+    /// Bytes 91-106:  pod nonce     — podNonce (16 bytes)
+    /// Bytes 107-170: pod EC X,Y    — podPublic (64 bytes, ephemeral ECDH)
+    /// ```
+    ///
+    /// Note: SPS1 payloads are sent over BLE as PubKey(64) + Nonce(16),
+    /// but in the transcript they appear as Nonce(16) + PubKey(64) (reversed order).
+    func buildChannelBindingTranscript() -> Data {
+        var transcript = Data(capacity: 171)
+
+        // Version byte
+        transcript.append(0x01)
+
+        // FIRMWARE_ID (fixed 6-byte value from PDM firmware, NOT a session nonce)
+        transcript.append(O5LTKExchanger.FIRMWARE_ID)
+
+        // Flags (4 zero bytes)
+        transcript.append(Data([0x00, 0x00, 0x00, 0x00]))
+
+        // Phone SPS1 payload: pdmNonce (16 bytes) + pdmPublic (64 bytes) = 80 bytes
+        // Note: order is Nonce first, then EC public key (reversed from BLE wire order)
+        transcript.append(pdmNonce)
+        transcript.append(pdmPublic)
+
+        // Pod SPS1 payload: podNonce (16 bytes) + podPublic (64 bytes) = 80 bytes
+        transcript.append(podNonce)
+        transcript.append(podPublic)
+
+        assert(transcript.count == 171, "Channel-binding transcript must be exactly 171 bytes")
+        return transcript
     }
 
     private func o5aesCmac(_ key: Data, _ data: Data) throws -> Data {

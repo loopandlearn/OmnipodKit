@@ -548,6 +548,24 @@ extension CBPeripheral {
 }
 
 
+// MARK: - O5 Heartbeat handling
+extension PeripheralManager {
+    /// Timestamp of the last heartbeat received from the O5 pod
+    private static var lastHeartbeatTime: Date?
+
+    /// Handle a heartbeat notification from the O5 pod.
+    /// This resets the idle timer to keep the connection alive.
+    func handleHeartbeat() {
+        PeripheralManager.lastHeartbeatTime = Date()
+        log.debug("Received O5 heartbeat at %{public}@", String(describing: PeripheralManager.lastHeartbeatTime))
+
+        // Reset idle timer when we receive a heartbeat
+        self.queue.async {
+            self.idleStart = Date()
+        }
+    }
+}
+
 // MARK: - Command session management
 extension PeripheralManager {
     func runSession(withName name: String , _ block: @escaping () -> Void) {

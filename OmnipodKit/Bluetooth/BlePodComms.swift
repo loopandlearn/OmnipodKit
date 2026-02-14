@@ -139,7 +139,7 @@ class BlePodComms: PodComms {
             response = try ltkExchanger.negotiateLTK()
             ltk = response.ltk
         case omnipod5Type:
-            let o5LTKExchanger = O5LTKExchanger(manager: manager, ids: ids)
+            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
             response = try o5LTKExchanger.o5negotiateLTK()
             ltk = response.ltk
         default:
@@ -174,15 +174,6 @@ class BlePodComms: PodComms {
         // Now create the real PodState using the current transport state and the versionResponse info
         log.debug("pairPod: creating PodState for versionResponse %{public}@ and transport %{public}@", String(describing: versionResponse), String(describing: blePodMessageTransport.state))
 
-        // JJJ temporary hack for fake Omnipod 5 pod support using DASH pods
-        let podType: PodType
-        if self.podId >> 24 != dashType.topIdByte && fakeO5Pairing {
-            podType = omnipod5Type
-        } else {
-            // JJJ will need to check real O5 podType and make sure five pod sim returns the same value!
-            podType = versionResponse.podType
-        }
-
         self.podState = PodState(
             address: self.podId,
             firmwareVersion: String(describing: versionResponse.firmwareVersion),
@@ -190,7 +181,7 @@ class BlePodComms: PodComms {
             lotNo: versionResponse.lot,
             lotSeq: versionResponse.tid,
             insulinType: insulinType,
-            podType: podType, // will eventualy be versionResponse.podType,
+            podType: versionResponse.podType,
             bleMessageTransportState: blePodMessageTransport.state,
             ltk: ltk,
             bleIdentifier: manager.peripheral.identifier.uuidString
