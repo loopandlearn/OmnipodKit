@@ -233,19 +233,16 @@ class O5LTKExchanger {
     ///
     /// Total plaintext: ~634 bytes. Encrypted: ~642 bytes (+ 8 byte AES-CCM tag).
     ///
-    /// IMPORTANT: The real app signs the channel-binding transcript with the SECONDARY key
-    /// (TEE hardware, non-extractable). We sign with the PRIMARY key here as a placeholder.
-    /// This signature will NOT be accepted by the pod until the secondary key is available.
+    /// Signs the channel-binding transcript with the secondary key (ECDSA SHA-256),
+    /// matching the real app behavior.
     private func o5sps2_1() throws -> Data {
         // Build the channel-binding transcript (171 bytes)
         let transcript = keyExchange.buildChannelBindingTranscript()
         log.info("Channel-binding transcript (%d bytes): %{PRIVATE}@", transcript.count, transcript.bytes.toHexString())
 
-        // Sign the transcript with the primary private key (ECDSA SHA-256).
-        // WARNING: Real app uses the non-extractable secondary key for this signature.
-        // This primary key signature is a placeholder — pod will likely reject it.
-        let signatureRaw = try certStore.signWithPrimaryRaw(transcript)
-        log.info("ECDSA signature over transcript (PRIMARY key, %d bytes): %{PRIVATE}@", signatureRaw.count, signatureRaw.bytes.toHexString())
+        // Sign the transcript with the secondary private key (ECDSA SHA-256)
+        let signatureRaw = try certStore.signRaw(transcript)
+        log.info("ECDSA signature over transcript (%d bytes): %{PRIVATE}@", signatureRaw.count, signatureRaw.bytes.toHexString())
 
         // Assemble the compact proof payload
         var compactProof = Data()
@@ -257,18 +254,21 @@ class O5LTKExchanger {
         // 2. Public keys from certificate chain (uncompressed, 65 bytes each with 0x04 prefix)
         //    BTSNOOP shows 5 keys: primary cert, secondary cert, + 3 attestation chain keys
         //    = 5 x 65 = 325 bytes
-        compactProof.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.primaryPublicKeyRaw))   // Primary cert key (65 bytes)
+        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
+            compactProof.append(O5CertificateStore.uncompressedPublicKey(primaryPubKey))   // Primary cert key (65 bytes)
+        }
         compactProof.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw)) // Secondary cert key (65 bytes)
         // Additional attestation chain public keys would go here (3 more x 65 bytes)
         // TODO: Extract public keys from secondary attestation chain certs
 
         // 3. Primary certificate (DER-encoded X.509)
         //    The primary certificate is sent to the pod during SPS2.1
-        let primaryCert = O5CertificateStore.primaryCertificateDER
-        // Length-prefix the certificate (2 bytes, big-endian)
-        compactProof.append(UInt8((primaryCert.count >> 8) & 0xFF))
-        compactProof.append(UInt8(primaryCert.count & 0xFF))
-        compactProof.append(primaryCert)
+        if let primaryCert = O5CertificateStore.primaryCertificateDER {
+            // Length-prefix the certificate (2 bytes, big-endian)
+            compactProof.append(UInt8((primaryCert.count >> 8) & 0xFF))
+            compactProof.append(UInt8(primaryCert.count & 0xFF))
+            compactProof.append(primaryCert)
+        }
 
         // 4. Certificate metadata
         var metadata = Data()
@@ -377,9 +377,7 @@ class O5LTKExchanger {
     /// Current best understanding:
     ///   - CMAC confirmations over session data
     ///   - Certificate/key binding data
-    ///   - ECDSA signature (possibly with PRIMARY key — this is the one SPS2 signing role
-    ///     that hasn't been definitively attributed; SPS21_KEYS_PRIMARY.md Section 15d notes
-    ///     it's unknown whether primary signs anything in SPS2)
+    ///   - ECDSA signature (signing key for SPS2 TBD — may use secondary or primary)
     ///   - Public keys and attestation chain fragments
     ///   - Session parameters (nonces, ECDH public keys, controller ID)
     private func o5sps2() throws -> Data {
@@ -401,14 +399,13 @@ class O5LTKExchanger {
         // Section 3: Certificate binding data
         let certBinding = buildCertificateBinding()
 
-        // Section 4: Sign the combined confirmation with the primary key
-        // NOTE: It's unknown whether SPS2 uses primary or secondary for signing.
-        // Primary is used here since it's available and SPS2.1 already used secondary.
+        // Section 4: Sign the combined confirmation
+        // The signing key for SPS2 is TBD — using secondary here (same as SPS2.1).
         var signatureInput = Data()
         signatureInput.append(pdmConf)
         signatureInput.append(transcriptHash)
         signatureInput.append(certBinding)
-        let confirmationSignature = try certStore.signWithPrimary(signatureInput)
+        let confirmationSignature = try certStore.sign(signatureInput)
 
         // Assemble the full SPS2 payload
         confirmationData.append(pdmConf)                          // 16 bytes
@@ -417,7 +414,9 @@ class O5LTKExchanger {
         confirmationData.append(confirmationSignature)             // ~70-72 bytes (DER)
 
         // Public keys (uncompressed, 65 bytes each)
-        confirmationData.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.primaryPublicKeyRaw))
+        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
+            confirmationData.append(O5CertificateStore.uncompressedPublicKey(primaryPubKey))
+        }
         confirmationData.append(O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw))
 
         // Session parameters
@@ -429,10 +428,11 @@ class O5LTKExchanger {
         confirmationData.append(keyExchange.podNonce)              // 16 bytes
 
         // Primary certificate (the pod received it in SPS2.1, but SPS2 may include it again)
-        let primaryCert = O5CertificateStore.primaryCertificateDER
-        confirmationData.append(UInt8((primaryCert.count >> 8) & 0xFF))
-        confirmationData.append(UInt8(primaryCert.count & 0xFF))
-        confirmationData.append(primaryCert)
+        if let primaryCert = O5CertificateStore.primaryCertificateDER {
+            confirmationData.append(UInt8((primaryCert.count >> 8) & 0xFF))
+            confirmationData.append(UInt8(primaryCert.count & 0xFF))
+            confirmationData.append(primaryCert)
+        }
 
         // Final integrity CMAC over all confirmation data
         let finalCmac = try o5aesCmac(confKey, confirmationData)
@@ -456,9 +456,11 @@ class O5LTKExchanger {
         var binding = Data()
 
         // Certificate chain fingerprints (SHA-256 of uncompressed public keys)
-        let primaryUncompressed = O5CertificateStore.uncompressedPublicKey(O5CertificateStore.primaryPublicKeyRaw)
+        if let primaryPubKey = O5CertificateStore.primaryPublicKeyRaw {
+            let primaryUncompressed = O5CertificateStore.uncompressedPublicKey(primaryPubKey)
+            binding.append(Data(SHA256.hash(data: primaryUncompressed)))
+        }
         let secondaryUncompressed = O5CertificateStore.uncompressedPublicKey(O5CertificateStore.secondaryPublicKeyRaw)
-        binding.append(Data(SHA256.hash(data: primaryUncompressed)))
         binding.append(Data(SHA256.hash(data: secondaryUncompressed)))
 
         // PDM identity
