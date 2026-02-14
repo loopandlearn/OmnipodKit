@@ -96,7 +96,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 
 The **primary key** (software, extractable) was captured from a Frida hook session. Its self-signed certificate is sent to the pod during SPS2.1 (role TBD — may also be used in SPS2).
 
-The **registration payload** is nil — we never captured the `register/complete` response for pdmid 2584724. This payload is needed for `setPodUid`, NOT for SPS2.1.
+The **registration payload** (163 bytes from `register/complete`) is now available. Verified: controller_id=`00277094` (2584724), secondary key=`e3c48e61...`. This payload is written to the pod during `setPodUid`, NOT included in SPS2.1.
 
 ## Cryptographic Details
 
@@ -126,7 +126,7 @@ Our compact proof produces ~607 bytes plaintext vs the 634-byte target from btsn
 ### Not Yet Implemented
 - **SPS2 exact structure**: The ~952-byte plaintext structure is speculative. Needs native library (`libb7fe0d.so`) analysis or Frida captures.
 - **Post-pairing command signing**: `EncryptedSignedMessage` (type 4) needs ECDSA with secondary key
-- **Registration payload capture**: Need to re-run TEE simulator registration and capture the `register/complete` response for pdmid 2584724
+- **Registration payload**: Now available (163 bytes). Needed for `setPodUid` post-pairing, not SPS2.1
 - **Heartbeat keep-alive**: UUID defined, notification subscription works, but actual keep-alive logic not implemented
 
 ## External Reference Files

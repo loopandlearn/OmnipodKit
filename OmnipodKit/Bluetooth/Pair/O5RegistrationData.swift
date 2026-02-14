@@ -323,11 +323,13 @@ extension O5RegistrationData {
             "KCHex0SdDrx+tWUDqG8At2JHA==",
         ],
 
-        // Registration Payload — NOT YET CAPTURED for pdmid 2584724.
-        // The payload must come from the register/complete API response for this specific session.
-        // It contains controller_id + secondary public key + commands + server-signed data.
-        // Without the correct payload, the pod will reject SPS2.1.
-        // TODO: Re-run TEE simulator registration and capture the register/complete response.
-        registrationPayloadBase64: nil
+        // Registration Payload from register/complete for pdmid 2584724.
+        // Structure (163 bytes): length(4) + flags(4) + id(3) + sep(1) + type(1) + keysize=65(1)
+        //   + controller_id(4) + secondary_pubkey(64) + commands(11) + encrypted_data(65)
+        // Verified: controller_id = 00277094 (2584724), secondary key = e3c48e61...
+        registrationPayloadBase64:
+            "AAAAnwAAAQATk3wAAUEAJ3CU48SOYXzLZJecbpnLTQevMHMWRQ/jrJ8XayCgm2TUeGT1Tepn0QMn" +
+            "75vgOu51a8aBnmrlz9Vm5Gh+MDeT7rqjv2tx441UaQAGEwYWBhcGHAYfcbN9kT/bY5A4StHPEZzu" +
+            "SfGdFAfyzrrI964yENeQae3Cn6HCY+R5XjeQhP5vfwq+EgRXe7VxG5wxjqHU4Cqcag=="
     )
 }
