@@ -143,19 +143,26 @@ class O5KeyExchange {
     public func incrementNonce(direction: Direction) {
         switch direction {
         case .write:
-            let prev = pdmNonce
-            self.pdmNonce = Data(pdmNonce.to(UInt64.self) + 1)
-            if pdmNonce.count != prev.count {
-                log.error("incrementNonce(write) changed pdmNonce size from %{public}d to %{public}d bytes!", prev.count, pdmNonce.count)
-            }
+            incrementNonceInPlace(&pdmNonce)
             break
         case .read:
-            let prev = podNonce
-            self.podNonce = Data(podNonce.to(UInt64.self) + 1)
-            if podNonce.count != prev.count {
-                log.error("incrementNonce(read) changed podNonce size from %{public}d to %{public}d bytes!", prev.count, podNonce.count)
-            }
+            incrementNonceInPlace(&podNonce)
             break
+        }
+    }
+
+    /// Increment the first 8 bytes of a nonce as a native-endian counter,
+    /// preserving the full nonce length. The previous implementation used
+    /// `Data(nonce.to(UInt64.self) + 1)` which truncated 16-byte nonces to 8 bytes.
+    private func incrementNonceInPlace(_ nonce: inout Data) {
+        let prevCount = nonce.count
+        var counter = nonce.withUnsafeBytes { $0.load(as: UInt64.self) }
+        counter &+= 1
+        Swift.withUnsafeBytes(of: counter) { src in
+            nonce.replaceSubrange(0..<8, with: src)
+        }
+        if nonce.count != prevCount {
+            log.error("incrementNonce changed nonce size from %{public}d to %{public}d bytes!", prevCount, nonce.count)
         }
     }
 
