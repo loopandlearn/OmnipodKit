@@ -9,6 +9,7 @@
 
 import Foundation
 import CryptoSwift
+import os.log
 
 enum Direction {
     case write
@@ -20,6 +21,8 @@ class O5KeyExchange {
 
     static let PUBLIC_KEY_SIZE = 64
     static let NONCE_SIZE = 16
+
+    private let log = OSLog(category: "O5KeyExchange")
 
     private let INTERMEDIARY_KEY_MAGIC_STRING = "TWIt".data(using: .utf8)
     private let PDM_CONF_MAGIC_PREFIX = "KC_2_U".data(using: .utf8)
@@ -61,19 +64,27 @@ class O5KeyExchange {
         conf = Data(capacity: O5KeyExchange.CMAC_SIZE)
 
         ltk = Data(capacity: O5KeyExchange.CMAC_SIZE)
+
+        log.default("O5KeyExchange init: controllerID=%{public}@", controllerID.hexadecimalString)
+        log.info("  pdmNonce:  %{public}@", pdmNonce.hexadecimalString)
+        log.info("  pdmPublic: %{public}@", pdmPublic.hexadecimalString)
     }
 
     func o5updatePodPublicData(_ payload: Data) throws {
         if (payload.count != O5KeyExchange.PUBLIC_KEY_SIZE + O5KeyExchange.NONCE_SIZE) {
-            throw PodProtocolError.messageIOException("Invalid payload size")
+            throw PodProtocolError.messageIOException("Invalid SPS1 payload size: \(payload.count), expected \(O5KeyExchange.PUBLIC_KEY_SIZE + O5KeyExchange.NONCE_SIZE)")
         }
         podPublic = payload.subdata(in: 0..<O5KeyExchange.PUBLIC_KEY_SIZE)
         podNonce = payload.subdata(in: O5KeyExchange.PUBLIC_KEY_SIZE..<O5KeyExchange.PUBLIC_KEY_SIZE + O5KeyExchange.NONCE_SIZE)
+        log.info("  podPublic: %{public}@", podPublic.hexadecimalString)
+        log.info("  podNonce:  %{public}@", podNonce.hexadecimalString)
         try o5generateKeys()
     }
 
     private func o5generateKeys() throws {
         let sharedSecret = try keyGenerator.computeSharedSecret(pdmPrivate, podPublic)
+        log.info("  sharedSecret: %{public}@", sharedSecret.hexadecimalString)
+
         var data = Data()
         data.append(withUnsafeBytes(of: UInt64(O5LTKExchanger.FIRMWARE_ID.count).bigEndian, {Data($0)}))
         data.append(O5LTKExchanger.FIRMWARE_ID)
@@ -85,9 +96,12 @@ class O5KeyExchange {
         data.append(self.podPublic)
         data.append(withUnsafeBytes(of: UInt64(sharedSecret.count).bigEndian, {Data($0)}))
         data.append(sharedSecret)
+        log.info("  KDF input (%{public}d bytes): %{public}@", data.count, data.hexadecimalString)
+
         let derivedKey = data.sha256()
         self.conf = derivedKey.subdata(in: 0..<16)
         self.ltk = derivedKey.subdata(in: 16..<derivedKey.count)
+        log.default("Key derivation complete: conf=%{public}@, ltk=%{public}@", conf.hexadecimalString, ltk.hexadecimalString)
     }
     
     public func getSPSNonce(direction: Direction) -> Data {
