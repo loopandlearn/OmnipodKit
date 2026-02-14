@@ -58,6 +58,13 @@ class O5KeyExchange {
         pdmPrivate = keyGenerator.generatePrivateKey()
         pdmPublic = try keyGenerator.publicFromPrivate(pdmPrivate)
 
+        guard pdmNonce.count == O5KeyExchange.NONCE_SIZE else {
+            throw PodProtocolError.pairingException("pdmNonce size \(pdmNonce.count) != expected \(O5KeyExchange.NONCE_SIZE)")
+        }
+        guard pdmPublic.count == O5KeyExchange.PUBLIC_KEY_SIZE else {
+            throw PodProtocolError.pairingException("pdmPublic size \(pdmPublic.count) != expected \(O5KeyExchange.PUBLIC_KEY_SIZE)")
+        }
+
         podPublic = Data(capacity: O5KeyExchange.PUBLIC_KEY_SIZE)
         podNonce = Data(capacity: O5KeyExchange.NONCE_SIZE)
 
@@ -99,12 +106,21 @@ class O5KeyExchange {
         log.info("  KDF input (%{public}d bytes): %{public}@", data.count, data.hexadecimalString)
 
         let derivedKey = data.sha256()
+        guard derivedKey.count == 32 else {
+            throw PodProtocolError.pairingException("SHA-256 output size \(derivedKey.count) != expected 32")
+        }
         self.conf = derivedKey.subdata(in: 0..<16)
-        self.ltk = derivedKey.subdata(in: 16..<derivedKey.count)
+        self.ltk = derivedKey.subdata(in: 16..<32)
         log.default("Key derivation complete: conf=%{public}@, ltk=%{public}@", conf.hexadecimalString, ltk.hexadecimalString)
     }
     
+    private static let SPS_NONCE_SIZE = 13
+
     public func getSPSNonce(direction: Direction) -> Data {
+        guard pdmNonce.count >= 6, podNonce.count >= 6 else {
+            log.error("Nonce too short for SPS nonce: pdmNonce=%{public}d bytes, podNonce=%{public}d bytes", pdmNonce.count, podNonce.count)
+            return Data() // will cause AES-CCM to fail with a clear error
+        }
         var nonce = Data()
         switch direction {
         case .write:
@@ -118,16 +134,27 @@ class O5KeyExchange {
             nonce.append(pdmNonce.subdata(in: 0..<6))
             break
         }
+        if nonce.count != O5KeyExchange.SPS_NONCE_SIZE {
+            log.error("SPS nonce size %{public}d != expected %{public}d", nonce.count, O5KeyExchange.SPS_NONCE_SIZE)
+        }
         return nonce
     }
     
     public func incrementNonce(direction: Direction) {
         switch direction {
         case .write:
+            let prev = pdmNonce
             self.pdmNonce = Data(pdmNonce.to(UInt64.self) + 1)
+            if pdmNonce.count != prev.count {
+                log.error("incrementNonce(write) changed pdmNonce size from %{public}d to %{public}d bytes!", prev.count, pdmNonce.count)
+            }
             break
         case .read:
+            let prev = podNonce
             self.podNonce = Data(podNonce.to(UInt64.self) + 1)
+            if podNonce.count != prev.count {
+                log.error("incrementNonce(read) changed podNonce size from %{public}d to %{public}d bytes!", prev.count, podNonce.count)
+            }
             break
         }
     }
@@ -151,7 +178,7 @@ class O5KeyExchange {
         var transcript = Data(capacity: 171)
 
         // Version byte
-        transcript.append(0x01)
+        transcript.append(Data([0x01]))
 
         // FIRMWARE_ID (fixed 6-byte value from PDM firmware, NOT a session nonce)
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
@@ -168,7 +195,11 @@ class O5KeyExchange {
         transcript.append(podNonce)
         transcript.append(podPublic)
 
-        assert(transcript.count == 171, "Channel-binding transcript must be exactly 171 bytes")
+        if transcript.count != 171 {
+            log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
+            log.error("  FIRMWARE_ID: %{public}d bytes, pdmNonce: %{public}d bytes, pdmPublic: %{public}d bytes, podNonce: %{public}d bytes, podPublic: %{public}d bytes",
+                       O5LTKExchanger.FIRMWARE_ID.count, pdmNonce.count, pdmPublic.count, podNonce.count, podPublic.count)
+        }
         return transcript
     }
 

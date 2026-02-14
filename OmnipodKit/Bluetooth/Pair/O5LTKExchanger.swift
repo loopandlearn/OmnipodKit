@@ -13,7 +13,11 @@ import os.log
 
 class O5LTKExchanger {
     // Fixed 6-byte value taken from the PDM firmware
-    static let FIRMWARE_ID: Data = Data(hex: "9b0ab96a76f4")
+    static let FIRMWARE_ID: Data = {
+        let id = Data(hex: "9b0ab96a76f4")
+        precondition(id.count == 6, "FIRMWARE_ID must be exactly 6 bytes, got \(id.count)")
+        return id
+    }()
 
     static private let SP1 = "SP1="
     static private let SP2 = ",SP2="

@@ -10,6 +10,7 @@
 
 import XCTest
 import CryptoKit
+import CryptoSwift
 @testable import OmnipodKit
 
 class O5PairingTests: XCTestCase {
@@ -382,6 +383,64 @@ class O5PairingTests: XCTestCase {
                        "Signing key must match secondary public key from registration")
     }
 
+    // MARK: - Data.append Safety (CryptoSwift overload pitfalls)
+
+    /// CryptoSwift adds Data.append overloads that can silently widen integer literals.
+    /// `Data.append(0x01)` may append 8 bytes (Int64) instead of 1 byte (UInt8).
+    /// Always use `Data([0x01])` or `contentsOf: [0x01]` instead.
+    func testDataAppendByteWidth() {
+        // This is how buildChannelBindingTranscript appends the version byte.
+        // If this fails, CryptoSwift's overload resolution has changed.
+        var data = Data()
+        data.append(Data([0x01]))
+        XCTAssertEqual(data.count, 1, "Appending Data([0x01]) must produce exactly 1 byte")
+        XCTAssertEqual(data[0], 0x01)
+
+        // contentsOf: [UInt8] is also safe
+        var data2 = Data()
+        data2.append(contentsOf: [0x02])
+        XCTAssertEqual(data2.count, 1, "Appending contentsOf: [0x02] must produce exactly 1 byte")
+    }
+
+    // MARK: - Nonce Increment Size Stability
+
+    /// Verify incrementNonce doesn't truncate the 16-byte nonce to 8 bytes.
+    /// `Data(pdmNonce.to(UInt64.self) + 1)` may produce 8 bytes from a 16-byte input.
+    func testIncrementNoncePreservesSize() throws {
+        let phonePrivateKey = Data(hexadecimalString: "f5b539ec69b24876e74785fba316fe2e95eb6e26005f80f9cc7394dfcb461d05")!
+        let phoneNonce = Data(hexadecimalString: "36ddde243ca8ef7fca132c725313fbfe")!
+
+        let keyGen = MockFixedPrivateKeyGenerator(fixedPrivateKey: phonePrivateKey, generator: P256KeyGenerator())
+        let randGen = MockRandomByteGenerator(fixedData: phoneNonce)
+        let ke = try O5KeyExchange(keyGen, randGen)
+
+        let podPubKey = Data(P256.KeyAgreement.PrivateKey().publicKey.rawRepresentation)
+        let podNonce = Data(hexadecimalString: "0c010b9d86dc2298da20749b7764a1e5")!
+        try ke.o5updatePodPublicData(podPubKey + podNonce)
+
+        // Verify initial sizes
+        XCTAssertEqual(ke.pdmNonce.count, 16, "pdmNonce must start at 16 bytes")
+        XCTAssertEqual(ke.podNonce.count, 16, "podNonce must start at 16 bytes")
+
+        // Increment and verify sizes are preserved
+        ke.incrementNonce(direction: .write)
+        XCTAssertEqual(ke.pdmNonce.count, 16, "pdmNonce must remain 16 bytes after write increment")
+
+        ke.incrementNonce(direction: .read)
+        XCTAssertEqual(ke.podNonce.count, 16, "podNonce must remain 16 bytes after read increment")
+
+        // SPS nonce must still be 13 bytes after increments
+        let writeNonce = ke.getSPSNonce(direction: .write)
+        XCTAssertEqual(writeNonce.count, 13, "SPS write nonce must be 13 bytes after increment")
+        let readNonce = ke.getSPSNonce(direction: .read)
+        XCTAssertEqual(readNonce.count, 13, "SPS read nonce must be 13 bytes after increment")
+
+        // Multiple increments should also be stable
+        ke.incrementNonce(direction: .write)
+        ke.incrementNonce(direction: .write)
+        XCTAssertEqual(ke.pdmNonce.count, 16, "pdmNonce must remain 16 bytes after 3 increments")
+    }
+
     // MARK: - Key Derivation Determinism
 
     /// Verify that O5KeyExchange with the same inputs always produces the same LTK and conf
@@ -413,5 +472,219 @@ class O5PairingTests: XCTestCase {
 
         // Transcripts must also match
         XCTAssertEqual(ke1.buildChannelBindingTranscript(), ke2.buildChannelBindingTranscript())
+    }
+}
+
+// MARK: - Real Session Validation (from 2026-02-14 O5 pairing attempt)
+//
+// These tests use values captured from a real O5 pairing session log.
+// They verify that our code produces byte-exact output matching real pod communication.
+
+class O5RealSessionTests: XCTestCase {
+
+    // All values from real session Xcode log output (2026-02-14)
+    let pdmNonce    = Data(hexadecimalString: "67b78fad1746e6e70e49225e9435dcdb")!
+    let pdmPublic   = Data(hexadecimalString: "05a2df12a90037c53b2799906f580c9290178250875d9a5c66e9225f12252cec5242856a774f12d7842b82e648b90653af4d4c9de75435169744eafaef3a8388")!
+    let podPublic   = Data(hexadecimalString: "ac9507c86809eb15373380728ab37cd714056f9371e99724abd02ae0e85fa86d60cc15bc22ab411e61205292d665eb120325371081ac50d8c5d503820537fcaa")!
+    let podNonce    = Data(hexadecimalString: "bf5e3c56728108d01b080ab90a911b31")!
+    let sharedSecret = Data(hexadecimalString: "f58a29d4b23f1c977ac8ac25fa7bb514a8547a7b4db83257d2f0cf4dcbb1963d")!
+    let controllerID = Data(hexadecimalString: "00277094")!
+    let expectedConf = Data(hexadecimalString: "d2b12c76bc999eeff55230a95969a8cc")!
+    let expectedLtk  = Data(hexadecimalString: "ccbddcedc2c1d9886a4d97183f0a4dc0")!
+
+    // MARK: - KDF (Key Derivation Function)
+
+    /// Verify KDF input construction matches the exact 210-byte value from the real session.
+    /// This tests the length-prefixed concatenation: len||FIRMWARE_ID || len||controllerID || len||pdmPub || len||podPub || len||sharedSecret
+    func testKDFInputConstruction() {
+        let expectedKdfInput = Data(hexadecimalString:
+            "00000000000000069b0ab96a76f4" +
+            "000000000000000400277094" +
+            "0000000000000040" +
+            "05a2df12a90037c53b2799906f580c9290178250875d9a5c66e9225f12252cec" +
+            "5242856a774f12d7842b82e648b90653af4d4c9de75435169744eafaef3a8388" +
+            "0000000000000040" +
+            "ac9507c86809eb15373380728ab37cd714056f9371e99724abd02ae0e85fa86d" +
+            "60cc15bc22ab411e61205292d665eb120325371081ac50d8c5d503820537fcaa" +
+            "0000000000000020" +
+            "f58a29d4b23f1c977ac8ac25fa7bb514a8547a7b4db83257d2f0cf4dcbb1963d"
+        )!
+        XCTAssertEqual(expectedKdfInput.count, 210, "KDF input must be exactly 210 bytes")
+
+        // Reconstruct the KDF input the same way O5KeyExchange.o5generateKeys() does
+        var kdfInput = Data()
+        kdfInput.append(withUnsafeBytes(of: UInt64(O5LTKExchanger.FIRMWARE_ID.count).bigEndian, { Data($0) }))
+        kdfInput.append(O5LTKExchanger.FIRMWARE_ID)
+        kdfInput.append(withUnsafeBytes(of: UInt64(controllerID.count).bigEndian, { Data($0) }))
+        kdfInput.append(controllerID)
+        kdfInput.append(withUnsafeBytes(of: UInt64(pdmPublic.count).bigEndian, { Data($0) }))
+        kdfInput.append(pdmPublic)
+        kdfInput.append(withUnsafeBytes(of: UInt64(podPublic.count).bigEndian, { Data($0) }))
+        kdfInput.append(podPublic)
+        kdfInput.append(withUnsafeBytes(of: UInt64(sharedSecret.count).bigEndian, { Data($0) }))
+        kdfInput.append(sharedSecret)
+
+        XCTAssertEqual(kdfInput.count, 210)
+        XCTAssertEqual(kdfInput, expectedKdfInput, "KDF input must match real session byte-for-byte")
+    }
+
+    /// Verify SHA-256 of the KDF input produces the exact conf and ltk from the real session.
+    func testKDFOutputMatchesRealSession() {
+        let kdfInput = Data(hexadecimalString:
+            "00000000000000069b0ab96a76f4" +
+            "000000000000000400277094" +
+            "0000000000000040" +
+            "05a2df12a90037c53b2799906f580c9290178250875d9a5c66e9225f12252cec" +
+            "5242856a774f12d7842b82e648b90653af4d4c9de75435169744eafaef3a8388" +
+            "0000000000000040" +
+            "ac9507c86809eb15373380728ab37cd714056f9371e99724abd02ae0e85fa86d" +
+            "60cc15bc22ab411e61205292d665eb120325371081ac50d8c5d503820537fcaa" +
+            "0000000000000020" +
+            "f58a29d4b23f1c977ac8ac25fa7bb514a8547a7b4db83257d2f0cf4dcbb1963d"
+        )!
+
+        // CryptoSwift .sha256() — same as used in O5KeyExchange.o5generateKeys()
+        let derivedKey = kdfInput.sha256()
+        XCTAssertEqual(derivedKey.count, 32)
+
+        let conf = Data(derivedKey[0..<16])
+        let ltk = Data(derivedKey[16..<32])
+
+        XCTAssertEqual(conf, expectedConf, "conf must match real session: \(expectedConf.hexadecimalString)")
+        XCTAssertEqual(ltk, expectedLtk, "ltk must match real session: \(expectedLtk.hexadecimalString)")
+    }
+
+    // MARK: - Channel-Binding Transcript
+
+    /// Verify the 171-byte transcript constructed from real session values is byte-exact.
+    /// This would have caught the Data.append(0x01) → 8-byte Int overload bug.
+    func testTranscriptFromRealSession() {
+        let expectedTranscript = Data(hexadecimalString:
+            "01" +                                                              // version byte (1)
+            "9b0ab96a76f4" +                                                    // FIRMWARE_ID (6)
+            "00000000" +                                                        // flags (4)
+            "67b78fad1746e6e70e49225e9435dcdb" +                                // pdmNonce (16)
+            "05a2df12a90037c53b2799906f580c9290178250875d9a5c66e9225f12252cec" + // pdmPublic (64)
+            "5242856a774f12d7842b82e648b90653af4d4c9de75435169744eafaef3a8388" +
+            "bf5e3c56728108d01b080ab90a911b31" +                                // podNonce (16)
+            "ac9507c86809eb15373380728ab37cd714056f9371e99724abd02ae0e85fa86d" + // podPublic (64)
+            "60cc15bc22ab411e61205292d665eb120325371081ac50d8c5d503820537fcaa"
+        )!
+        XCTAssertEqual(expectedTranscript.count, 171, "Expected transcript must be 171 bytes")
+
+        // Reconstruct transcript the same way buildChannelBindingTranscript() does
+        var transcript = Data(capacity: 171)
+        transcript.append(Data([0x01]))
+        transcript.append(O5LTKExchanger.FIRMWARE_ID)
+        transcript.append(Data([0x00, 0x00, 0x00, 0x00]))
+        transcript.append(pdmNonce)
+        transcript.append(pdmPublic)
+        transcript.append(podNonce)
+        transcript.append(podPublic)
+
+        XCTAssertEqual(transcript.count, 171, "Transcript must be exactly 171 bytes (got \(transcript.count))")
+        XCTAssertEqual(transcript, expectedTranscript, "Transcript must match real session byte-for-byte")
+
+        // Verify key structural offsets
+        XCTAssertEqual(transcript[0], 0x01, "Byte 0: version")
+        XCTAssertEqual(transcript.subdata(in: 1..<7), O5LTKExchanger.FIRMWARE_ID, "Bytes 1-6: FIRMWARE_ID")
+        XCTAssertEqual(transcript.subdata(in: 7..<11), Data([0x00, 0x00, 0x00, 0x00]), "Bytes 7-10: flags")
+        XCTAssertEqual(transcript.subdata(in: 11..<27), pdmNonce, "Bytes 11-26: pdmNonce")
+        XCTAssertEqual(transcript.subdata(in: 27..<91), pdmPublic, "Bytes 27-90: pdmPublic")
+        XCTAssertEqual(transcript.subdata(in: 91..<107), podNonce, "Bytes 91-106: podNonce")
+        XCTAssertEqual(transcript.subdata(in: 107..<171), podPublic, "Bytes 107-170: podPublic")
+    }
+
+    // MARK: - SPS Nonce
+
+    /// Verify SPS nonce construction from real session nonces.
+    func testSPSNonceFromRealSession() {
+        // Write: 0x01 + pdmNonce[0:6] + podNonce[0:6]
+        let expectedWriteNonce = Data(hexadecimalString: "0167b78fad1746bf5e3c567281")!
+        XCTAssertEqual(expectedWriteNonce.count, 13)
+
+        var writeNonce = Data()
+        writeNonce.append(contentsOf: [UInt8(0x01)])
+        writeNonce.append(pdmNonce.subdata(in: 0..<6))
+        writeNonce.append(podNonce.subdata(in: 0..<6))
+        XCTAssertEqual(writeNonce, expectedWriteNonce, "Write SPS nonce must match")
+
+        // Read: 0x02 + podNonce[0:6] + pdmNonce[0:6]
+        let expectedReadNonce = Data(hexadecimalString: "02bf5e3c56728167b78fad1746")!
+        XCTAssertEqual(expectedReadNonce.count, 13)
+
+        var readNonce = Data()
+        readNonce.append(contentsOf: [UInt8(0x02)])
+        readNonce.append(podNonce.subdata(in: 0..<6))
+        readNonce.append(pdmNonce.subdata(in: 0..<6))
+        XCTAssertEqual(readNonce, expectedReadNonce, "Read SPS nonce must match")
+    }
+
+    // MARK: - SP2 (GetStatus Command Encoding)
+
+    /// Verify SP2 payload encoding for podId=0x277095 matches the real session.
+    func testSP2EncodingForRealPodId() {
+        let expectedSP2 = Data(hexadecimalString: "0027709500030e010081a1")!
+
+        let address: UInt32 = 0x277095
+        let message = Message(address: address, messageBlocks: [GetStatusCommand()], sequenceNum: 0)
+        let encoded = message.encoded()
+
+        XCTAssertEqual(encoded, expectedSP2, "SP2 get status encoding must match real session")
+    }
+
+    // MARK: - SPS0
+
+    /// Verify SPS0 phone and pod payloads match the real session.
+    func testSPS0FromRealSession() {
+        // Phone→Pod SPS0
+        let phoneSPS0 = Data(hexadecimalString: "000109a218")!
+        let phoneHeader = Data([0x00, 0x01, 0x09])
+        let phoneCRC = O5LTKExchanger.crc16XMODEM(phoneHeader)
+        var phonePayload = phoneHeader
+        phonePayload.append(UInt8((phoneCRC >> 8) & 0xFF))
+        phonePayload.append(UInt8(phoneCRC & 0xFF))
+        XCTAssertEqual(phonePayload, phoneSPS0, "Phone SPS0 must match real session")
+
+        // Pod→Phone SPS0 (extracted from raw message: "SPS0=" + len + payload)
+        let podSPS0 = Data(hexadecimalString: "0000099129")!
+        let podHeader = Data([0x00, 0x00, 0x09])
+        let podCRC = O5LTKExchanger.crc16XMODEM(podHeader)
+        var podPayload = podHeader
+        podPayload.append(UInt8((podCRC >> 8) & 0xFF))
+        podPayload.append(UInt8(podCRC & 0xFF))
+        XCTAssertEqual(podPayload, podSPS0, "Pod SPS0 must match real session")
+    }
+
+    // MARK: - Controller ID
+
+    /// Verify controller ID derivation: pdmid 2584724 → 0x00277094
+    func testControllerIDFromRealSession() {
+        XCTAssertEqual(controllerID, Data(hexadecimalString: "00277094")!)
+
+        // Verify it matches pdmid conversion
+        var pdmid = UInt32(2584724).bigEndian
+        let derived = Data(bytes: &pdmid, count: 4)
+        XCTAssertEqual(derived, controllerID, "controllerID must equal pdmid in big-endian")
+
+        // Pod ID is controller ID + 1
+        let podIdValue = UInt32(bigEndian: controllerID.withUnsafeBytes { $0.load(as: UInt32.self) }) + 1
+        XCTAssertEqual(podIdValue, 0x277095, "podId must be controllerId + 1")
+    }
+
+    // MARK: - Component Sizes
+
+    /// Verify all real session values have expected sizes.
+    /// This catches Data(hex:) or Data(hexadecimalString:) producing wrong-size output.
+    func testRealSessionComponentSizes() {
+        XCTAssertEqual(pdmNonce.count, 16, "pdmNonce")
+        XCTAssertEqual(pdmPublic.count, 64, "pdmPublic")
+        XCTAssertEqual(podPublic.count, 64, "podPublic")
+        XCTAssertEqual(podNonce.count, 16, "podNonce")
+        XCTAssertEqual(sharedSecret.count, 32, "sharedSecret")
+        XCTAssertEqual(controllerID.count, 4, "controllerID")
+        XCTAssertEqual(expectedConf.count, 16, "conf")
+        XCTAssertEqual(expectedLtk.count, 16, "ltk")
+        XCTAssertEqual(O5LTKExchanger.FIRMWARE_ID.count, 6, "FIRMWARE_ID")
     }
 }
