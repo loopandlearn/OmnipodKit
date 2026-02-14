@@ -150,4 +150,68 @@ class O5CertificateStore {
         }
         return nil
     }
+
+    // MARK: - DER Certificate Field Extraction
+
+    /// Extract the serial number from a DER-encoded X.509 v3 certificate.
+    ///
+    /// Searches for the v3 version pattern `a0 03 02 01 02` followed by the
+    /// serial number INTEGER tag `02`, then reads the length and serial bytes.
+    static func extractSerialNumber(fromDERCert certDER: Data) -> Data? {
+        // v3 version: [0] EXPLICIT { INTEGER 2 } = a0 03 02 01 02
+        // Followed by serial: 02 [length] [serial bytes]
+        let v3Pattern = Data([0xa0, 0x03, 0x02, 0x01, 0x02, 0x02])
+        guard let range = certDER.range(of: v3Pattern) else { return nil }
+
+        let serialLenOffset = range.upperBound // points to serial length byte
+        guard serialLenOffset < certDER.count else { return nil }
+
+        let serialLen = Int(certDER[serialLenOffset])
+        let serialStart = serialLenOffset + 1
+        guard serialLen > 0, serialStart + serialLen <= certDER.count else { return nil }
+
+        return certDER.subdata(in: serialStart..<(serialStart + serialLen))
+    }
+
+    /// Extract the Subject Alternative Name (SAN) DER value from a DER-encoded X.509 certificate.
+    ///
+    /// Searches for OID 2.5.29.17 (`06 03 55 1d 11`), then parses past any intervening
+    /// bytes to the OCTET STRING containing the GeneralNames SEQUENCE.
+    static func extractSANDER(fromDERCert certDER: Data) -> Data? {
+        // SAN OID: 2.5.29.17 = 06 03 55 1d 11
+        let sanOID = Data([0x06, 0x03, 0x55, 0x1d, 0x11])
+        guard let oidRange = certDER.range(of: sanOID) else { return nil }
+
+        // After OID, skip to the OCTET STRING (tag 0x04) containing SAN value
+        var offset = oidRange.upperBound
+        while offset < certDER.count && certDER[offset] != 0x04 {
+            offset += 1
+        }
+        guard offset < certDER.count else { return nil }
+
+        // Parse OCTET STRING tag + length
+        offset += 1 // skip 0x04 tag
+        guard offset < certDER.count else { return nil }
+
+        let contentLen: Int
+        if certDER[offset] & 0x80 == 0 {
+            // Short-form length
+            contentLen = Int(certDER[offset])
+            offset += 1
+        } else {
+            // Long-form length
+            let numLenBytes = Int(certDER[offset] & 0x7f)
+            offset += 1
+            guard offset + numLenBytes <= certDER.count else { return nil }
+            var len = 0
+            for i in 0..<numLenBytes {
+                len = (len << 8) | Int(certDER[offset + i])
+            }
+            contentLen = len
+            offset += numLenBytes
+        }
+
+        guard contentLen > 0, offset + contentLen <= certDER.count else { return nil }
+        return certDER.subdata(in: offset..<(offset + contentLen))
+    }
 }

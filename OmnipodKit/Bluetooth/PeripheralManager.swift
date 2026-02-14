@@ -191,12 +191,15 @@ extension PeripheralManager {
 
         for (serviceUUID, characteristicUUIDs) in configuration.notifyingCharacteristics {
             guard let service = peripheral.services?.itemWithUUID(serviceUUID) else {
-                throw PeripheralManagerError.unknownCharacteristic
+                // Service not discovered — may be optional (e.g., heartbeat on unpaired O5 pods)
+                log.info("Skipping notifications for undiscovered service: %{public}@", serviceUUID.uuidString)
+                continue
             }
 
             for characteristicUUID in characteristicUUIDs {
                 guard let characteristic = service.characteristics?.itemWithUUID(characteristicUUID) else {
-                    throw PeripheralManagerError.unknownCharacteristic
+                    log.info("Skipping notifications for undiscovered characteristic: %{public}@", characteristicUUID.uuidString)
+                    continue
                 }
 
                 guard !characteristic.isNotifying else {

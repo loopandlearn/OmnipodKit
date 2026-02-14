@@ -89,6 +89,8 @@ struct O5RegistrationData {
     var intermediateCAPublicKeyRaw: Data { Data(hex: intermediateCAPublicKeyHex) }
     var podIntermediateCAPublicKeyRaw: Data { Data(hex: podIntermediateCAPublicKeyHex) }
     var tlsCertificateDER: Data? { Data(base64Encoded: tlsCertificateDERBase64) }
+    var rootCACertDER: Data? { Data(base64Encoded: rootCACertDERBase64) }
+    var intermediateCACertDER: Data? { Data(base64Encoded: intermediateCACertDERBase64) }
 
     /// Registration payload from register/complete (written to pod during setPodUid).
     var registrationPayload: Data? { registrationPayloadBase64.flatMap { Data(base64Encoded: $0) } }
@@ -238,61 +240,62 @@ extension O5RegistrationData {
             "c5480d43ce04fda10b4980139a400903f581a3ef8a67186d719a79dc5492f441",
 
         // Secondary Attestation Chain (KEYS/com.twi.enclave.device.secondary/cert_*.der)
+        // TEE Simulator chain (uid=10262), cert_0 public key matches secondary key.
         secondaryAttestationChainDERBase64: [
-            // cert_0 — leaf (device secondary key)
-            "MIIC3TCCAoKgAwIBAgIEALxhTjAKBggqhkjOPQQDAjA5MQwwCgYDVQQMDANURUUx" +
-            "KTAnBgNVBAUTIDhjMGU2MGNkZjA0ZTJiNDUxYzI5NjY0NWViYWUwYWQ4MB4XDTcw" +
-            "MDEwMTAwMDAwMFoXDTQ4MDEwMTAwMDAwMFowRjEMMAoGA1UEChMDVHdpMQswCQYD" +
-            "VQQGEwJVUzEpMCcGA1UEAxMgY29tLnR3aS5lbmNsYXZlLmRldmljZS5zZWNvbmRh" +
-            "cnkwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR9dvxGwya9u9MU+43QeegjSbFN" +
-            "ZOfCQmZDYtEpOTTmREW0U7GBjfYNNJHc3n8qmLrWrazlLaaAaaMgm9sG601Zo4IB" +
-            "aTCCAWUwDgYDVR0PAQH/BAQDAgeAMIIBUQYKKwYBBAHWeQIBEQSCAUEwggE9AgIA" +
-            "yAoBAQICAMgKAQEEIDMzMTM1MzY1N2ZmZGMxMDliYzIwOGNmNTNhZTg2OWI5BAA" +
-            "wWL+FPQgCBgGcFwNXob+FRUgERjBEMR4wHAQWY29tLmluc3VsZXQubXlibHVlLnBk" +
-            "bQICE6YxIgQgTkgHdQiznlfdb06NK1Pbid/gSj3oiZi02patX9XFJDQwga6hCDEG" +
-            "AgECAgEDogMCAQOjBAICAQClCDEGAgEAAgEEpgUxAwIBBaoDAgEBv4N3AgUAv4U+" +
-            "AwIBAL+FQEwwSgQgiyxM1Tn1B16OfPISrbPbBBP7130yEZnHPVpHPFHy4Q0BAf8K" +
-            "AQAEIPJIqrgRh9zJpZtCeAzrqElhQSy+Zb8Yg7/qYKqvresNv4VBBQIDAfvQv4VC" +
-            "BQIDAxdpv4VOBgIEATUlCb+FTwYCBAE1JQkwCgYIKoZIzj0EAwIDSQAwRgIhAPgo" +
-            "02exMqF7okXk3xC+51d5SvADQvoohfBNfnR2wpG2AiEAnA1O0V+GDqT+wIOraBhp" +
-            "XJuzSD6i5ePr2seRAOe7Gog=",
-            // cert_1 — TEE intermediate
-            "MIIB9DCCAXmgAwIBAgIQKCxmIIUNPuj0j6bL98QLNjAKBggqhkjOPQQDAjA5MQww" +
-            "CgYDVQQMDANURUUxKTAnBgNVBAUTIGQ4YmZlOTUxYzg0MGEwNGQ1MTcwYjVhZGUw" +
-            "NmQzYTU0MB4XDTIyMDEyNTIzMzUyMVoXDTMyMDEyMzIzMzUyMVowOTEMMAoGA1UE" +
-            "DAwDVEVFMSkwJwYDVQQFEyA4YzBlNjBjZGYwNGUyYjQ1MWMyOTY2NDVlYmFlMGFk" +
-            "ODBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKFIMTCFQmHYYDbipfC1GgwFRuIA" +
-            "y1uRyNaqm9KD7HIGnZlyYa2gXl/khe+B4yqa1y2hI6wgv9cgkhbD1qaqIs+jYzBh" +
-            "MB0GA1UdDgQWBBT9htbJlzc01RuKa5VPFDuWC+/9rzAfBgNVHSMEGDAWgBRI9I6O" +
-            "trDGv8Vaz6nPAL/WqA7rUzAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIC" +
-            "BDAKBggqhkjOPQQDAgNpADBmAjEApCZ12C5NTULVQz3fXc5fKcQTMOhTthgcDWRu" +
-            "b/WnKLl2ja2J1H/zehzXtgFwQDx1AjEA1D2jtYHZ+V2iewDM9GmCp266Alcpbx1N" +
-            "Kdun1CSUBLeM4UFp3SI+9XBMaAoQTj+t",
-            // cert_2 — HW intermediate (EC P-384)
-            "MIIDlDCCAXygAwIBAgIRAJVCTT29Kco6Jb3Kxe5RGHwwDQYJKoZIhvcNAQELBQAw" +
-            "GzEZMBcGA1UEBRMQZjkyMDA5ZTg1M2I2YjA0NTAeFw0yMjAxMjUyMzMyNDhaFw0z" +
-            "MjAxMjMyMzMyNDhaMDkxDDAKBgNVBAwMA1RFRTEpMCcGA1UEBRMgZDhiZmU5NTFj" +
-            "ODQwYTA0ZDUxNzBiNWFkZTA2ZDNhNTQwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQW" +
-            "wIfytXG3HCiP5A86lhNH6YxLM5nIgnssT8AejEwAtF/Qh8rI9++5kyl4CoSTW8dh" +
-            "7c7ssRPp8AekngN/BzHB3A7Muw6Z2V69zwQVye2HaVMmrsy0AAHv15Unmg3/1Nyj" +
-            "YzBhMB0GA1UdDgQWBBRI9I6OtrDGv8Vaz6nPAL/WqA7rUzAfBgNVHSMEGDAWgBQ2" +
-            "YeEAfIgFCVGLRGxH/xpMyepPEjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQE" +
-            "AwICBDANBgkqhkiG9w0BAQsFAAOCAgEAM9sIKoPdl8OeIf2bfiNxopvg0u/Saxu/" +
-            "qfMTBywzXrspkBmCgXk0NVHRnS+K+BYsIMxd7GTcPU98+69MOLSBH5qEY1G/1uu+" +
-            "wIlU3B6/v3k+oyAGzCwZiNBMkIF8ASYj/t3s79h69y54CVAFqKwWBXZWeXZawGY6" +
-            "JdQ39dLlkLpxBq2Jb0fJC/9mdvU3lw7j6qVQPpXDKKuk1l5mTsv7yrSHyxUByHp" +
-            "8IvF+RxIbGe3qPpMlRB8kSRJKugtMPPu2g0sAYxI9Hw8Dm1UQvgQAWj2KJ9tHdi" +
-            "Znjb3byHkm3d0+wEzSczjfqQ5k5DRSOjWdQk8vSv3SHOeUG25w/3lKvg1AVihgir" +
-            "onLdSDYjCm6c9HJl8Aa6j9ofIwZQIZn7rnl8e2AGa/BNgmviNnc2Zgnkw1nhUsb" +
-            "NmdfoNbyf5sLK0PrScgZ+INmx7ZqflnXq325todpsW2LYkPR+S6cOG8hF/9M87gC" +
-            "K6RHC0GBoDnMhA6MtGn/3MTivEBSiB3XVD8a9ywFhueOkyvMAN+61VLFSDQi3HAF" +
-            "xlQE3Lo/vVZGtQuZf0pxf/+2TA+H+oeJR7fnnf5LwllUIBN70XfgVjA1oxPnSYf2" +
-            "EUEFxwGxDGhDPHJy+ufJ1SQiuzpaIbpuBjq7XHNnXkrDbVNTT8/8T8rFPF+pp2ia" +
-            "RKE0tVhbx89LBM=",
-            // cert_3 — Google HW Attestation Root (RSA-4096)
-            "MIIFHDCCAwSgAwIBAgIJAMNrfES5rhgxMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNV" +
-            "BAUTEGY5MjAwOWU4NTNiNmIwNDUwHhcNMjExMTE3MjMxMDQyWhcNMzYxMTEzMjMx" +
-            "MDQyWjAbMRkwFwYDVQQFExBmOTIwMDllODUzYjZiMDQ1MIICIjANBgkqhkiG9w0B" +
+            // cert_0 — leaf (TEE simulator, contains our secondary public key e3c48e61...)
+            "MIIC1TCCAnugAwIBAgIEALxhTjAKBggqhkjOPQQDAjA5MQwwCgYDVQQMDANURUUx" +
+            "KTAnBgNVBAUTIDczMjI4ODQ3Mzk3ZmMzYjZhZDA4NmQ3MTUyNTU1ZDdhMB4XDTcw" +
+            "MDEwMTAwMDAwMFoXDTQ4MDEwMTAwMDAwMFowRjEpMCcGA1UEAwwgY29tLnR3aS5l" +
+            "bmNsYXZlLmRldmljZS5zZWNvbmRhcnkxCzAJBgNVBAYTAlVTMQwwCgYDVQQKDANU" +
+            "d2kwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATjxI5hfMtkl5xumctNB68wcxZF" +
+            "D+OsnxdrIKCbZNR4ZPVN6mfRAyfvm+A67nVrxoGeauXP1WbkaH4wN5PuuqO/o4IB" +
+            "YjCCAV4wDgYDVR0PAQH/BAQDAgeAMIIBSgYKKwYBBAHWeQIBEQSCATowggE2AgIB" +
+            "LAoBAQICASwKAQEEIGE4ZTNmM2VkMWM2OTYyZjZiZmUxMjZjYjZjODk5MzEyBAAw" +
+            "WL+FPQgCBgGcXS+zLL+FRUgERjBEMR4wHAQWY29tLmluc3VsZXQubXlibHVlLnBk" +
+            "bQICFGQxIgQgTkgHdQiznlfdb06NK1Pbid/gSj3oiZi02patX9XFJDQwgaehCDEG" +
+            "AgECAgEDogMCAQOjBAICAQClCDEGAgEAAgEEqgMCAQG/g3cCBQC/hT4DAgEAv4VA" +
+            "TDBKBCARJIJpoNX1zKLjYZpVlwyNsk7r0bknefE91SdWRAWymgEB/woBAAQgaCv5" +
+            "r9i8J4lbu+msb202wIA5edhVBIyCDRNs6uOlreS/hUEFAgMCSfC/hUIFAgMDF2m/" +
+            "hU4GAgQBNSUJv4VPBgIEATUlCTAKBggqhkjOPQQDAgNIADBFAiBks8X8cPq/kCEG" +
+            "KG2X7qPLQ6QsP+c4VIhs1ZCaONu/LwIhAIhTMsTBiaQous8hU3S3YspdigvgBKGB" +
+            "f7gBNRZQb/kp",
+            // cert_1 — TEE intermediate (TEE simulator)
+            "MIIB8jCCAXmgAwIBAgIQH7v+o2W6bJu0JVFT0Z8LjTAKBggqhkjOPQQDAjA5MQww" +
+            "CgYDVQQMDANURUUxKTAnBgNVBAUTIGI1ZmEyMTVkMjY5ZWQ1ZDk2ZTRmYTUzMDU2" +
+            "NTFjODAzMB4XDTIwMDEwNzIwNTEzN1oXDTMwMDEwNDIwNTEzN1owOTEMMAoGA1UE" +
+            "DAwDVEVFMSkwJwYDVQQFEyA3MzIyODg0NzM5N2ZjM2I2YWQwODZkNzE1MjU1NWQ3" +
+            "YTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNDKinW13NyJcYlpbKzI76ZedNEQ" +
+            "Bt37AhT96xpa7jM1yP2iqr73nnQa3pgZYpT6pAnAhn4Ssw7dozaxYQfIlHujYzBh" +
+            "MB0GA1UdDgQWBBQGt3dexBepBAJNItT5VkWhUY4NzzAfBgNVHSMEGDAWgBQN5NB3" +
+            "d2lA7UG8vE9WMJZ8OTbKwTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIC" +
+            "BDAKBggqhkjOPQQDAgNnADBkAjB/X1qd4v6xXFX7vl7wsW56/b3LoCp+eOQBraiuC" +
+            "rnbk7D7zygmTdW7ZquEwePSGEYCMGjS8jcrJUiRSQR8d/MweRrfiMIC8c2X/M/MPz" +
+            "a1k7aPRbVY66e60wcwKw0VoaqmNA==",
+            // cert_2 — HW intermediate (EC P-384, TEE simulator)
+            "MIIDkzCCAXugAwIBAgIQS2Lw1jXh2CqWmcac2htOGTANBgkqhkiG9w0BAQsFADAb" +
+            "MRkwFwYDVQQFExBmOTIwMDllODUzYjZiMDQ1MB4XDTIwMDEwNzIwNTA1MFoXDTMw" +
+            "MDEwNDIwNTA1MFowOTEMMAoGA1UEDAwDVEVFMSkwJwYDVQQFEyBiNWZhMjE1ZDI2" +
+            "OWVkNWQ5NmU0ZmE1MzA1NjUxYzgwMzB2MBAGByqGSM49AgEGBSuBBAAiA2IABEN3" +
+            "xgZcDXwQ3HOojzHbQwgOnuv4t9/uCE7euyjfPcId/WJIAkhQttfaiXHbQAHZqnvZ" +
+            "hsgrEo31c+QPEVKhEwiEQb7WclTax7JwsVIhXBOGQs1vpYGSV9/gcE1HxqxFCaNj" +
+            "MGEwHQYDVR0OBBYEFA3k0Hd3aUDtQby8T1Ywlnw5NsrBMB8GA1UdIwQYMBaAFDZh" +
+            "4QB8iAUJUYtEbEf/GkzJ6k8SMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQD" +
+            "AgIEMA0GCSqGSIb3DQEBCwUAA4ICAQATR4gQZqXNRnFT97prNB9JwB5ecpe4H5wv" +
+            "k+RinuV+hyTnyWKzga0YI4Riaw+gQLISNAih4P1evAgchChnJSk4HhR3SGPLO+wm" +
+            "hMRBhgTzG0UTyX1y8yrxZC1aDPjQTBm9JMSZ868DgcEJryJO+3ynVYeGwRddDMu5" +
+            "7hyNKibvbrKU/zZUlR3JcdaWz7ZGLkcKZMwg1qiL91R9lD337EZOKyCNJOcj1r0G" +
+            "yZ809eMcWZyK68oPfwFa+dhErGu8GUVW3tn9jdp4JLQjkh37/cSXHhZCOe0Ar2/p" +
+            "YRBfv4lRkUhA7fdSbMMbVjD/aVYsN4jzmzDw/uftXjIQBy3cu9v68ipJND8C5Vv4" +
+            "ugIvsuUb0bSIBBSBBp/Pt1fQbMRJFUbDXZ+L74nwRvgM2NniHZX7emHzk3KRf/oQ" +
+            "EH8vUQutkP/KNBoiI5PuUyu0kNw64XcNbH93LtXDL5UOaRDvhG1pJ9RN4tkPh7CC" +
+            "D4u0HsT/rRV+pzfZpRDt4j3TGD6VnYMscJRL0RpwfxEYQaa45LQSXzECVKxCL+im" +
+            "ZQcPTnINWpTY3cOKcRRtT2EyzxmD8/pwto4ChTq6hfsb0U2DNn5QZq9KKej5cK+G" +
+            "Vj3//K3lO0XpXkSXeJEe4HC1c+KDZMqkgHv78c9wVdfPC++ERNBMhMxO0a0gCgLr" +
+            "HUOdeTeYfw==",
+            // cert_3 — Google HW Attestation Root (RSA-4096, TEE simulator)
+            "MIIFHDCCAwSgAwIBAgIJANUP8luj8tazMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNV" +
+            "BAUTEGY5MjAwOWU4NTNiNmIwNDUwHhcNMTkxMTIyMjAzNzU4WhcNMzQxMTE4MjAz" +
+            "NzU4WjAbMRkwFwYDVQQFExBmOTIwMDllODUzYjZiMDQ1MIICIjANBgkqhkiG9w0B" +
             "AQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xUFmOr75gvMsd/dTEDDJdS" +
             "Sxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5jlRfdnJLmN0pTy/4lj4/7" +
             "tv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y//0rb+T+W8a9nsNL/ggj" +
@@ -306,25 +309,25 @@ extension O5RegistrationData {
             "DK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+NpUFgNPN9PvQi8WEg5Um" +
             "AGMCAwEAAaNjMGEwHQYDVR0OBBYEFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMB8GA1Ud" +
             "IwQYMBaAFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMA8GA1UdEwEB/wQFMAMBAf8wDgYD" +
-            "VR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4ICAQBTNNZe5cuf8oiq+jV0itTG" +
-            "zWVhSTjOBEk2FQvh11J3o3lna0o7rd8RFHnN00q4hi6TapFhh4qaw/iG6Xg+xOan" +
-            "63niLWIC5GOPFgPeYXM9+nBb3zZzC8ABypYuCusWCmt6Tn3+Pjbz3MTVhRGXuT/T" +
-            "QH4KGFY4PhvzAyXwdjTOCXID+aHud4RLcSySr0Fq/L+R8TWalvM1wJJPhyRjqRC" +
-            "JerGtfBagiALzvhnmY7U1qFcS0NCnKjoO7oFedKdWlZz0YAfu3aGCJd4KHT0MsGi" +
-            "LZez9WP81xYSrKMNEsDK+zK5fVzw6jA7cxmpXcARTnmAuGUeI7VVDhDzKeVOctf3" +
-            "a0qQLwC+d0+xrETZ4r2fRGNw2YEs2W8Qj6oDcfPvq9JySe7pJ6wcHnl5EZ0lwc4" +
-            "xH7Y4Dx9RA1JlfooLMw3tOdJZH0enxPXaydfAD3YifeZpFaUzicHeLzVJLt9dvGB" +
-            "0bHQLE4+EqKFgOZv2EoP686DQqbVS1u+9k0p2xbMA105TBIk7npraa8VM0fnrRKi" +
-            "7wlZKwdH+aNAyhbXRW9xsnODJ+g8eF452zvbiKKngEKirK5LGieoXBX7tZ9D1GNB" +
-            "H2Ob3bKOwwIWdEFle/YF/h6zWgdeoaNGDqVBrLr2+0DtWoiB1aDEjLWl9FmyIUyU" +
-            "m7mD/vFDkzF+wm7cyWpQpCVQ==",
+            "VR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4ICAQBOMaBc8oumXb2voc7XCWnu" +
+            "XKhBBK3e2KMGz39t7lA3XXRe2ZLLAkLM5y3J7tURkf5a1SutfdOyXAmeE6SRo83U" +
+            "h6WszodmMkxK5GM4JGrnt4pBisu5igXEydaW7qq2CdC6DOGjG+mEkN8/TA6p3cno" +
+            "L/sPyz6evdjLlSeJ8rFBH6xWyIZCbrcpYEJzXaUOEaxxXxgYz5/cTiVKN2M1G2ok" +
+            "QBUIYSY6bjEL4aUN5cfo7ogP3UvliEo3Eo0YgwuzR2v0KR6C1cZqZJSTnghIC/v" +
+            "AD32KdNQ+c3N+vl2OTsUVMC1GiWkngNx1OO1+kXW+YTnnTUOtOIswUP/Vqd5SYg" +
+            "AImMAfY8U9/iIgkQj6T2W6FsScy94IN9fFhE1UtzmLoBIuUFsVXJMTz+Jucth+Iq" +
+            "oWFua9v1R93/k98p41pjtFX+H8DslVgfP097vju4KDlqN64xV1grw3ZLl4CiOe/A" +
+            "91oeLm2UHOq6wn3esB4r2EIQKb6jTVGu5sYCcdWpXr0AUVqcABPdgL+H7qJguBw" +
+            "09ojm6xNIrw2OocrDKsudk/okr/AwqEyPKw9WnMlQgLIKw1rODG2NvU9oR3GVGdM" +
+            "kUBZutL8VuFkERQGt6vQ2OCw0sV47VMkuYbacK/xyZFiRcrPJPb41zgbQj9XAEyL" +
+            "KCHex0SdDrx+tWUDqG8At2JHA==",
         ],
 
-        // Registration Payload (from register/complete for pdmid 2538336 session)
-        registrationPayloadBase64:
-            "AAAAnwAAAQATUuYAAUEAJrtgfXb8RsMmvbvTFPuN0HnoI0mxTWTnwkJmQ2LRKTk0" +
-            "5kRFtFOxgY32DTSR3N5/Kpi61q2s5S2mgGmjIJvbButNWWtf7KwA9gAGEwYWBhcG" +
-            "HAYfhCR70zZZUkTC5LROE+NurBHspOH4k3UmWrWbwpfuxjEVqNBQj5p9LrCBTiTC" +
-            "clQbA1+uyjMzF/PB/gDql/PS9w=="
+        // Registration Payload — NOT YET CAPTURED for pdmid 2584724.
+        // The payload must come from the register/complete API response for this specific session.
+        // It contains controller_id + secondary public key + commands + server-signed data.
+        // Without the correct payload, the pod will reject SPS2.1.
+        // TODO: Re-run TEE simulator registration and capture the register/complete response.
+        registrationPayloadBase64: nil
     )
 }

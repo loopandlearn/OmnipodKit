@@ -260,13 +260,13 @@ class O5LTKExchanger {
 
     /// Build and encrypt the SPS2.1 compact proof payload (~634 bytes plaintext -> ~642 encrypted).
     ///
-    /// Structure (from BTSNOOP + reverse engineering):
+    /// Structure (from BTSNOOP + PAIRING_FLOW.md reverse engineering):
     ///   1. ECDSA signature over 171-byte channel-binding transcript (64 bytes raw r || s)
     ///   2. Five extracted public keys from certificate chain (5 × 65 = 325 bytes, uncompressed)
-    ///   3. Registration payload from register/complete (~163 bytes)
-    ///   4. Certificate metadata: pdmid, pdmidExtension, cert fingerprints, SAN data
+    ///   3. Certificate metadata: serial numbers, truncated fingerprints, SAN data (~245 bytes)
     ///
     /// Signed with the secondary key (ECDSA SHA-256), matching real app behavior.
+    /// The registration payload is NOT included here — it's written to the pod during setPodUid.
     private func o5sps2_1() throws -> Data {
         // Build the channel-binding transcript (171 bytes)
         let transcript = keyExchange.buildChannelBindingTranscript()
@@ -279,12 +279,12 @@ class O5LTKExchanger {
         // Assemble the compact proof payload
         var compactProof = Data()
 
-        // 1. ECDSA signature (64 bytes, raw r || s)
+        // === Section 1: ECDSA signature (64 bytes, raw r || s) ===
         compactProof.append(signatureRaw)
 
-        // 2. Five public keys (uncompressed, 65 bytes each with 0x04 prefix)
+        // === Section 2: Five public keys (uncompressed, 65 bytes each with 0x04 prefix) ===
         //    Key order: secondary (TLS cert), intermediate CA, root CA, attestation leaf, TEE intermediate
-        //    Pod verifies: pdm_pubkey == extract_public_key(tlsCertificate) — TLS cert key = secondary key
+        //    Pod verifies: pdm_pubkey == extract_public_key(tlsCertificate)
 
         // Key 1: Secondary/TLS certificate public key (identity key, used for signing)
         let secondaryPubKey = certStore.registration.secondaryPublicKeyRaw
@@ -317,37 +317,80 @@ class O5LTKExchanger {
             log.error("Missing TEE intermediate public key (cert_1) — compact proof will be short")
         }
 
-        // 3. Registration payload from register/complete (written to pod during setPodUid)
-        if let regPayload = certStore.registration.registrationPayload {
-            compactProof.append(regPayload)
-            log.info("  Registration payload: %{public}d bytes", regPayload.count)
-        } else {
-            log.error("Missing registration payload — compact proof will be short")
-        }
+        let keysEnd = compactProof.count
+        let keysSize = keysEnd - signatureRaw.count
+        log.info("  Keys total: %{public}d bytes (expected 325)", keysSize)
 
-        // 4. Certificate metadata
+        // === Section 3: Certificate metadata ===
+        // The pod uses this to verify the PDM's certificate chain against pre-loaded certs.
+        // Fields: serial numbers (20 bytes each), truncated fingerprints (20 bytes each), SAN DER.
         var metadata = Data()
 
-        // PDM identity
-        var pdmid = certStore.registration.pdmid.bigEndian
-        metadata.append(Data(bytes: &pdmid, count: 4))
+        // TLS certificate serial number (20 bytes for our cert)
+        if let tlsCertDER = certStore.registration.tlsCertificateDER,
+           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: tlsCertDER) {
+            metadata.append(serial)
+            log.info("  TLS cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        } else {
+            log.error("Failed to extract TLS cert serial number")
+        }
 
-        var pdmidExt = certStore.registration.pdmidExtension.bigEndian
-        metadata.append(Data(bytes: &pdmidExt, count: 4))
-
-        // TLS certificate SHA-256 fingerprint (pod may use this to look up pre-loaded cert)
+        // TLS certificate SHA-256 fingerprint truncated to 20 bytes
         if let tlsCertDER = certStore.registration.tlsCertificateDER {
-            let fingerprint = Data(SHA256.hash(data: tlsCertDER))
-            metadata.append(fingerprint)
-            log.info("  TLS cert fingerprint: %{public}@", fingerprint.hexadecimalString)
+            let fullFingerprint = Data(SHA256.hash(data: tlsCertDER))
+            let truncatedFP = fullFingerprint.prefix(20)
+            metadata.append(truncatedFP)
+            log.info("  TLS cert fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
+        } else {
+            log.error("Failed to compute TLS cert fingerprint")
+        }
+
+        // TLS certificate SAN DER value (contains pdmid, devicetype, commands URIs)
+        if let tlsCertDER = certStore.registration.tlsCertificateDER,
+           let sanDER = O5CertificateStore.extractSANDER(fromDERCert: tlsCertDER) {
+            metadata.append(sanDER)
+            log.info("  TLS cert SAN DER (%{public}d bytes): %{public}@", sanDER.count, sanDER.hexadecimalString)
+        } else {
+            log.error("Failed to extract TLS cert SAN DER")
+        }
+
+        // INS02PG1 intermediate CA serial number
+        if let intermCertDER = certStore.registration.intermediateCACertDER,
+           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: intermCertDER) {
+            metadata.append(serial)
+            log.info("  INS02PG1 serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        } else {
+            log.error("Failed to extract INS02PG1 serial number")
+        }
+
+        // INS02PG1 intermediate CA fingerprint[:20]
+        if let intermCertDER = certStore.registration.intermediateCACertDER {
+            let truncatedFP = Data(SHA256.hash(data: intermCertDER)).prefix(20)
+            metadata.append(truncatedFP)
+            log.info("  INS02PG1 fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
+        }
+
+        // INS00PG1 root CA serial number
+        if let rootCertDER = certStore.registration.rootCACertDER,
+           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: rootCertDER) {
+            metadata.append(serial)
+            log.info("  INS00PG1 serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        } else {
+            log.error("Failed to extract INS00PG1 serial number")
+        }
+
+        // INS00PG1 root CA fingerprint[:20]
+        if let rootCertDER = certStore.registration.rootCACertDER {
+            let truncatedFP = Data(SHA256.hash(data: rootCertDER)).prefix(20)
+            metadata.append(truncatedFP)
+            log.info("  INS00PG1 fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
         }
 
         compactProof.append(metadata)
 
-        let keysSize = 325 // 5 × 65 (when all present)
-        let metadataSize = compactProof.count - signatureRaw.count - keysSize
-        log.default("Compact proof assembled: %{public}d bytes (sig=%{public}d + keys=%{public}d + metadata=%{public}d, btsnoop expects ~634)",
-                    compactProof.count, signatureRaw.count, keysSize, metadataSize)
+        let metadataSize = compactProof.count - keysEnd
+        log.default("Compact proof assembled: %{public}d bytes total (sig=%{public}d + keys=%{public}d + metadata=%{public}d). Target=634, gap=%{public}d",
+                    compactProof.count, signatureRaw.count, keysSize, metadataSize, 634 - compactProof.count)
 
         // Encrypt with AES-CCM using the derived conf key
         let nonce = keyExchange.getSPSNonce(direction: .write)
@@ -363,7 +406,7 @@ class O5LTKExchanger {
             throw PodProtocolError.pairingException("SPS2.1 encrypt failed: \(error)")
         }
         keyExchange.incrementNonce(direction: .write)
-        log.default("SPS2.1 encrypted payload: %{public}d bytes (plaintext was %{public}d bytes, btsnoop expects ~642)", encrypted.count, compactProof.count)
+        log.default("SPS2.1 encrypted: %{public}d bytes (plaintext=%{public}d, target encrypted=642, target plaintext=634)", encrypted.count, compactProof.count)
         return Data(encrypted)
     }
 
