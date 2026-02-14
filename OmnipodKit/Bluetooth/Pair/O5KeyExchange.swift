@@ -65,7 +65,7 @@ class O5KeyExchange {
 
         ltk = Data(capacity: O5KeyExchange.CMAC_SIZE)
 
-        log.default("O5KeyExchange init: controllerID=%{public}@", controllerID.hexadecimalString)
+        log.default("O5KeyExchange init: controllerID=%{public}@", self.controllerID.hexadecimalString)
         log.info("  pdmNonce:  %{public}@", pdmNonce.hexadecimalString)
         log.info("  pdmPublic: %{public}@", pdmPublic.hexadecimalString)
     }
