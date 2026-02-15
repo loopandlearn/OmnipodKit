@@ -325,6 +325,7 @@ extension PeripheralManager {
 
     /// - Throws: PeripheralManagerError
     func writeValue(_ value: Data, for characteristic: CBCharacteristic, type: CBCharacteristicWriteType, timeout: TimeInterval) throws {
+        log.default("[BLE RAW] WRITE %{public}@: %{public}@", characteristic.uuid.uuidString, value.hexadecimalString)
         try runCommand(timeout: timeout) {
             if case .withResponse = type {
                 addCondition(.write(characteristic: characteristic))

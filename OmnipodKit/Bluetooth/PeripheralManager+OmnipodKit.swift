@@ -199,36 +199,62 @@ extension PeripheralManager {
     func waitForCommand(_ command: PodCommand, timeout: TimeInterval = 5) throws {
         dispatchPrecondition(condition: .onQueue(queue))
 
-        // Wait for data to be read.
-        queueLock.lock()
-        if (cmdQueue.count == 0) {
-            queueLock.wait(until: Date().addingTimeInterval(timeout))
-        }
-        queueLock.unlock()
+        let deadline = Date().addingTimeInterval(timeout)
 
-        commandLock.lock()
-        defer {
-            commandLock.unlock()
-        }
-
-        // Lock to protect dataQueue
-        queueLock.lock()
-        defer {
+        while true {
+            // Wait for data to be read.
+            queueLock.lock()
+            if cmdQueue.count == 0 {
+                let remaining = deadline.timeIntervalSinceNow
+                if remaining > 0 {
+                    queueLock.wait(until: deadline)
+                }
+            }
             queueLock.unlock()
-        }
 
-        if (cmdQueue.count > 0) {
-            let value = cmdQueue.remove(at: 0)
+            commandLock.lock()
 
-            if command.rawValue != value[0] {
+            // Lock to protect cmdQueue
+            queueLock.lock()
+
+            if cmdQueue.count > 0 {
+                let value = cmdQueue.remove(at: 0)
+
+                if command.rawValue == value[0] {
+                    queueLock.unlock()
+                    commandLock.unlock()
+                    return // Got expected command
+                }
+
+                // During O5 pairing, pod sends intermediate PAIR_STATUS (0x08) commands
+                // before SUCCESS. Log and continue waiting for the expected command.
+                if value[0] == PodCommand.PAIR_STATUS.rawValue {
+                    log.default("waitForCommand: skipping intermediate PAIR_STATUS (0x08), data=%{public}@, waiting for 0x%{public}02x",
+                               value.hexadecimalString, command.rawValue)
+                    queueLock.unlock()
+                    commandLock.unlock()
+                    // Check if we still have time left before looping
+                    if Date() >= deadline {
+                        throw PeripheralManagerError.emptyValue
+                    }
+                    continue // Loop and wait for next command
+                }
+
+                // Unexpected command that isn't PAIR_STATUS
                 log.error("waitForCommand failed. rawValue != value[0] (%d != %d); data=%@", command.rawValue, value[0], value.hexadecimalString)
+                queueLock.unlock()
+                commandLock.unlock()
                 throw PeripheralManagerError.incorrectResponse
             }
 
-            return
-        }
+            queueLock.unlock()
+            commandLock.unlock()
 
-        throw PeripheralManagerError.emptyValue
+            // No data in queue and deadline reached
+            if Date() >= deadline {
+                throw PeripheralManagerError.emptyValue
+            }
+        }
     }
 
     /// - Throws: PeripheralManagerError
