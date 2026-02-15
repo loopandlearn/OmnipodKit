@@ -22,6 +22,16 @@ class O5KeyExchange {
     static let PUBLIC_KEY_SIZE = 64
     static let NONCE_SIZE = 16
 
+    /// Counts pairing attempts so we can cycle through all 4 flag combinations (mod 4).
+    static var pairAttempts: Int = 0
+
+    /// When true, uses nonces-first layout (nonce-key interleaved per side, matching Frida capture).
+    /// When false, uses keys-grouped layout (keys together then nonces together, matching native RE).
+    var keysNonceFirst: Bool = false
+
+    /// When true, puts controllerID in bytes 7-10. When false, puts 4 zero bytes.
+    var bytesAsControllerId: Bool = false
+
     private let log = OSLog(category: "O5KeyExchange")
 
     private let INTERMEDIARY_KEY_MAGIC_STRING = "TWIt".data(using: .utf8)
@@ -168,37 +178,46 @@ class O5KeyExchange {
 
     /// Build the 171-byte channel-binding transcript for SPS2.1 signing.
     ///
-    /// From native library `sub_36690` (fully resolved, `ctx[4]==0` controller path):
+    /// Layout is controlled by two boolean flags:
+    ///
+    /// **keysNonceFirst == false** (keys-grouped, native RE layout):
     /// ```
-    /// Byte  0:       0x01            — type (w1==0 → 0x01)
-    /// Bytes 1-6:     FIRMWARE_ID     — 9b0ab96a76f4 (6 bytes, from ctx+0xff)
-    /// Bytes 7-10:    controller_id   — e.g. 00277094 (4 bytes, from ctx+0xfb)
-    /// Bytes 11-74:   pdmPublic       — phone ECDH public key (64 bytes)
-    /// Bytes 75-138:  podPublic       — pod ECDH public key (64 bytes)
-    /// Bytes 139-154: pdmNonce        — phone nonce (16 bytes)
-    /// Bytes 155-170: podNonce        — pod nonce (16 bytes)
+    /// [0x01][FIRMWARE_ID(6)][bytes7_10(4)][pdmPublic(64)][podPublic(64)][pdmNonce(16)][podNonce(16)]
     /// ```
     ///
-    /// Note: Keys are grouped together, then nonces grouped together (NOT interleaved).
+    /// **keysNonceFirst == true** (nonces-first, Frida capture layout):
+    /// ```
+    /// [0x01][FIRMWARE_ID(6)][bytes7_10(4)][pdmNonce(16)][pdmPublic(64)][podNonce(16)][podPublic(64)]
+    /// ```
+    ///
+    /// `bytes7_10` is `controllerID` when `bytesAsControllerId == true`, or 4 zero bytes when false.
+    /// Total is always 1 + 6 + 4 + 64 + 64 + 16 + 16 = 171 bytes.
     func buildChannelBindingTranscript() -> Data {
         var transcript = Data(capacity: 171)
 
-        // Type byte (controller context: ctx[4]==0, w1==ctx[4]==0 → type 0x01)
+        // Type byte (controller context: ctx[4]==0, w1==ctx[4]==0 -> type 0x01)
         transcript.append(Data([0x01]))
 
-        // Field A: FIRMWARE_ID (6 bytes, from ctx+0xff)
+        // Field A: FIRMWARE_ID (6 bytes)
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
 
-        // Field B: controller_id (4 bytes, from ctx+0xfb) — NOT zeros
-        transcript.append(controllerID)
+        // Field B: bytes 7-10 — controllerID or zeros depending on flag
+        let bytes7_10 = bytesAsControllerId ? controllerID : Data([0x00, 0x00, 0x00, 0x00])
+        transcript.append(bytes7_10)
 
-        // Both public keys grouped together (64 + 64 = 128 bytes)
-        transcript.append(pdmPublic)
-        transcript.append(podPublic)
-
-        // Both nonces grouped together (16 + 16 = 32 bytes)
-        transcript.append(pdmNonce)
-        transcript.append(podNonce)
+        if keysNonceFirst {
+            // Nonces-first layout: nonce-key interleaved per side (Frida capture)
+            transcript.append(pdmNonce)
+            transcript.append(pdmPublic)
+            transcript.append(podNonce)
+            transcript.append(podPublic)
+        } else {
+            // Keys-grouped layout: keys together then nonces together (native RE)
+            transcript.append(pdmPublic)
+            transcript.append(podPublic)
+            transcript.append(pdmNonce)
+            transcript.append(podNonce)
+        }
 
         if transcript.count != 171 {
             log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
@@ -210,29 +229,47 @@ class O5KeyExchange {
 
     /// Build the pod's (peer) variant of the channel-binding transcript for verifying pod SPS2.1.
     ///
-    /// The pod signs with `w1=1` (its own context has `ctx[4]==1`), which produces:
+    /// Layout is controlled by two boolean flags (same as controller transcript, but type=0x02
+    /// and the fixed fields are swapped: bytes7_10 first, then FIRMWARE_ID).
+    ///
+    /// **keysNonceFirst == false** (keys-grouped, native RE layout):
     /// ```
-    /// [0x02] [controller_id(4)] [FIRMWARE_ID(6)] [podPub(64)] [pdmPub(64)] [podNonce(16)] [pdmNonce(16)]
+    /// [0x02][bytes7_10(4)][FIRMWARE_ID(6)][podPublic(64)][pdmPublic(64)][podNonce(16)][pdmNonce(16)]
     /// ```
+    ///
+    /// **keysNonceFirst == true** (nonces-first, Frida capture layout):
+    /// ```
+    /// [0x02][bytes7_10(4)][FIRMWARE_ID(6)][podNonce(16)][podPublic(64)][pdmNonce(16)][pdmPublic(64)]
+    /// ```
+    ///
+    /// `bytes7_10` is `controllerID` when `bytesAsControllerId == true`, or 4 zero bytes when false.
+    /// Total is always 1 + 4 + 6 + 64 + 64 + 16 + 16 = 171 bytes.
     func buildPodChannelBindingTranscript() -> Data {
         var transcript = Data(capacity: 171)
 
-        // Type byte (pod context: w1==1 → type 0x02)
+        // Type byte (pod context: w1==1 -> type 0x02)
         transcript.append(Data([0x02]))
 
-        // Field A: controller_id (4 bytes) — swapped from controller transcript
-        transcript.append(controllerID)
+        // Field A: bytes7_10 (4 bytes) — swapped position from controller transcript
+        let bytes7_10 = bytesAsControllerId ? controllerID : Data([0x00, 0x00, 0x00, 0x00])
+        transcript.append(bytes7_10)
 
-        // Field B: FIRMWARE_ID (6 bytes) — swapped from controller transcript
+        // Field B: FIRMWARE_ID (6 bytes) — swapped position from controller transcript
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
 
-        // Pod keys first (swapped from controller transcript)
-        transcript.append(podPublic)
-        transcript.append(pdmPublic)
-
-        // Pod nonces first (swapped from controller transcript)
-        transcript.append(podNonce)
-        transcript.append(pdmNonce)
+        if keysNonceFirst {
+            // Nonces-first layout: nonce-key interleaved per side (Frida capture)
+            transcript.append(podNonce)
+            transcript.append(podPublic)
+            transcript.append(pdmNonce)
+            transcript.append(pdmPublic)
+        } else {
+            // Keys-grouped layout: keys together then nonces together (native RE)
+            transcript.append(podPublic)
+            transcript.append(pdmPublic)
+            transcript.append(podNonce)
+            transcript.append(pdmNonce)
+        }
 
         return transcript
     }

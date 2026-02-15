@@ -47,6 +47,40 @@ class O5LTKExchanger {
 
     func o5negotiateLTK() throws -> PairResult {
 
+        // Set channel-binding transcript flags based on the current pair attempt (cycles through 4 combinations)
+        let attempt = O5KeyExchange.pairAttempts % 4
+        switch attempt {
+        case 0:
+            keyExchange.keysNonceFirst = false
+            keyExchange.bytesAsControllerId = false
+        case 1:
+            keyExchange.keysNonceFirst = false
+            keyExchange.bytesAsControllerId = true
+        case 2:
+            keyExchange.keysNonceFirst = true
+            keyExchange.bytesAsControllerId = false
+        case 3:
+            keyExchange.keysNonceFirst = true
+            keyExchange.bytesAsControllerId = true
+        default:
+            break
+        }
+        log.default("=== PAIR ATTEMPT #%{public}d: keysNonceFirst=%{public}@, bytesAsControllerId=%{public}@ ===",
+                    O5KeyExchange.pairAttempts,
+                    String(describing: keyExchange.keysNonceFirst),
+                    String(describing: keyExchange.bytesAsControllerId))
+
+        do {
+            return try o5negotiateLTKBody()
+        } catch {
+            O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 4
+            log.error("Pairing failed, next attempt will use combination #%{public}d", O5KeyExchange.pairAttempts % 4)
+            throw error
+        }
+    }
+
+    private func o5negotiateLTKBody() throws -> PairResult {
+
         log.default("=== O5 Pairing Start === myId=0x%{public}x podId=0x%{public}x", ids.myId.toUInt32(), ids.podId.toUInt32())
         log.default("Sending SP1+SP2")
         let sp1sp2 = PairMessage(
