@@ -57,22 +57,16 @@ class O5LTKExchanger {
         keyExchange.sigBeforeCert           = (attempt & 0x20) != 0
         keyExchange.nonceLastBytes          = (attempt & 0x40) != 0
         keyExchange.swapNonceDirection      = (attempt & 0x80) != 0
-        log.default("=== PAIR ATTEMPT #%{public}d/%{public}d: keysNonceFirst=%{public}@, bytesAsControllerId=%{public}@, useUInt32LengthPrefixes=%{public}@, kdfZeroControllerID=%{public}@, swapCertIndexes=%{public}@, sigBeforeCert=%{public}@, nonceLastBytes=%{public}@, swapNonceDirection=%{public}@ ===",
-                    O5KeyExchange.pairAttempts, 256,
-                    String(describing: keyExchange.keysNonceFirst),
-                    String(describing: keyExchange.bytesAsControllerId),
-                    String(describing: keyExchange.useUInt32LengthPrefixes),
-                    String(describing: keyExchange.kdfZeroControllerID),
-                    String(describing: keyExchange.swapCertIndexes),
-                    String(describing: keyExchange.sigBeforeCert),
-                    String(describing: keyExchange.nonceLastBytes),
-                    String(describing: keyExchange.swapNonceDirection))
+        let flagDesc = "keysNonceFirst=\(keyExchange.keysNonceFirst), bytesAsControllerId=\(keyExchange.bytesAsControllerId), useUInt32LengthPrefixes=\(keyExchange.useUInt32LengthPrefixes), kdfZeroControllerID=\(keyExchange.kdfZeroControllerID), swapCertIndexes=\(keyExchange.swapCertIndexes), sigBeforeCert=\(keyExchange.sigBeforeCert), nonceLastBytes=\(keyExchange.nonceLastBytes), swapNonceDirection=\(keyExchange.swapNonceDirection)"
+        log.default("=== PAIR ATTEMPT #%{public}d/%{public}d: %{public}@ ===",
+                    O5KeyExchange.pairAttempts, 256, flagDesc)
 
         do {
             return try o5negotiateLTKBody()
         } catch {
             O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 256
-            log.error("Pairing failed, next attempt will use combination #%{public}d/%{public}d", O5KeyExchange.pairAttempts % 256, 256)
+            log.error("Pairing failed (attempt #%{public}d), next attempt will use combination #%{public}d/%{public}d",
+                      O5KeyExchange.pairAttempts, O5KeyExchange.pairAttempts % 256, 256)
             throw error
         }
     }

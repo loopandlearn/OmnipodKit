@@ -260,8 +260,8 @@ class O5KeyExchange {
 
         if transcript.count != 171 {
             log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
-            log.error("  FIRMWARE_ID: %{public}d, pdmNonce: %{public}d, pdmPublic: %{public}d, podNonce: %{public}d, podPublic: %{public}d",
-                       O5LTKExchanger.FIRMWARE_ID.count, pdmNonce.count, pdmPublic.count, podNonce.count, podPublic.count)
+            let sizes = "FIRMWARE_ID: \(O5LTKExchanger.FIRMWARE_ID.count), pdmNonce: \(pdmNonce.count), pdmPublic: \(pdmPublic.count), podNonce: \(podNonce.count), podPublic: \(podPublic.count)"
+            log.error("  %{public}@", sizes)
         }
         return transcript
     }
