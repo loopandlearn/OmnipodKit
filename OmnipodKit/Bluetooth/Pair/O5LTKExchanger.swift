@@ -47,34 +47,32 @@ class O5LTKExchanger {
 
     func o5negotiateLTK() throws -> PairResult {
 
-        // Set channel-binding transcript flags based on the current pair attempt (cycles through 4 combinations)
-        let attempt = O5KeyExchange.pairAttempts % 4
-        switch attempt {
-        case 0:
-            keyExchange.keysNonceFirst = false
-            keyExchange.bytesAsControllerId = false
-        case 1:
-            keyExchange.keysNonceFirst = false
-            keyExchange.bytesAsControllerId = true
-        case 2:
-            keyExchange.keysNonceFirst = true
-            keyExchange.bytesAsControllerId = false
-        case 3:
-            keyExchange.keysNonceFirst = true
-            keyExchange.bytesAsControllerId = true
-        default:
-            break
-        }
-        log.default("=== PAIR ATTEMPT #%{public}d: keysNonceFirst=%{public}@, bytesAsControllerId=%{public}@ ===",
-                    O5KeyExchange.pairAttempts,
+        // Set flags based on the current pair attempt (cycles through 256 combinations via bit-masking)
+        let attempt = O5KeyExchange.pairAttempts % 256
+        keyExchange.keysNonceFirst          = (attempt & 0x01) != 0
+        keyExchange.bytesAsControllerId     = (attempt & 0x02) != 0
+        keyExchange.useUInt32LengthPrefixes = (attempt & 0x04) != 0
+        keyExchange.kdfZeroControllerID     = (attempt & 0x08) != 0
+        keyExchange.swapCertIndexes         = (attempt & 0x10) != 0
+        keyExchange.sigBeforeCert           = (attempt & 0x20) != 0
+        keyExchange.nonceLastBytes          = (attempt & 0x40) != 0
+        keyExchange.swapNonceDirection      = (attempt & 0x80) != 0
+        log.default("=== PAIR ATTEMPT #%{public}d/%{public}d: keysNonceFirst=%{public}@, bytesAsControllerId=%{public}@, useUInt32LengthPrefixes=%{public}@, kdfZeroControllerID=%{public}@, swapCertIndexes=%{public}@, sigBeforeCert=%{public}@, nonceLastBytes=%{public}@, swapNonceDirection=%{public}@ ===",
+                    O5KeyExchange.pairAttempts, 256,
                     String(describing: keyExchange.keysNonceFirst),
-                    String(describing: keyExchange.bytesAsControllerId))
+                    String(describing: keyExchange.bytesAsControllerId),
+                    String(describing: keyExchange.useUInt32LengthPrefixes),
+                    String(describing: keyExchange.kdfZeroControllerID),
+                    String(describing: keyExchange.swapCertIndexes),
+                    String(describing: keyExchange.sigBeforeCert),
+                    String(describing: keyExchange.nonceLastBytes),
+                    String(describing: keyExchange.swapNonceDirection))
 
         do {
             return try o5negotiateLTKBody()
         } catch {
-            O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 4
-            log.error("Pairing failed, next attempt will use combination #%{public}d", O5KeyExchange.pairAttempts % 4)
+            O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 256
+            log.error("Pairing failed, next attempt will use combination #%{public}d/%{public}d", O5KeyExchange.pairAttempts % 256, 256)
             throw error
         }
     }
@@ -364,11 +362,22 @@ class O5LTKExchanger {
     ///
     /// Total: cert_size[1] + 64 + 8 = cert_size[1] + 72 (observed 570 + 72 = 642).
     private func o5sps2_1() throws -> Data {
-        // Get the INS02PG1 intermediate CA certificate DER (index 1 in the cert list)
-        guard let certDER = certStore.registration.intermediateCACertDER else {
-            throw PodProtocolError.pairingException("SPS2.1: INS02PG1 intermediate CA certificate DER is nil")
+        // Get the certificate DER — swapCertIndexes controls which cert is used
+        let certDER: Data
+        if keyExchange.swapCertIndexes {
+            guard let tlsDER = certStore.registration.tlsCertificateDER else {
+                throw PodProtocolError.pairingException("SPS2.1: TLS certificate DER is nil")
+            }
+            certDER = tlsDER
+        } else {
+            guard let intermediateDER = certStore.registration.intermediateCACertDER else {
+                throw PodProtocolError.pairingException("SPS2.1: INS02PG1 intermediate CA certificate DER is nil")
+            }
+            certDER = intermediateDER
         }
-        log.default("SPS2.1: cert[1] = INS02PG1 DER (%{public}d bytes)", certDER.count)
+        log.default("SPS2.1: using %{public}@ cert (%{public}d bytes), sigBeforeCert=%{public}@",
+                    keyExchange.swapCertIndexes ? "TLS" : "INS02PG1", certDER.count,
+                    String(describing: keyExchange.sigBeforeCert))
 
         // Build the 171-byte channel-binding transcript and sign with secondary key
         let transcript = keyExchange.buildChannelBindingTranscript()
@@ -377,13 +386,19 @@ class O5LTKExchanger {
         let signatureRaw = try certStore.signRaw(transcript)
         log.info("ECDSA signature (aux64, %d bytes): %{public}@", signatureRaw.count, signatureRaw.bytes.toHexString())
 
-        // Assemble plaintext: cert_DER || signature(64)
+        // Assemble plaintext: cert_DER || signature(64) or signature(64) || cert_DER
         var plaintext = Data(capacity: certDER.count + 64)
-        plaintext.append(certDER)
-        plaintext.append(signatureRaw)
+        if keyExchange.sigBeforeCert {
+            plaintext.append(signatureRaw)
+            plaintext.append(certDER)
+        } else {
+            plaintext.append(certDER)
+            plaintext.append(signatureRaw)
+        }
 
-        log.default("SPS2.1 plaintext: %{public}d bytes (cert=%{public}d + sig=%{public}d, target=634)",
-                    plaintext.count, certDER.count, signatureRaw.count)
+        log.default("SPS2.1 plaintext: %{public}d bytes (cert=%{public}d + sig=%{public}d, sigBeforeCert=%{public}@)",
+                    plaintext.count, certDER.count, signatureRaw.count,
+                    String(describing: keyExchange.sigBeforeCert))
 
         // Encrypt with AES-CCM: key=conf, nonce=13B, tag=8
         let nonce = keyExchange.getSPSNonce(direction: .write)
@@ -490,11 +505,21 @@ class O5LTKExchanger {
     ///
     /// Total: cert_size[0] + 8 (observed 951 + 8 = 959).
     private func o5sps2() throws -> Data {
-        // Get the TLS certificate DER (index 0 in the cert list)
-        guard let certDER = certStore.registration.tlsCertificateDER else {
-            throw PodProtocolError.pairingException("SPS2: TLS certificate DER is nil")
+        // Get the certificate DER — swapCertIndexes controls which cert is used
+        let certDER: Data
+        if keyExchange.swapCertIndexes {
+            guard let intermediateDER = certStore.registration.intermediateCACertDER else {
+                throw PodProtocolError.pairingException("SPS2: INS02PG1 intermediate CA certificate DER is nil")
+            }
+            certDER = intermediateDER
+        } else {
+            guard let tlsDER = certStore.registration.tlsCertificateDER else {
+                throw PodProtocolError.pairingException("SPS2: TLS certificate DER is nil")
+            }
+            certDER = tlsDER
         }
-        log.default("SPS2: cert[0] = TLS cert DER (%{public}d bytes)", certDER.count)
+        log.default("SPS2: using %{public}@ cert (%{public}d bytes)",
+                    keyExchange.swapCertIndexes ? "INS02PG1" : "TLS", certDER.count)
 
         // Encrypt with AES-CCM: key=conf, nonce=13B, tag=8
         let nonce = keyExchange.getSPSNonce(direction: .write)

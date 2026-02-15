@@ -141,11 +141,18 @@ Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowled
 | 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant. Reverted. |
 | 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. |
 | 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | Pod disconnect after SPS2.1 | Native RE confirmed exact layout. Transcript now matches native exactly. |
-| 6 | Next: investigate certificate validity / registration provisioning | **PENDING** | All crypto/protocol confirmed correct by native RE. Pod still rejects. |
+| 6 | Systematic test: keysNonceFirst=false, bytesAsControllerId=false (keys-grouped, zeros) | Pod disconnect after SPS2.1 | Attempt #0. Same behavior. |
+| 7 | Systematic test: keysNonceFirst=false, bytesAsControllerId=true (keys-grouped, controllerID) | Pod disconnect after SPS2.1 | Attempt #1. Same behavior. |
+| 8 | Systematic test: keysNonceFirst=true, bytesAsControllerId=false (nonces-first, zeros) | Pod disconnect after SPS2.1 | Attempt #2. Same behavior. |
+| 9 | Systematic test: keysNonceFirst=true, bytesAsControllerId=true (nonces-first, controllerID) | Pod disconnect after SPS2.1 | Attempt #3. Same behavior. |
+| 10 | Next: investigate certificate validity / registration provisioning | **PENDING** | All 4 transcript combinations tested — transcript layout is NOT the issue. |
 
 **Bugs found via native library RE (test #5):**
 1. Bytes 7-10 were `00000000` but should be `controller_id` (`00277094`)
 2. Key/nonce order was interleaved (`pdmPub||pdmNonce||podPub||podNonce`) but should be grouped (`pdmPub||podPub||pdmNonce||podNonce`)
+
+**Transcript layout definitively ruled out (tests #6-9):**
+All 4 combinations of `{keysNonceFirst, bytesAsControllerId}` tested systematically via cycling `pairAttempts` counter. All failed identically — pod ACKs SPS2.1 then disconnects. The transcript field ordering is NOT the cause of rejection.
 
 **Key learning (test #3):**
 `BlePacket_MAX_PAYLOAD_SIZE=244` for O5 is an application-level protocol constant that defines logical packet

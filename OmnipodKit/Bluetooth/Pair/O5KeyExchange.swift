@@ -22,7 +22,7 @@ class O5KeyExchange {
     static let PUBLIC_KEY_SIZE = 64
     static let NONCE_SIZE = 16
 
-    /// Counts pairing attempts so we can cycle through all 4 flag combinations (mod 4).
+    /// Counts pairing attempts so we can cycle through all 256 flag combinations (mod 256).
     static var pairAttempts: Int = 0
 
     /// When true, uses nonces-first layout (nonce-key interleaved per side, matching Frida capture).
@@ -31,6 +31,24 @@ class O5KeyExchange {
 
     /// When true, puts controllerID in bytes 7-10. When false, puts 4 zero bytes.
     var bytesAsControllerId: Bool = false
+
+    /// When true, uses 4-byte UInt32 BE length prefixes in KDF (instead of 8-byte UInt64).
+    var useUInt32LengthPrefixes: Bool = false
+
+    /// When true, uses zeros instead of real controllerID in the KDF input.
+    var kdfZeroControllerID: Bool = false
+
+    /// When true, swaps cert indexes: TLS cert in SPS2.1 (with sig), INS02PG1 in SPS2 (without sig).
+    var swapCertIndexes: Bool = false
+
+    /// When true, puts signature before cert in SPS2.1 plaintext (sig||cert instead of cert||sig).
+    var sigBeforeCert: Bool = false
+
+    /// When true, uses the last 6 bytes of each nonce for SPS nonce construction (instead of first 6).
+    var nonceLastBytes: Bool = false
+
+    /// When true, uses direction bytes 0x00/0x01 for write/read (instead of 0x01/0x02).
+    var swapNonceDirection: Bool = false
 
     private let log = OSLog(category: "O5KeyExchange")
 
@@ -101,17 +119,29 @@ class O5KeyExchange {
     private func o5generateKeys() throws {
         let sharedSecret = try keyGenerator.computeSharedSecret(pdmPrivate, podPublic)
         log.info("  sharedSecret: %{public}@", sharedSecret.hexadecimalString)
+        log.info("  KDF flags: useUInt32LengthPrefixes=%{public}@, kdfZeroControllerID=%{public}@",
+                 String(describing: useUInt32LengthPrefixes), String(describing: kdfZeroControllerID))
+
+        let appendLength: (inout Data, Int) -> Void = { [useUInt32LengthPrefixes] buf, len in
+            if useUInt32LengthPrefixes {
+                buf.append(withUnsafeBytes(of: UInt32(len).bigEndian, { Data($0) }))
+            } else {
+                buf.append(withUnsafeBytes(of: UInt64(len).bigEndian, { Data($0) }))
+            }
+        }
+
+        let kdfControllerID = kdfZeroControllerID ? Data([0x00, 0x00, 0x00, 0x00]) : self.controllerID
 
         var data = Data()
-        data.append(withUnsafeBytes(of: UInt64(O5LTKExchanger.FIRMWARE_ID.count).bigEndian, {Data($0)}))
+        appendLength(&data, O5LTKExchanger.FIRMWARE_ID.count)
         data.append(O5LTKExchanger.FIRMWARE_ID)
-        data.append(withUnsafeBytes(of: UInt64(self.controllerID.count).bigEndian, {Data($0)}))
-        data.append(self.controllerID)
-        data.append(withUnsafeBytes(of: UInt64(self.pdmPublic.count).bigEndian, {Data($0)}))
+        appendLength(&data, kdfControllerID.count)
+        data.append(kdfControllerID)
+        appendLength(&data, self.pdmPublic.count)
         data.append(self.pdmPublic)
-        data.append(withUnsafeBytes(of: UInt64(self.podPublic.count).bigEndian, {Data($0)}))
+        appendLength(&data, self.podPublic.count)
         data.append(self.podPublic)
-        data.append(withUnsafeBytes(of: UInt64(sharedSecret.count).bigEndian, {Data($0)}))
+        appendLength(&data, sharedSecret.count)
         data.append(sharedSecret)
         log.info("  KDF input (%{public}d bytes): %{public}@", data.count, data.hexadecimalString)
 
@@ -131,18 +161,27 @@ class O5KeyExchange {
             log.error("Nonce too short for SPS nonce: pdmNonce=%{public}d bytes, podNonce=%{public}d bytes", pdmNonce.count, podNonce.count)
             return Data() // will cause AES-CCM to fail with a clear error
         }
+
+        let pdmSlice: Data
+        let podSlice: Data
+        if nonceLastBytes {
+            pdmSlice = pdmNonce.subdata(in: (pdmNonce.count - 6)..<pdmNonce.count)
+            podSlice = podNonce.subdata(in: (podNonce.count - 6)..<podNonce.count)
+        } else {
+            pdmSlice = pdmNonce.subdata(in: 0..<6)
+            podSlice = podNonce.subdata(in: 0..<6)
+        }
+
         var nonce = Data()
         switch direction {
         case .write:
-            nonce.append(contentsOf: [0x01])
-            nonce.append(pdmNonce.subdata(in: 0..<6))
-            nonce.append(podNonce.subdata(in: 0..<6))
-            break
+            nonce.append(contentsOf: [swapNonceDirection ? 0x00 : 0x01])
+            nonce.append(pdmSlice)
+            nonce.append(podSlice)
         case .read:
-            nonce.append(contentsOf: [0x02])
-            nonce.append(podNonce.subdata(in: 0..<6))
-            nonce.append(pdmNonce.subdata(in: 0..<6))
-            break
+            nonce.append(contentsOf: [swapNonceDirection ? 0x01 : 0x02])
+            nonce.append(podSlice)
+            nonce.append(pdmSlice)
         }
         if nonce.count != O5KeyExchange.SPS_NONCE_SIZE {
             log.error("SPS nonce size %{public}d != expected %{public}d", nonce.count, O5KeyExchange.SPS_NONCE_SIZE)
