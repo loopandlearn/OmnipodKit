@@ -500,24 +500,12 @@ extension PeripheralManager {
         case .connected:
             clearCommsQueues()
 
-            // Log the negotiated MTU and adjust packet sizes for O5 pods.
-            // setServicePodType sets BlePacket_MAX_PAYLOAD_SIZE=244 for O5, but the actual
-            // negotiated MTU may be smaller (e.g. 20 bytes at MTU 23). We must use the real
-            // negotiated value to avoid writing oversized packets that get truncated.
+            // Log the negotiated MTU for diagnostics. Note: BlePacket_MAX_PAYLOAD_SIZE (244 for O5)
+            // is an application-level protocol constant for logical packet framing, NOT the physical
+            // BLE MTU. CoreBluetooth handles L2CAP fragmentation of larger writes transparently.
+            // Android requests MTU 251, pod responds with 247. iOS auto-negotiates but may stay at 23.
             let mtu = peripheral.maximumWriteValueLength(for: .withoutResponse)
             self.log.default("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d, BlePacket_MAX_PAYLOAD_SIZE: %{public}d", mtu, BlePacket_MAX_PAYLOAD_SIZE)
-            if self.podType == omnipod5Type {
-                let effectiveMaxPayload = min(max(mtu, 20), 244)
-                if effectiveMaxPayload != BlePacket_MAX_PAYLOAD_SIZE {
-                    self.log.default("Adjusting BlePacket_MAX_PAYLOAD_SIZE from %{public}d to %{public}d based on negotiated MTU", BlePacket_MAX_PAYLOAD_SIZE, effectiveMaxPayload)
-                    BlePacket_MAX_PAYLOAD_SIZE = effectiveMaxPayload
-                    FirstBlePacket_CAPACITY_WITHOUT_MIDDLE_PACKETS = BlePacket_MAX_PAYLOAD_SIZE - BleFirstPacket_HEADER_SIZE_WITHOUT_MIDDLE_PACKETS
-                    FirstBlePacket_CAPACITY_WITH_MIDDLE_PACKETS = BlePacket_MAX_PAYLOAD_SIZE - BleFirstPacket_HEADER_SIZE_WITH_MIDDLE_PACKETS
-                    FirstBlePacket_CAPACITY_WITH_THE_OPTIONAL_PLUS_ONE_PACKET = FirstBlePacket_CAPACITY_WITH_MIDDLE_PACKETS
-                    MiddleBlePacket_CAPACITY = BlePacket_MAX_PAYLOAD_SIZE - 1
-                    LastBlePacket_CAPACITY = BlePacket_MAX_PAYLOAD_SIZE - LastBlePacket_HEADER_SIZE
-                }
-            }
 
             self.log.debug("PeripheralManager - didConnect - running assertConfiguration")
             assertConfiguration()

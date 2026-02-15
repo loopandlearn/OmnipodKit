@@ -208,10 +208,6 @@ extension PeripheralManager {
         switch self.podType {
         case omnipod5Type:
             type = .withoutResponse
-            let maxWrite = peripheral.maximumWriteValueLength(for: .withoutResponse)
-            if value.count > maxWrite {
-                log.error("O5 sendData: packet size %{public}d exceeds maximumWriteValueLength %{public}d!", value.count, maxWrite)
-            }
         case dashType:
             type = .withResponse
         default:
