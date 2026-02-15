@@ -129,16 +129,26 @@ class BlePodComms: PodComms {
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         guard let manager = manager else { throw PodCommsError.podNotConnected }
-        let ids = Ids(myId: self.myId, podId: self.podId)
 
+        let ids: Ids
         let response: PairResult
         let ltk: Data
         switch self.podType {
         case dashType:
+            ids = Ids(myId: self.myId, podId: self.podId)
             let ltkExchanger = LTKExchanger(manager: manager, ids: ids)
             response = try ltkExchanger.negotiateLTK()
             ltk = response.ltk
         case omnipod5Type:
+            // O5 controller/pod IDs MUST match the TLS certificate pdmid.
+            // Override any stale persisted IDs to ensure TWi headers match the crypto layer.
+            let certPdmid = O5CertificateStore.pdmid
+            if self.myId != certPdmid {
+                log.default("O5: Correcting myId from %X to certificate pdmid %X", self.myId, certPdmid)
+                self.myId = certPdmid
+                self.podId = certPdmid + 1
+            }
+            ids = Ids(myId: self.myId, podId: self.podId)
             let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
             response = try o5LTKExchanger.o5negotiateLTK()
             ltk = response.ltk

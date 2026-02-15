@@ -981,7 +981,15 @@ extension OmniPumpManager {
                 state.podId = 0
                 self.log.info("Resetting controllerId and podId for Eros pod")
 
-            case dashType, omnipod5Type:
+            case omnipod5Type:
+                // O5 controller ID MUST always match the TLS certificate pdmid.
+                // The pod validates that TWi source address matches the certificate identity.
+                let certPdmid = O5CertificateStore.pdmid
+                state.controllerId = certPdmid
+                state.podId = certPdmid + 1
+                self.log.info("O5 controllerId=%08X podId=%08X (from certificate pdmid %u)", state.controllerId, state.podId, certPdmid)
+
+            case dashType:
                 // If controllerId doesn't have its lower 3 bits clear, reset it for the new 7 cycle podId
                 if state.controllerId == 0 || (state.controllerId & 0b111) != 0 {
                     // Create a semi-unique controllerId and an initial podId of controllerId + 1.
