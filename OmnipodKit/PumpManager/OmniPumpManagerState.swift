@@ -143,6 +143,12 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             self.rileyLinkConnectionManagerState = rileyLinkConnectionManagerState
             self.controllerId = 0
             self.podId = 0
+        } else if podType == omnipod5Type {
+            // O5 controller ID is always derived from the TLS certificate pdmid.
+            // Never use a persisted value — the certificate is the source of truth.
+            let myId = O5CertificateStore.pdmid
+            self.controllerId = myId
+            self.podId = myId + 1
         } else if let controllerId = controllerId, let podId = podId {
             self.controllerId = controllerId
             self.podId = podId

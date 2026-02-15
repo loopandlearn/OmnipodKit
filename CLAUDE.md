@@ -159,6 +159,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 ## Known Issues / Recent Fixes
 
 ### Fixed
+- **HELLO controller ID mismatch (test #11)**: `OmniPumpManagerState` deserialized a stale `controllerId` from persistence, so `sendHello()` told the pod "I am `0x277094`" but pairing messages used `0x277D18`. Pod used HELLO ID in its KDF → different conf key → SPS2.1 decrypt failed → disconnect. Fix: `OmniPumpManagerState.init` now always derives O5 controller ID from `O5CertificateStore.pdmid` instead of using persisted value. Removed downstream correction band-aids from `BlePodComms.pairPod()`.
 - **CryptoSwift Data.append overload**: Was corrupting channel-binding transcript (178 → 171 bytes). Fixed by using explicit `Data([0x01])` instead of `UInt8(0x01)`.
 - **incrementNonce truncation**: Was truncating 16-byte nonces to 8 bytes. Fixed with `incrementNonceInPlace()` that modifies in place.
 - **Wrong attestation chain**: cert_0-cert_3 were from pdmid 2538336 Pixel TEE (wrong public key `7d76fc46...`). Replaced with correct TEE simulator certs from KEYS/ that match our secondary key `e3c48e61...`.
@@ -175,22 +176,30 @@ The previous pdmid 2584724 registration failed because the TEE simulator certs/k
 provisioning session. The new pdmid 2587928 registration used freshly provisioned keys with valid TEE
 attestation, which the pod accepted.
 
-### SPS2.1 Pairing Troubleshooting Log (pdmid 2584724 — all failed)
+### SPS2.1 Pairing Troubleshooting Log
 
 | # | Change | Result | Notes |
 |---|--------|--------|-------|
-| 1 | Nonces-first transcript: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
-| 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same pod as #1, corrupted by bad MTU attempt |
-| 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant. Reverted. |
-| 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. |
-| 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | Pod disconnect after SPS2.1 | Native RE confirmed exact layout. Transcript now matches native exactly. |
-| 6-9 | Systematic test of all 4 {keysNonceFirst, bytesAsControllerId} combinations | Pod disconnect after SPS2.1 | All 4 failed identically — transcript layout NOT the issue. |
+| 1 | Nonces-first transcript: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | pdmid 2584724. Original order, tested twice |
+| 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | pdmid 2584724. Same pod as #1, corrupted by bad MTU attempt |
+| 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | pdmid 2584724. **WRONG** — 244 is an app-level protocol constant. Reverted. |
+| 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | pdmid 2584724. Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. |
+| 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | Pod disconnect after SPS2.1 | pdmid 2584724. Native RE confirmed exact layout. Transcript now matches native exactly. |
+| 6-9 | Systematic test of all 4 {keysNonceFirst, bytesAsControllerId} combinations | Pod disconnect after SPS2.1 | pdmid 2584724. All 4 failed identically — transcript layout NOT the issue. |
 | 10 | **New registration (pdmid 2587928) with fresh TEE keys** | **P0 = 0xa5 SUCCESS** | Root cause was invalid/stale TEE keys from pdmid 2584724. |
+| 11 | pdmid 2587928, new pod, no code changes since #10 | Pod disconnect after SPS2.1 | HELLO sent with stale controller ID `0x277094` (pdmid 2584724) from persisted state, but pairing messages used corrected `0x277D18` (pdmid 2587928). Pod KDF used HELLO ID → different conf key → SPS2.1 decrypt failed. |
+| 12 | **Fixed: derive O5 controller ID from certificate in `OmniPumpManagerState` init** | **Pending test** | `OmniPumpManagerState.init` now always uses `O5CertificateStore.pdmid` for O5 instead of persisted `controllerId`. Removed downstream "correction" band-aids from `BlePodComms.pairPod()`. HELLO and all pairing messages now use the same controller ID. |
 
-**Root cause**: The pdmid 2584724 TEE simulator keys were from a different provisioning session (uid=10262)
-and did not have valid attestation for the certificates being sent. The pod validates the TEE attestation
-chain during SPS2.1/SPS2 and rejects mismatched keys. Using freshly provisioned keys (pdmid 2587928,
-uid=10260) with a matching `register/complete` flow resolved the issue.
+**Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
+(uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
+attestation chain during SPS2.1/SPS2 and rejects mismatched keys. Using freshly provisioned keys
+(pdmid 2587928, uid=10260) with a matching `register/complete` flow resolved the issue.
+
+**Root cause (test 11)**: `OmniPumpManagerState` deserialized `controllerId = 2584724` from persisted state
+(left over from the old registration). `sendHello()` used this stale ID, but `pairPod()` corrected
+`self.myId` to the certificate pdmid `2587928` *after* HELLO was already sent. The pod used the HELLO
+controller ID (`0x277094`) in its KDF, derived a different `conf` key, and couldn't decrypt SPS2.1.
+Fix: O5 controller ID is now always derived from the TLS certificate at init time — never from persistence.
 
 **Confirmed correct by native RE and btsnoop (no changes needed):**
 - KDF: plain SHA-256 with 8-byte BE length prefixes ✓
