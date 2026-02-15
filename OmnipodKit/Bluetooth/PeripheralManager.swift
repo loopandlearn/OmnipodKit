@@ -325,7 +325,13 @@ extension PeripheralManager {
 
     /// - Throws: PeripheralManagerError
     func writeValue(_ value: Data, for characteristic: CBCharacteristic, type: CBCharacteristicWriteType, timeout: TimeInterval) throws {
-        log.default("[BLE RAW] WRITE %{public}@: %{public}@", characteristic.uuid.uuidString, value.hexadecimalString)
+        if type == .withoutResponse {
+            log.default("[BLE RAW] WRITE %{public}@ type=withoutResponse canSend=%{public}@ (%{public}d bytes): %{public}@",
+                        characteristic.uuid.uuidString, String(describing: peripheral.canSendWriteWithoutResponse), value.count, value.hexadecimalString)
+        } else {
+            log.default("[BLE RAW] WRITE %{public}@ type=withResponse (%{public}d bytes): %{public}@",
+                        characteristic.uuid.uuidString, value.count, value.hexadecimalString)
+        }
         try runCommand(timeout: timeout) {
             if case .withResponse = type {
                 addCondition(.write(characteristic: characteristic))
@@ -417,6 +423,11 @@ extension PeripheralManager: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            log.error("[BLE RAW] didWriteValueFor %{public}@ ERROR: %{public}@", characteristic.uuid.uuidString, String(describing: error))
+        } else {
+            log.default("[BLE RAW] didWriteValueFor %{public}@ OK", characteristic.uuid.uuidString)
+        }
         commandLock.lock()
         
         if let index = commandConditions.firstIndex(where: { (condition) -> Bool in
@@ -471,6 +482,10 @@ extension PeripheralManager: CBPeripheralDelegate {
         self.log.default("didReadRSSI: %{public}@", String(describing: RSSI))
     }
 
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        log.default("[BLE RAW] peripheralIsReadyToSendWriteWithoutResponse — buffer was full, now ready")
+    }
+
 }
 
 
@@ -490,6 +505,8 @@ extension PeripheralManager {
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnect peripheral: CBPeripheral, error: Error?) {
+        log.error("[DISCONNECT] PeripheralManager didDisconnect: error=%{public}@ peripheral=%{public}@",
+                  String(describing: error), peripheral)
         self.queue.async {
             self.idleStart = nil
         }

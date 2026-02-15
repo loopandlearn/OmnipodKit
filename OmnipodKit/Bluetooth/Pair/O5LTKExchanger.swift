@@ -59,6 +59,10 @@ class O5LTKExchanger {
     private func o5negotiateLTKBody() throws -> PairResult {
 
         log.default("=== O5 Pairing Start === myId=0x%{public}x podId=0x%{public}x", ids.myId.toUInt32(), ids.podId.toUInt32())
+        let mtuNoResp = manager.peripheral.maximumWriteValueLength(for: .withoutResponse)
+        let mtuWithResp = manager.peripheral.maximumWriteValueLength(for: .withResponse)
+        log.default("MTU at pairing start: withoutResponse=%{public}d, withResponse=%{public}d, BlePacket_MAX_PAYLOAD_SIZE=%{public}d",
+                    mtuNoResp, mtuWithResp, BlePacket_MAX_PAYLOAD_SIZE)
         log.default("Sending SP1+SP2")
         let sp1sp2 = PairMessage(
             sequenceNumber: seq,
@@ -122,20 +126,24 @@ class O5LTKExchanger {
         )
 
         log.default("Sending SPS2.1 (%{public}d bytes)... peripheral state=%{public}@", sps2_1.message.payload.count, peripheralStateString())
+        let sps21SendStart = Date()
         try o5throwOnSendError(sps2_1.message, O5LTKExchanger.SPS2_1)
+        log.default("SPS2.1 sent in %{public}.3f sec", Date().timeIntervalSince(sps21SendStart))
         log.default("SPS2.1 sent successfully, pod acknowledged (SUCCESS). peripheral state=%{public}@", peripheralStateString())
 
         log.default("Waiting for pod SPS2.1 response... peripheral state=%{public}@", peripheralStateString())
+        let sps21ReadStart = Date()
         let podSPS2_1: MessagePacket
         do {
             guard let resp = try manager.readMessagePacket(doRTS: false) else {
-                log.error("SPS2.1 read returned nil. peripheral state=%{public}@", peripheralStateString())
+                log.error("SPS2.1 read returned nil after %{public}.3f sec. peripheral state=%{public}@", Date().timeIntervalSince(sps21ReadStart), peripheralStateString())
                 logPeripheralState("SPS2.1")
                 throw PodProtocolError.pairingException("Could not read SPS2.1")
             }
             podSPS2_1 = resp
+            log.default("SPS2.1 response read in %{public}.3f sec", Date().timeIntervalSince(sps21ReadStart))
         } catch {
-            log.error("SPS2.1 read threw error: %{public}@. peripheral state=%{public}@", String(describing: error), peripheralStateString())
+            log.error("SPS2.1 read threw error after %{public}.3f sec: %{public}@. peripheral state=%{public}@", Date().timeIntervalSince(sps21ReadStart), String(describing: error), peripheralStateString())
             logPeripheralState("SPS2.1-exception")
             throw error
         }

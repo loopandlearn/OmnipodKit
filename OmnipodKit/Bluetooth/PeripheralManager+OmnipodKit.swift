@@ -227,6 +227,8 @@ extension PeripheralManager {
                 let value = cmdQueue.remove(at: 0)
 
                 if command.rawValue == value[0] {
+                    log.default("waitForCommand: got expected 0x%{public}02x, full data=%{public}@ (%{public}d bytes)",
+                                command.rawValue, value.hexadecimalString, value.count)
                     queueLock.unlock()
                     commandLock.unlock()
                     return // Got expected command

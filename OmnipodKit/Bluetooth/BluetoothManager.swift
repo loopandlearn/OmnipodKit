@@ -330,7 +330,11 @@ extension BluetoothManager: CBCentralManagerDelegate {
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
         log.debug("%{public}@: %{public}@, %{public}@", #function, peripheral, advertisementData)
-        
+
+        if let mfgData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
+            log.default("[SCAN] ManufacturerData: %{public}@ (%{public}d bytes)", mfgData.hexadecimalString, mfgData.count)
+        }
+
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {
             addPeripheral(peripheral, podAdvertisement: podAdvertisement)
             
@@ -371,7 +375,12 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
-        log.debug("%{public}@: error=%{public}@ %{public}@", #function, error?.localizedDescription ?? "None", peripheral)
+        log.error("[DISCONNECT] %{public}@: error=%{public}@ domain=%{public}@ code=%{public}d peripheral=%{public}@",
+                  #function,
+                  error?.localizedDescription ?? "None",
+                  (error as NSError?)?.domain ?? "none",
+                  (error as NSError?)?.code ?? 0,
+                  peripheral)
 
         // Proxy disconnection events to peripheral manager
         for device in devices where device.manager.peripheral.identifier == peripheral.identifier {
