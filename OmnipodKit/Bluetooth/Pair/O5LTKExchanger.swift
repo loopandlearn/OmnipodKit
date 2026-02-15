@@ -95,21 +95,42 @@ class O5LTKExchanger {
         try o5validatePodSps1(podSps1)
 
         // send ~642 byte SPS2.1 and receive ~641 byte SPS2.1 pairing messages
-        log.default("Sending SPS2.1")
+        log.default("=== SPS2.1 PHASE START ===")
         seq += 1
-        let sps2_1 = try PairMessage(
+
+        log.default("Building SPS2.1 payload...")
+        let sps2_1_payload = try o5sps2_1()
+        log.default("SPS2.1 payload built: %{public}d bytes encrypted", sps2_1_payload.count)
+
+        let sps2_1 = PairMessage(
             sequenceNumber: seq,
             source: ids.myId,
             destination: podAddress,
             keys: [O5LTKExchanger.SPS2_1],
-            payloads: [o5sps2_1()]
+            payloads: [sps2_1_payload]
         )
+
+        log.default("Sending SPS2.1 (%{public}d bytes)... peripheral state=%{public}@", sps2_1.message.payload.count, peripheralStateString())
         try o5throwOnSendError(sps2_1.message, O5LTKExchanger.SPS2_1)
-        guard let podSPS2_1 = try manager.readMessagePacket(doRTS: false) else {
-            logPeripheralState("SPS2.1")
-            throw PodProtocolError.pairingException("Could not read SPS2.1")
+        log.default("SPS2.1 sent successfully, pod acknowledged (SUCCESS). peripheral state=%{public}@", peripheralStateString())
+
+        log.default("Waiting for pod SPS2.1 response... peripheral state=%{public}@", peripheralStateString())
+        let podSPS2_1: MessagePacket
+        do {
+            guard let resp = try manager.readMessagePacket(doRTS: false) else {
+                log.error("SPS2.1 read returned nil. peripheral state=%{public}@", peripheralStateString())
+                logPeripheralState("SPS2.1")
+                throw PodProtocolError.pairingException("Could not read SPS2.1")
+            }
+            podSPS2_1 = resp
+        } catch {
+            log.error("SPS2.1 read threw error: %{public}@. peripheral state=%{public}@", String(describing: error), peripheralStateString())
+            logPeripheralState("SPS2.1-exception")
+            throw error
         }
+        log.default("SPS2.1 response received (%{public}d bytes). peripheral state=%{public}@", podSPS2_1.payload.count, peripheralStateString())
         try o5validatePodSps2_1(podSPS2_1)
+        log.default("=== SPS2.1 PHASE COMPLETE ===")
 
         /// send ~960 byte SPS2 and receive ~902 byte SPS2 pairing messages
         log.default("Sending SPS2")
@@ -160,25 +181,60 @@ class O5LTKExchanger {
     }
 
     private func o5throwOnSendError(_ msg: MessagePacket, _ msgType: String) throws {
+        log.default("[o5throwOnSendError] %{public}@: begin (payload %{public}d bytes, seq %{public}d, doRTS=false). peripheral state=%{public}@",
+                    msgType, msg.payload.count, seq, peripheralStateString())
         let result = manager.sendMessagePacket(msg, doRTS: false)
-        guard case .sentWithAcknowledgment = result else {
-            log.error("Send %{public}@ failed (payload %{public}d bytes, seq %{public}d): %{public}@", msgType, msg.payload.count, seq, String(describing: result))
+        switch result {
+        case .sentWithAcknowledgment:
+            log.default("[o5throwOnSendError] %{public}@: sentWithAcknowledgment (SUCCESS received). peripheral state=%{public}@",
+                        msgType, peripheralStateString())
+        case .sentWithError(let error):
+            log.error("[o5throwOnSendError] %{public}@: sentWithError — data was sent but error occurred: %{public}@. peripheral state=%{public}@",
+                      msgType, String(describing: error), peripheralStateString())
             throw PodProtocolError.pairingException("Send \(msgType) failure (seq \(seq), \(msg.payload.count) bytes): \(result)")
+        case .unsentWithError(let error):
+            log.error("[o5throwOnSendError] %{public}@: unsentWithError — data was NOT sent: %{public}@. peripheral state=%{public}@",
+                      msgType, String(describing: error), peripheralStateString())
+            throw PodProtocolError.pairingException("Send \(msgType) failure (seq \(seq), \(msg.payload.count) bytes): \(result)")
+        }
+    }
+
+    /// Return a human-readable peripheral state string for inline logging
+    private func peripheralStateString() -> String {
+        let state = manager.peripheral.state
+        switch state {
+        case .connected: return "connected"
+        case .connecting: return "connecting"
+        case .disconnected: return "DISCONNECTED"
+        case .disconnecting: return "DISCONNECTING"
+        @unknown default: return "unknown(\(state.rawValue))"
         }
     }
 
     /// Log peripheral state for debugging read timeouts
     private func logPeripheralState(_ step: String) {
-        let state = manager.peripheral.state
-        let stateStr: String
-        switch state {
-        case .connected: stateStr = "connected"
-        case .connecting: stateStr = "connecting"
-        case .disconnected: stateStr = "disconnected"
-        case .disconnecting: stateStr = "disconnecting"
-        @unknown default: stateStr = "unknown(\(state.rawValue))"
+        let periState = peripheralStateString()
+        let isConnected = manager.peripheral.state == .connected
+        let centralState: String
+        if let central = manager.central {
+            switch central.state {
+            case .poweredOn: centralState = "poweredOn"
+            case .poweredOff: centralState = "poweredOff"
+            case .resetting: centralState = "resetting"
+            case .unauthorized: centralState = "unauthorized"
+            case .unsupported: centralState = "unsupported"
+            case .unknown: centralState = "unknown"
+            @unknown default: centralState = "unknown(\(central.state.rawValue))"
+            }
+        } else {
+            centralState = "nil (deallocated)"
         }
-        log.error("Read failed at %{public}@: peripheral state=%{public}@", step, stateStr)
+        let serviceCount = manager.peripheral.services?.count ?? -1
+        let hasDataChar = manager.peripheral.getDataCharacteristic() != nil
+        let hasCmdChar = manager.peripheral.getCommandCharacteristic() != nil
+        log.error("Read failed at %{public}@: peripheral state=%{public}@ (isConnected=%{public}@), central state=%{public}@, services=%{public}d, dataChar=%{public}@, cmdChar=%{public}@",
+                  step, periState, String(describing: isConnected), centralState, serviceCount,
+                  String(describing: hasDataChar), String(describing: hasCmdChar))
     }
 
     /// The 11-byte O5 SP2 payload is an encoded type 0 get pod status command for the requested id including the calculated CRC-16

@@ -140,7 +140,8 @@ Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowled
 | 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same pod as #1, corrupted by bad MTU attempt |
 | 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant. Reverted. |
 | 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. |
-| 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | **TESTING** | Native RE confirmed exact layout. Two bugs found. |
+| 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | Pod disconnect after SPS2.1 | Native RE confirmed exact layout. Transcript now matches native exactly. |
+| 6 | Next: investigate certificate validity / registration provisioning | **PENDING** | All crypto/protocol confirmed correct by native RE. Pod still rejects. |
 
 **Bugs found via native library RE (test #5):**
 1. Bytes 7-10 were `00000000` but should be `controller_id` (`00277094`)
