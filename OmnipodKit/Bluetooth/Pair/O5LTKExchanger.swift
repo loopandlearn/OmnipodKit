@@ -64,9 +64,9 @@ class O5LTKExchanger {
         do {
             return try o5negotiateLTKBody()
         } catch {
-            O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 256
-            log.error("Pairing failed (attempt #%{public}d), next attempt will use combination #%{public}d/%{public}d",
-                      O5KeyExchange.pairAttempts, O5KeyExchange.pairAttempts % 256, 256)
+            // O5KeyExchange.pairAttempts = (O5KeyExchange.pairAttempts + 1) % 256
+            log.error("Pairing failed (attempt #%{public}d)",
+                      O5KeyExchange.pairAttempts)
             throw error
         }
     }

@@ -23,7 +23,8 @@ class O5KeyExchange {
     static let NONCE_SIZE = 16
 
     /// Counts pairing attempts so we can cycle through all 256 flag combinations (mod 256).
-    static var pairAttempts: Int = 0
+    /// Attempt #60 (0b00111100) produced a structured error response from pod instead of disconnect.
+    static var pairAttempts: Int = 60
 
     /// When true, uses nonces-first layout (nonce-key interleaved per side, matching Frida capture).
     /// When false, uses keys-grouped layout (keys together then nonces together, matching native RE).
