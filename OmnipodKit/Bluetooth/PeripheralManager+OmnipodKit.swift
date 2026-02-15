@@ -27,7 +27,10 @@ extension PeripheralManager {
             throw PeripheralManagerError.notReady
         }
 
-        try writeValue(Data([PodCommand.HELLO.rawValue, 0x01, 0x04]) + controllerId, for: characteristic, type: .withResponse, timeout: 5)
+        // O5 uses writeWithoutResponse on command characteristic (confirmed by btsnoop).
+        // DASH uses writeWithResponse.
+        let type: CBCharacteristicWriteType = (podType == omnipod5Type) ? .withoutResponse : .withResponse
+        try writeValue(Data([PodCommand.HELLO.rawValue, 0x01, 0x04]) + controllerId, for: characteristic, type: type, timeout: 5)
     }
     
     func enableNotifications() throws {
@@ -187,12 +190,15 @@ extension PeripheralManager {
     /// - Throws: PeripheralManagerError
     func sendCommandType(_ command: PodCommand, timeout: TimeInterval = 5) throws  {
         dispatchPrecondition(condition: .onQueue(queue))
-        
+
         guard let characteristic = peripheral.getCommandCharacteristic() else {
             throw PeripheralManagerError.notReady
         }
-        
-        try writeValue(Data([command.rawValue]), for: characteristic, type: .withResponse, timeout: timeout)
+
+        // O5 uses writeWithoutResponse on command characteristic (confirmed by btsnoop).
+        // DASH uses writeWithResponse.
+        let type: CBCharacteristicWriteType = (podType == omnipod5Type) ? .withoutResponse : .withResponse
+        try writeValue(Data([command.rawValue]), for: characteristic, type: type, timeout: timeout)
     }
 
     /// - Throws: PeripheralManagerError

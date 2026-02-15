@@ -159,6 +159,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 ## Known Issues / Recent Fixes
 
 ### Fixed
+- **O5 command char write type (test #12→#13)**: `sendHello()` and `sendCommandType()` used `.withResponse` (ATT Write Request) on the command characteristic, inherited from DASH. Btsnoop shows Android uses `.withoutResponse` (ATT Write Command). Fixed both to use `.withoutResponse` for O5, matching `sendData()` which already had the O5/DASH switch.
 - **HELLO controller ID mismatch (test #11)**: `OmniPumpManagerState` deserialized a stale `controllerId` from persistence, so `sendHello()` told the pod "I am `0x277094`" but pairing messages used `0x277D18`. Pod used HELLO ID in its KDF → different conf key → SPS2.1 decrypt failed → disconnect. Fix: `OmniPumpManagerState.init` now always derives O5 controller ID from `O5CertificateStore.pdmid` instead of using persisted value. Removed downstream correction band-aids from `BlePodComms.pairPod()`.
 - **CryptoSwift Data.append overload**: Was corrupting channel-binding transcript (178 → 171 bytes). Fixed by using explicit `Data([0x01])` instead of `UInt8(0x01)`.
 - **incrementNonce truncation**: Was truncating 16-byte nonces to 8 bytes. Fixed with `incrementNonceInPlace()` that modifies in place.
@@ -188,7 +189,8 @@ attestation, which the pod accepted.
 | 6-9 | Systematic test of all 4 {keysNonceFirst, bytesAsControllerId} combinations | Pod disconnect after SPS2.1 | pdmid 2584724. All 4 failed identically — transcript layout NOT the issue. |
 | 10 | **New registration (pdmid 2587928) with fresh TEE keys** | **P0 = 0xa5 SUCCESS** | Root cause was invalid/stale TEE keys from pdmid 2584724. |
 | 11 | pdmid 2587928, new pod, no code changes since #10 | Pod disconnect after SPS2.1 | HELLO sent with stale controller ID `0x277094` (pdmid 2584724) from persisted state, but pairing messages used corrected `0x277D18` (pdmid 2587928). Pod KDF used HELLO ID → different conf key → SPS2.1 decrypt failed. |
-| 12 | **Fixed: derive O5 controller ID from certificate in `OmniPumpManagerState` init** | **Pending test** | `OmniPumpManagerState.init` now always uses `O5CertificateStore.pdmid` for O5 instead of persisted `controllerId`. Removed downstream "correction" band-aids from `BlePodComms.pairPod()`. HELLO and all pairing messages now use the same controller ID. |
+| 12 | Fixed: derive O5 controller ID from certificate in `OmniPumpManagerState` init | Pod disconnect after SPS2.1 | HELLO ID now correct (`0x277D18`). Same pod as #11 — manufacturer data changed `0x00→0x80`, pod may be in tainted state from previous failed attempt. All message structure verified byte-for-byte against btsnoop. |
+| 13 | **Fixed: O5 command characteristic write type `.withResponse` → `.withoutResponse`** | **Pending test** | Btsnoop shows Android uses ATT Write Command (`.withoutResponse`) for all command char writes. OmnipodKit was using ATT Write Request (`.withResponse`), inherited from DASH. Fixed `sendHello()` and `sendCommandType()` to use `.withoutResponse` for O5. **Test with a fresh pod** (not the tainted one from #11/#12). |
 
 **Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
 (uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
@@ -200,6 +202,12 @@ attestation chain during SPS2.1/SPS2 and rejects mismatched keys. Using freshly 
 `self.myId` to the certificate pdmid `2587928` *after* HELLO was already sent. The pod used the HELLO
 controller ID (`0x277094`) in its KDF, derived a different `conf` key, and couldn't decrypt SPS2.1.
 Fix: O5 controller ID is now always derived from the TLS certificate at init time — never from persistence.
+
+**Root cause (test 12)**: HELLO ID fix confirmed working, but same pod was reused from test #11. Pod
+manufacturer data byte changed `0x00→0x80` between attempts, indicating internal state change. Full
+byte-by-byte comparison of SPS2.1 message structure against btsnoop showed all content matches. Only
+remaining discrepancy: command characteristic write type (`.withResponse` vs btsnoop's `.withoutResponse`).
+Fix: `sendHello()` and `sendCommandType()` now use `.withoutResponse` for O5, matching the real Android app.
 
 **Confirmed correct by native RE and btsnoop (no changes needed):**
 - KDF: plain SHA-256 with 8-byte BE length prefixes ✓
