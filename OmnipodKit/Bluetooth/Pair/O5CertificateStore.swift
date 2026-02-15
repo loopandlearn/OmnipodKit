@@ -153,24 +153,60 @@ class O5CertificateStore {
 
     // MARK: - DER Certificate Field Extraction
 
-    /// Extract the serial number from a DER-encoded X.509 v3 certificate.
+    /// Extract the serial number from a DER-encoded X.509 certificate.
     ///
-    /// Searches for the v3 version pattern `a0 03 02 01 02` followed by the
-    /// serial number INTEGER tag `02`, then reads the length and serial bytes.
+    /// Handles both v3 certificates (with explicit version tag `a0 03 02 01 02`)
+    /// and v1 certificates (no version tag — serial immediately after TBSCertificate SEQUENCE).
     static func extractSerialNumber(fromDERCert certDER: Data) -> Data? {
-        // v3 version: [0] EXPLICIT { INTEGER 2 } = a0 03 02 01 02
+        // Try v3 first: [0] EXPLICIT { INTEGER 2 } = a0 03 02 01 02
         // Followed by serial: 02 [length] [serial bytes]
         let v3Pattern = Data([0xa0, 0x03, 0x02, 0x01, 0x02, 0x02])
-        guard let range = certDER.range(of: v3Pattern) else { return nil }
+        if let range = certDER.range(of: v3Pattern) {
+            let serialLenOffset = range.upperBound
+            guard serialLenOffset < certDER.count else { return nil }
+            let serialLen = Int(certDER[serialLenOffset])
+            let serialStart = serialLenOffset + 1
+            guard serialLen > 0, serialStart + serialLen <= certDER.count else { return nil }
+            return certDER.subdata(in: serialStart..<(serialStart + serialLen))
+        }
 
-        let serialLenOffset = range.upperBound // points to serial length byte
-        guard serialLenOffset < certDER.count else { return nil }
+        // V1 fallback: no version tag. Structure is:
+        //   SEQUENCE (outer cert) { SEQUENCE (TBSCertificate) { INTEGER (serial) ... } ... }
+        // Parse outer SEQUENCE, then inner TBSCertificate SEQUENCE, then read serial INTEGER directly.
+        guard certDER.count > 4, certDER[0] == 0x30 else { return nil }
+        let (_, outerContentStart) = parseDERLength(certDER, offset: 1)
+        guard let tbsStart = outerContentStart, tbsStart < certDER.count, certDER[tbsStart] == 0x30 else { return nil }
+        let (_, tbsContentStart) = parseDERLength(certDER, offset: tbsStart + 1)
+        guard let serialOffset = tbsContentStart, serialOffset < certDER.count else { return nil }
 
-        let serialLen = Int(certDER[serialLenOffset])
-        let serialStart = serialLenOffset + 1
+        // First element should be INTEGER (0x02) = serial number (v1 has no version tag)
+        guard certDER[serialOffset] == 0x02 else { return nil }
+        let lenOffset = serialOffset + 1
+        guard lenOffset < certDER.count else { return nil }
+        let serialLen = Int(certDER[lenOffset])
+        let serialStart = lenOffset + 1
         guard serialLen > 0, serialStart + serialLen <= certDER.count else { return nil }
-
         return certDER.subdata(in: serialStart..<(serialStart + serialLen))
+    }
+
+    /// Parse a DER length field starting at `offset`. Returns (length, contentStartOffset).
+    /// Handles both short-form (single byte) and long-form (0x8n + n bytes) lengths.
+    private static func parseDERLength(_ data: Data, offset: Int) -> (Int?, Int?) {
+        guard offset < data.count else { return (nil, nil) }
+        let firstByte = data[offset]
+        if firstByte & 0x80 == 0 {
+            // Short form
+            return (Int(firstByte), offset + 1)
+        } else {
+            // Long form
+            let numLenBytes = Int(firstByte & 0x7f)
+            guard numLenBytes > 0, offset + 1 + numLenBytes <= data.count else { return (nil, nil) }
+            var len = 0
+            for i in 0..<numLenBytes {
+                len = (len << 8) | Int(data[offset + 1 + i])
+            }
+            return (len, offset + 1 + numLenBytes)
+        }
     }
 
     /// Extract the Subject Alternative Name (SAN) DER value from a DER-encoded X.509 certificate.

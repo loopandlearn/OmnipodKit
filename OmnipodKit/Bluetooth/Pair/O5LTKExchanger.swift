@@ -263,7 +263,7 @@ class O5LTKExchanger {
     /// Structure (from BTSNOOP + PAIRING_FLOW.md reverse engineering):
     ///   1. ECDSA signature over 171-byte channel-binding transcript (64 bytes raw r || s)
     ///   2. Five extracted public keys from certificate chain (5 × 65 = 325 bytes, uncompressed)
-    ///   3. Certificate metadata: serial numbers, truncated fingerprints, SAN data (~245 bytes)
+    ///   3. Certificate metadata: serial numbers, truncated fingerprints, SAN data, primary cert (~242 bytes)
     ///
     /// Signed with the secondary key (ECDSA SHA-256), matching real app behavior.
     /// The registration payload is NOT included here — it's written to the pod during setPodUid.
@@ -384,6 +384,23 @@ class O5LTKExchanger {
             let truncatedFP = Data(SHA256.hash(data: rootCertDER)).prefix(20)
             metadata.append(truncatedFP)
             log.info("  INS00PG1 fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
+        }
+
+        // Primary certificate serial number (v1 self-signed cert, typically 4 bytes)
+        // The primary cert is loaded 5 times during SPS2.1 per Frida logs — its metadata is sent to the pod.
+        if let primaryCertDER = certStore.registration.primaryCertificateDER,
+           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: primaryCertDER) {
+            metadata.append(serial)
+            log.info("  Primary cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        } else {
+            log.error("Failed to extract primary cert serial number (cert may be nil or unparseable)")
+        }
+
+        // Primary certificate SHA-256 fingerprint[:20]
+        if let primaryCertDER = certStore.registration.primaryCertificateDER {
+            let truncatedFP = Data(SHA256.hash(data: primaryCertDER)).prefix(20)
+            metadata.append(truncatedFP)
+            log.info("  Primary cert fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
         }
 
         compactProof.append(metadata)
