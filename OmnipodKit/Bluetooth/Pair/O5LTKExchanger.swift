@@ -229,12 +229,16 @@ class O5LTKExchanger {
         } else {
             centralState = "nil (deallocated)"
         }
-        let serviceCount = manager.peripheral.services?.count ?? -1
-        let hasDataChar = manager.peripheral.getDataCharacteristic() != nil
-        let hasCmdChar = manager.peripheral.getCommandCharacteristic() != nil
-        log.error("Read failed at %{public}@: peripheral state=%{public}@ (isConnected=%{public}@), central state=%{public}@, services=%{public}d, dataChar=%{public}@, cmdChar=%{public}@",
-                  step, periState, String(describing: isConnected), centralState, serviceCount,
-                  String(describing: hasDataChar), String(describing: hasCmdChar))
+        // Only access services/characteristics if still connected — they may be
+        // invalidated after disconnect, causing EXC_BAD_ACCESS.
+        let serviceCount: Int
+        if isConnected {
+            serviceCount = manager.peripheral.services?.count ?? -1
+        } else {
+            serviceCount = -1
+        }
+        log.error("Read failed at %{public}@: peripheral state=%{public}@ (isConnected=%{public}@), central state=%{public}@, services=%{public}d",
+                  step, periState, String(describing: isConnected), centralState, serviceCount)
     }
 
     /// The 11-byte O5 SP2 payload is an encoded type 0 get pod status command for the requested id including the calculated CRC-16
