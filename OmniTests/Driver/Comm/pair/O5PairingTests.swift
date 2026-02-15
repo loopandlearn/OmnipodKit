@@ -78,11 +78,11 @@ class O5PairingTests: XCTestCase {
     /// pdmid → 4-byte big-endian controller ID
     func testControllerIDFromPdmid() {
         let reg = O5RegistrationData.active
-        XCTAssertEqual(reg.pdmid, 2584724)
+        XCTAssertEqual(reg.pdmid, 2587928)
 
         let controllerID = reg.controllerID
         XCTAssertEqual(controllerID.count, 4)
-        XCTAssertEqual(controllerID.hexadecimalString, "00277094")
+        XCTAssertEqual(controllerID.hexadecimalString, "00277d18")
     }
 
     /// Pod ID is always PDM ID + 1 (confirmed in both btsnoop sessions)
@@ -95,19 +95,19 @@ class O5PairingTests: XCTestCase {
 
     // MARK: - Key Derivation (from extracted TEE simulator keys)
 
-    /// Verify secondary key scalar produces the expected public key
+    /// Verify secondary key scalar produces the expected public key (pdmid 2587928)
     func testSecondaryKeyDerivation() throws {
-        let scalar = Data(hexadecimalString: "f5b539ec69b24876e74785fba316fe2e95eb6e26005f80f9cc7394dfcb461d05")!
-        let expectedPubKey = Data(hexadecimalString: "e3c48e617ccb64979c6e99cb4d07af307316450fe3ac9f176b20a09b64d47864f54dea67d10327ef9be03aee756bc6819e6ae5cfd566e4687e303793eebaa3bf")!
+        let scalar = Data(hexadecimalString: "0bf11c04dab072a65f8faca060288188cb006845490bc618440d2af918099e24")!
+        let expectedPubKey = Data(hexadecimalString: "5b04057ec3625db9a54ff3eba0518950f912d11af7cce09bf7149d3ef38acda4416cc723f3dd127e5a65b89356c5b4506303c287017fe8ed4dc8d347ef0f19c0")!
 
         let privateKey = try P256.Signing.PrivateKey(rawRepresentation: scalar)
         XCTAssertEqual(Data(privateKey.publicKey.rawRepresentation), expectedPubKey)
     }
 
-    /// Verify primary key scalar produces the expected public key
+    /// Verify primary key scalar produces the expected public key (pdmid 2587928)
     func testPrimaryKeyDerivation() throws {
-        let scalar = Data(hexadecimalString: "7045a86517f2127bfe84bd366c068107ed46198487f46380fd68c5f8fac57560")!
-        let expectedPubKey = Data(hexadecimalString: "3c121cb7074a6047651b39be78fd29498bd5eee4271d5d73a5001783e60a18559014f9dfa2faf8fda788fa9242934f8138e43e1d651dd77d789ef13fe6f5a962")!
+        let scalar = Data(hexadecimalString: "4d0e2b45250130b4ee4c449454bd29a91fec6bde5ad69a502e15b7218e6f440e")!
+        let expectedPubKey = Data(hexadecimalString: "33444df9308ff4a65d7752f25c86a4b2292ef8eb285a902ac63aad6b9e19d0ca0b093248d9ed8a160fb04f417a8a95f51b7642232759fb071632088166105814")!
 
         let privateKey = try P256.Signing.PrivateKey(rawRepresentation: scalar)
         XCTAssertEqual(Data(privateKey.publicKey.rawRepresentation), expectedPubKey)
@@ -116,9 +116,9 @@ class O5PairingTests: XCTestCase {
     /// Verify O5CertificateStore loads correctly and the signing key matches
     func testCertificateStoreInit() throws {
         let store = try O5CertificateStore()
-        let expectedPubKey = Data(hexadecimalString: "e3c48e617ccb64979c6e99cb4d07af307316450fe3ac9f176b20a09b64d47864f54dea67d10327ef9be03aee756bc6819e6ae5cfd566e4687e303793eebaa3bf")!
+        let expectedPubKey = Data(hexadecimalString: "5b04057ec3625db9a54ff3eba0518950f912d11af7cce09bf7149d3ef38acda4416cc723f3dd127e5a65b89356c5b4506303c287017fe8ed4dc8d347ef0f19c0")!
         XCTAssertEqual(store.signingPublicKeyRaw, expectedPubKey)
-        XCTAssertEqual(store.controllerIDValue, 2584724)
+        XCTAssertEqual(store.controllerIDValue, 2587928)
     }
 
     // MARK: - Channel-Binding Transcript (structure validated against SPS21_KEYS_PRIMARY.md Section 6)
@@ -126,7 +126,7 @@ class O5PairingTests: XCTestCase {
     /// Verify the 171-byte transcript structure: offsets, field sizes, content order
     func testChannelBindingTranscriptStructure() throws {
         // Use a known P-256 key for the phone side
-        let phonePrivateKey = Data(hexadecimalString: "f5b539ec69b24876e74785fba316fe2e95eb6e26005f80f9cc7394dfcb461d05")!
+        let phonePrivateKey = Data(hexadecimalString: "0bf11c04dab072a65f8faca060288188cb006845490bc618440d2af918099e24")!
         let phoneNonce = Data(hexadecimalString: "36ddde243ca8ef7fca132c725313fbfe")!
 
         let keyGen = MockFixedPrivateKeyGenerator(fixedPrivateKey: phonePrivateKey, generator: P256KeyGenerator())
@@ -147,24 +147,25 @@ class O5PairingTests: XCTestCase {
         // Byte 0: version
         XCTAssertEqual(transcript[0], 0x01)
 
-        // Bytes 1-6: FIRMWARE_ID (NOT a session nonce)
+        // Bytes 1-6: FIRMWARE_ID
         XCTAssertEqual(transcript.subdata(in: 1..<7).hexadecimalString, "9b0ab96a76f4")
 
-        // Bytes 7-10: flags (zero)
-        XCTAssertEqual(transcript.subdata(in: 7..<11), Data([0x00, 0x00, 0x00, 0x00]))
+        // Bytes 7-10: controllerID (bytesAsControllerId=true is now the default)
+        XCTAssertEqual(transcript.subdata(in: 7..<11).hexadecimalString, "00277d18")
 
-        // Bytes 11-26: phone nonce (16 bytes) — Nonce FIRST in transcript (reversed from SPS1 wire order)
-        XCTAssertEqual(transcript.subdata(in: 11..<27), phoneNonce)
-
-        // Bytes 27-90: phone public key (64 bytes)
+        // Keys-grouped layout (keysNonceFirst=false): keys together then nonces
+        // Bytes 11-74: phone public key (64 bytes)
         let expectedPhonePub = try P256KeyGenerator().publicFromPrivate(phonePrivateKey)
-        XCTAssertEqual(transcript.subdata(in: 27..<91), expectedPhonePub)
+        XCTAssertEqual(transcript.subdata(in: 11..<75), expectedPhonePub)
 
-        // Bytes 91-106: pod nonce (16 bytes)
-        XCTAssertEqual(transcript.subdata(in: 91..<107), podNonce)
+        // Bytes 75-138: pod public key (64 bytes)
+        XCTAssertEqual(transcript.subdata(in: 75..<139), podPubKey)
 
-        // Bytes 107-170: pod public key (64 bytes)
-        XCTAssertEqual(transcript.subdata(in: 107..<171), podPubKey)
+        // Bytes 139-154: phone nonce (16 bytes)
+        XCTAssertEqual(transcript.subdata(in: 139..<155), phoneNonce)
+
+        // Bytes 155-170: pod nonce (16 bytes)
+        XCTAssertEqual(transcript.subdata(in: 155..<171), podNonce)
     }
 
     /// Verify transcript from a captured session matches the known base64 value.
@@ -686,5 +687,135 @@ class O5RealSessionTests: XCTestCase {
         XCTAssertEqual(expectedConf.count, 16, "conf")
         XCTAssertEqual(expectedLtk.count, 16, "ltk")
         XCTAssertEqual(O5LTKExchanger.FIRMWARE_ID.count, 6, "FIRMWARE_ID")
+    }
+}
+
+// MARK: - Golden Data from Successful Pairing (btsnoop 2026-02-15, pdmid 2587928)
+//
+// These tests verify the active registration data and expected sizes from the
+// btsnoop capture of a SUCCESSFUL O5 pairing (P0 = 0xa5).
+// Source: /Users/james/Downloads/O5keys/KEYS/btsnoop_hci_20260215-2pm.log
+
+class O5BtsnoopGoldenDataTests: XCTestCase {
+
+    // MARK: - Registration Data Verification
+
+    /// Verify the active registration matches pdmid 2587928
+    func testActiveRegistrationIsBtsnoop() {
+        let reg = O5RegistrationData.active
+        XCTAssertEqual(reg.pdmid, 2587928)
+        XCTAssertEqual(reg.pdmidExtension, 43008040)
+        XCTAssertEqual(reg.controllerID.hexadecimalString, "00277d18")
+    }
+
+    /// Pod ID is always controller ID + 1 (verified in btsnoop: 0x00277d19)
+    func testPodIDFromBtsnoop() {
+        let controllerID: UInt32 = 2587928
+        XCTAssertEqual(controllerID + 1, 2587929)
+
+        var podId = UInt32(2587929).bigEndian
+        let podIdData = Data(bytes: &podId, count: 4)
+        XCTAssertEqual(podIdData.hexadecimalString, "00277d19")
+    }
+
+    /// SP2 encoding for the btsnoop pod ID
+    func testSP2EncodingForBtsnoopPodId() {
+        let address: UInt32 = 0x00277d19
+        let message = Message(address: address, messageBlocks: [GetStatusCommand()], sequenceNum: 0)
+        let encoded = message.encoded()
+        XCTAssertEqual(encoded.count, 11, "SP2 payload must be 11 bytes")
+    }
+
+    // MARK: - Certificate DER Sizes (verified against btsnoop encrypted payload sizes)
+
+    /// INS02PG1 intermediate cert = 634 bytes DER (btsnoop: SPS2.1 = 634 + 8 = 642)
+    func testINS02PG1CertSize() {
+        let reg = O5RegistrationData.active
+        guard let certDER = reg.intermediateCACertDER else {
+            XCTFail("INS02PG1 cert DER is nil")
+            return
+        }
+        XCTAssertEqual(certDER.count, 634, "INS02PG1 DER must be 634 bytes (btsnoop SPS2.1 = 634 + 8 tag = 642)")
+    }
+
+    /// TLS cert = 1017 bytes DER (btsnoop: SPS2 = 1017 + 64 sig + 8 tag = 1089)
+    func testTLSCertSize() {
+        let reg = O5RegistrationData.active
+        guard let certDER = reg.tlsCertificateDER else {
+            XCTFail("TLS cert DER is nil")
+            return
+        }
+        XCTAssertEqual(certDER.count, 1017, "TLS DER must be 1017 bytes (btsnoop SPS2 = 1017 + 64 + 8 = 1089)")
+    }
+
+    /// Root CA cert (INS00PG1) = 435 bytes DER
+    func testRootCACertSize() {
+        let reg = O5RegistrationData.active
+        guard let certDER = reg.rootCACertDER else {
+            XCTFail("Root CA cert DER is nil")
+            return
+        }
+        XCTAssertEqual(certDER.count, 435, "INS00PG1 root CA DER must be 435 bytes")
+    }
+
+    // MARK: - SPS2.1 / SPS2 Expected Encrypted Sizes
+
+    /// SPS2.1 = cert-only (short path): INS02PG1 (634) + tag (8) = 642
+    func testSPS21ExpectedSize() {
+        let reg = O5RegistrationData.active
+        guard let certDER = reg.intermediateCACertDER else {
+            XCTFail("INS02PG1 cert DER is nil")
+            return
+        }
+        let expectedEncryptedSize = certDER.count + 8 // cert + AES-CCM tag
+        XCTAssertEqual(expectedEncryptedSize, 642, "SPS2.1 encrypted size must be 642")
+    }
+
+    /// SPS2 = cert + signature (extended path): TLS (1017) + sig (64) + tag (8) = 1089
+    func testSPS2ExpectedSize() {
+        let reg = O5RegistrationData.active
+        guard let certDER = reg.tlsCertificateDER else {
+            XCTFail("TLS cert DER is nil")
+            return
+        }
+        let expectedEncryptedSize = certDER.count + 64 + 8 // cert + ECDSA sig + AES-CCM tag
+        XCTAssertEqual(expectedEncryptedSize, 1089, "SPS2 encrypted size must be 1089")
+    }
+
+    // MARK: - Key Material Verification
+
+    /// Secondary key scalar → public key derivation for pdmid 2587928
+    func testSecondaryKeyMatchesTLSCert() throws {
+        let reg = O5RegistrationData.active
+        let store = try O5CertificateStore()
+
+        // The signing public key must match the secondary public key from registration
+        XCTAssertEqual(store.signingPublicKeyRaw, reg.secondaryPublicKeyRaw)
+
+        // Extract public key from TLS certificate and verify it matches
+        if let tlsDER = reg.tlsCertificateDER,
+           let certPubKey = O5CertificateStore.extractP256PublicKey(fromDERCert: tlsDER) {
+            XCTAssertEqual(certPubKey, reg.secondaryPublicKeyRaw,
+                           "TLS cert public key must match secondary key")
+        } else {
+            XCTFail("Could not extract public key from TLS certificate")
+        }
+    }
+
+    /// Registration payload contains the correct controller_id and secondary public key
+    func testRegistrationPayloadContents() {
+        let reg = O5RegistrationData.active
+        guard let payload = reg.registrationPayload else {
+            XCTFail("Registration payload is nil")
+            return
+        }
+        XCTAssertEqual(payload.count, 163, "Registration payload must be 163 bytes")
+
+        // Controller ID at offset 8 (after 4-byte length + 4-byte flags)
+        // Actually at offset 10: length(4) + flags(4) + id(3) + sep(1) + type(1) + keysize(1) + controller_id(4)
+        // The exact offset depends on the structure, but the controller_id bytes should be present
+        let controllerIDBytes = Data(hexadecimalString: "00277d18")!
+        XCTAssertNotNil(payload.range(of: controllerIDBytes),
+                        "Registration payload must contain controller_id 00277d18")
     }
 }

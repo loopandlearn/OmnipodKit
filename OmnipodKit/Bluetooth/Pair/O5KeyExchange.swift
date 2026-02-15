@@ -22,33 +22,28 @@ class O5KeyExchange {
     static let PUBLIC_KEY_SIZE = 64
     static let NONCE_SIZE = 16
 
-    /// Counts pairing attempts so we can cycle through all 256 flag combinations (mod 256).
-    /// Attempt #60 (0b00111100) produced a structured error response from pod instead of disconnect.
-    static var pairAttempts: Int = 60
+    /// Confirmed correct values from btsnoop capture of successful pairing (pdmid 2587928, 2026-02-15).
+    /// All flags verified by exact size matching and protocol flow analysis.
 
-    /// When true, uses nonces-first layout (nonce-key interleaved per side, matching Frida capture).
-    /// When false, uses keys-grouped layout (keys together then nonces together, matching native RE).
+    /// Keys-grouped layout: keys together then nonces together (confirmed by native RE sub_36690).
     var keysNonceFirst: Bool = false
 
-    /// When true, puts controllerID in bytes 7-10. When false, puts 4 zero bytes.
-    var bytesAsControllerId: Bool = false
+    /// Confirmed: bytes 7-10 of channel-binding transcript are the real controllerID (not zeros).
+    var bytesAsControllerId: Bool = true
 
-    /// When true, uses 4-byte UInt32 BE length prefixes in KDF (instead of 8-byte UInt64).
+    /// Confirmed: KDF uses 8-byte UInt64 BE length prefixes (matching real session KDF input).
     var useUInt32LengthPrefixes: Bool = false
 
-    /// When true, uses zeros instead of real controllerID in the KDF input.
+    /// Confirmed: KDF uses real controllerID (not zeros).
     var kdfZeroControllerID: Bool = false
 
-    /// When true, swaps cert indexes: TLS cert in SPS2.1 (with sig), INS02PG1 in SPS2 (without sig).
+    /// Confirmed: SPS2.1 = INS02PG1 intermediate cert, SPS2 = TLS leaf cert (default order).
     var swapCertIndexes: Bool = false
 
-    /// When true, puts signature before cert in SPS2.1 plaintext (sig||cert instead of cert||sig).
-    var sigBeforeCert: Bool = false
-
-    /// When true, uses the last 6 bytes of each nonce for SPS nonce construction (instead of first 6).
+    /// Confirmed: SPS nonce uses first 6 bytes of each nonce.
     var nonceLastBytes: Bool = false
 
-    /// When true, uses direction bytes 0x00/0x01 for write/read (instead of 0x01/0x02).
+    /// Confirmed: write direction = 0x01, read direction = 0x02.
     var swapNonceDirection: Bool = false
 
     private let log = OSLog(category: "O5KeyExchange")
