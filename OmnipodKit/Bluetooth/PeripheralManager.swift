@@ -500,12 +500,14 @@ extension PeripheralManager {
         case .connected:
             clearCommsQueues()
 
-            // Log the negotiated MTU and adjust packet sizes for O5 pods
+            // Log the negotiated MTU and adjust packet sizes for O5 pods.
+            // setServicePodType sets BlePacket_MAX_PAYLOAD_SIZE=244 for O5, but the actual
+            // negotiated MTU may be smaller (e.g. 20 bytes at MTU 23). We must use the real
+            // negotiated value to avoid writing oversized packets that get truncated.
             let mtu = peripheral.maximumWriteValueLength(for: .withoutResponse)
-            self.log.default("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d", mtu)
-            if self.podType == omnipod5Type && mtu > 20 {
-                // Use the negotiated MTU for O5 packet sizing instead of assuming 244
-                let effectiveMaxPayload = min(mtu, 244)
+            self.log.default("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d, BlePacket_MAX_PAYLOAD_SIZE: %{public}d", mtu, BlePacket_MAX_PAYLOAD_SIZE)
+            if self.podType == omnipod5Type {
+                let effectiveMaxPayload = min(max(mtu, 20), 244)
                 if effectiveMaxPayload != BlePacket_MAX_PAYLOAD_SIZE {
                     self.log.default("Adjusting BlePacket_MAX_PAYLOAD_SIZE from %{public}d to %{public}d based on negotiated MTU", BlePacket_MAX_PAYLOAD_SIZE, effectiveMaxPayload)
                     BlePacket_MAX_PAYLOAD_SIZE = effectiveMaxPayload

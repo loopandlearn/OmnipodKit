@@ -132,15 +132,24 @@ was completely wrong. Rewritten to match native structure. Size now matches btsn
 
 Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowledged) but the pod rejects the payload and drops the BLE connection.
 
-| # | Transcript Order | Result | Notes |
-|---|-----------------|--------|-------|
-| 1 | Nonces-first: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
-| 2 | Keys-first: `[pdmPublic][pdmNonce][podPublic][podNonce]` | **TESTING** | Matches SPS1 wire format (pubkey+nonce) |
+| # | Change | Result | Notes |
+|---|--------|--------|-------|
+| 1 | Nonces-first transcript: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
+| 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same behavior |
+| 3 | **MTU fix**: `maximumWriteValueLength=20` but `BlePacket_MAX_PAYLOAD_SIZE=244` — packets truncated! | **TESTING** | Was writing 244-byte BLE packets into 20-byte pipe. Fixed to use actual negotiated MTU. |
 
-**Possible remaining causes if keys-first also fails:**
-- **KDF is wrong** → wrong conf key → pod can't decrypt SPS2.1 at all (most likely)
+**Critical MTU bug found (test #3):**
+The pod negotiates MTU 23 (20 usable bytes), but `setServicePodType(omnipod5Type)` set `BlePacket_MAX_PAYLOAD_SIZE=244`.
+This means ALL O5 BLE packets were oversized and truncated/corrupted. The pod disconnect was likely caused by
+receiving garbled data, not by wrong transcript order or KDF. Once MTU is fixed, transcript/KDF issues can be evaluated.
+
+Note: Android btsnoop shows MTU 247 — the O5 pod supports larger MTUs but iOS is not negotiating higher.
+iOS has no API to request MTU; it negotiates automatically. The pod may need a specific trigger or sequence.
+
+**Possible remaining causes after MTU fix:**
+- **KDF is wrong** → wrong conf key → pod can't decrypt SPS2.1 at all
+- **Transcript field order** — still uncertain (keys-first vs nonces-first)
 - **Flags field** should be controllerID (`00277094`) instead of zeros
-- **MTU 23** may cause issues (btsnoop used MTU 247) — try requesting larger MTU
 - **Double-hashing** — CryptoKit `signature(for:)` hashes internally; if native lib also hashes, signature would differ
 - **Primary key** should be used instead of secondary key for SPS2.1 signing
 
