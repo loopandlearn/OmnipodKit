@@ -184,28 +184,36 @@ class O5KeyExchange {
     func buildChannelBindingTranscript() -> Data {
         var transcript = Data(capacity: 171)
 
-        // Version byte
+        // From native library sub_36690, the channel-binding transcript is:
+        //   type(1) + fieldA(6) + fieldB(4) + fieldC(64) + fieldD(64) + fieldE(16) + fieldF(16) = 171
+        // Fields C/D are the ECDH public keys (64 bytes each), E/F are the nonces (16 bytes each).
+        // Order: keys first, then nonces (confirmed by context offset layout in libb7fe0d.so).
+
+        // Type byte (mode 0 → type 1)
         transcript.append(Data([0x01]))
 
-        // FIRMWARE_ID (fixed 6-byte value from PDM firmware, NOT a session nonce)
+        // Field A: FIRMWARE_ID (fixed 6-byte value)
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
 
-        // Flags (4 zero bytes)
+        // Field B: Flags (4 zero bytes)
         transcript.append(Data([0x00, 0x00, 0x00, 0x00]))
 
-        // Phone SPS1 payload: pdmNonce (16 bytes) + pdmPublic (64 bytes) = 80 bytes
-        // Note: order is Nonce first, then EC public key (reversed from BLE wire order)
-        transcript.append(pdmNonce)
+        // Field C: PDM ECDH public key (64 bytes)
         transcript.append(pdmPublic)
 
-        // Pod SPS1 payload: podNonce (16 bytes) + podPublic (64 bytes) = 80 bytes
-        transcript.append(podNonce)
+        // Field D: Pod ECDH public key (64 bytes)
         transcript.append(podPublic)
+
+        // Field E: PDM nonce (16 bytes)
+        transcript.append(pdmNonce)
+
+        // Field F: Pod nonce (16 bytes)
+        transcript.append(podNonce)
 
         if transcript.count != 171 {
             log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
-            log.error("  FIRMWARE_ID: %{public}d bytes, pdmNonce: %{public}d bytes, pdmPublic: %{public}d bytes, podNonce: %{public}d bytes, podPublic: %{public}d bytes",
-                       O5LTKExchanger.FIRMWARE_ID.count, pdmNonce.count, pdmPublic.count, podNonce.count, podPublic.count)
+            log.error("  FIRMWARE_ID: %{public}d, pdmPublic: %{public}d, podPublic: %{public}d, pdmNonce: %{public}d, podNonce: %{public}d",
+                       O5LTKExchanger.FIRMWARE_ID.count, pdmPublic.count, podPublic.count, pdmNonce.count, podNonce.count)
         }
         return transcript
     }

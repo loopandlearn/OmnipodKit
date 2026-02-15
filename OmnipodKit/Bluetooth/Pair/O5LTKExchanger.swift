@@ -256,174 +256,57 @@ class O5LTKExchanger {
         try keyExchange.o5updatePodPublicData(payload)
     }
 
-    // MARK: - SPS2.1 (Compact Proof Assembly)
+    // MARK: - SPS2.1 (Certificate Confirmation, Index 1)
 
-    /// Build and encrypt the SPS2.1 compact proof payload (~634 bytes plaintext -> ~642 encrypted).
+    /// Build and encrypt the SPS2.1 payload.
     ///
-    /// Structure (from BTSNOOP + PAIRING_FLOW.md reverse engineering):
-    ///   1. ECDSA signature over 171-byte channel-binding transcript (64 bytes raw r || s)
-    ///   2. Five extracted public keys from certificate chain (5 × 65 = 325 bytes, uncompressed)
-    ///   3. Certificate metadata: serial numbers, truncated fingerprints, SAN data, primary cert (~242 bytes)
+    /// From native library decompile (libb7fe0d.so sub_36de4):
+    ///   plaintext = cert_DER[index=1] || aux64
+    ///   encrypted = AES_CCM_ENC(plaintext) || tag(8)
     ///
-    /// Signed with the secondary key (ECDSA SHA-256), matching real app behavior.
-    /// The registration payload is NOT included here — it's written to the pod during setPodUid.
+    /// The certificate at index 1 is the INS02PG1 intermediate CA (570 bytes for our cert).
+    /// aux64 is the 64-byte ECDSA raw signature (r || s) over the 171-byte channel-binding
+    /// transcript, signed with the secondary key.
+    ///
+    /// Total: cert_size[1] + 64 + 8 = cert_size[1] + 72 (observed 570 + 72 = 642).
     private func o5sps2_1() throws -> Data {
-        // Build the channel-binding transcript (171 bytes)
+        // Get the INS02PG1 intermediate CA certificate DER (index 1 in the cert list)
+        guard let certDER = certStore.registration.intermediateCACertDER else {
+            throw PodProtocolError.pairingException("SPS2.1: INS02PG1 intermediate CA certificate DER is nil")
+        }
+        log.default("SPS2.1: cert[1] = INS02PG1 DER (%{public}d bytes)", certDER.count)
+
+        // Build the 171-byte channel-binding transcript and sign with secondary key
         let transcript = keyExchange.buildChannelBindingTranscript()
         log.info("Channel-binding transcript (%d bytes): %{public}@", transcript.count, transcript.bytes.toHexString())
 
-        // Sign the transcript with the secondary private key (ECDSA SHA-256)
         let signatureRaw = try certStore.signRaw(transcript)
-        log.info("ECDSA signature over transcript (%d bytes): %{public}@", signatureRaw.count, signatureRaw.bytes.toHexString())
+        log.info("ECDSA signature (aux64, %d bytes): %{public}@", signatureRaw.count, signatureRaw.bytes.toHexString())
 
-        // Assemble the compact proof payload
-        var compactProof = Data()
+        // Assemble plaintext: cert_DER || signature(64)
+        var plaintext = Data(capacity: certDER.count + 64)
+        plaintext.append(certDER)
+        plaintext.append(signatureRaw)
 
-        // === Section 1: ECDSA signature (64 bytes, raw r || s) ===
-        compactProof.append(signatureRaw)
+        log.default("SPS2.1 plaintext: %{public}d bytes (cert=%{public}d + sig=%{public}d, target=634)",
+                    plaintext.count, certDER.count, signatureRaw.count)
 
-        // === Section 2: Five public keys (uncompressed, 65 bytes each with 0x04 prefix) ===
-        //    Key order: secondary (TLS cert), intermediate CA, root CA, attestation leaf, TEE intermediate
-        //    Pod verifies: pdm_pubkey == extract_public_key(tlsCertificate)
-
-        // Key 1: Secondary/TLS certificate public key (identity key, used for signing)
-        let secondaryPubKey = certStore.registration.secondaryPublicKeyRaw
-        compactProof.append(O5CertificateStore.uncompressedPublicKey(secondaryPubKey))
-        log.info("  Key 1 (secondary/TLS): %{public}@", secondaryPubKey.hexadecimalString)
-
-        // Key 2: INS02PG1 intermediate CA public key
-        let intermCAPubKey = certStore.registration.intermediateCAPublicKeyRaw
-        compactProof.append(O5CertificateStore.uncompressedPublicKey(intermCAPubKey))
-        log.info("  Key 2 (INS02PG1): %{public}@", intermCAPubKey.hexadecimalString)
-
-        // Key 3: INS00PG1 root CA public key
-        let rootCAPubKey = certStore.registration.rootCAPublicKeyRaw
-        compactProof.append(O5CertificateStore.uncompressedPublicKey(rootCAPubKey))
-        log.info("  Key 3 (INS00PG1): %{public}@", rootCAPubKey.hexadecimalString)
-
-        // Key 4: Attestation leaf public key (cert_0 from secondary attestation chain)
-        if let attestLeafKey = certStore.registration.attestationLeafPublicKeyRaw {
-            compactProof.append(O5CertificateStore.uncompressedPublicKey(attestLeafKey))
-            log.info("  Key 4 (attest leaf): %{public}@", attestLeafKey.hexadecimalString)
-        } else {
-            log.error("Missing attestation leaf public key (cert_0) — compact proof will be short")
-        }
-
-        // Key 5: TEE intermediate public key (cert_1 from secondary attestation chain)
-        if let teeIntermKey = certStore.registration.teeIntermediatePublicKeyRaw {
-            compactProof.append(O5CertificateStore.uncompressedPublicKey(teeIntermKey))
-            log.info("  Key 5 (TEE interm): %{public}@", teeIntermKey.hexadecimalString)
-        } else {
-            log.error("Missing TEE intermediate public key (cert_1) — compact proof will be short")
-        }
-
-        let keysEnd = compactProof.count
-        let keysSize = keysEnd - signatureRaw.count
-        log.info("  Keys total: %{public}d bytes (expected 325)", keysSize)
-
-        // === Section 3: Certificate metadata ===
-        // The pod uses this to verify the PDM's certificate chain against pre-loaded certs.
-        // Fields: serial numbers (20 bytes each), truncated fingerprints (20 bytes each), SAN DER.
-        var metadata = Data()
-
-        // TLS certificate serial number (20 bytes for our cert)
-        if let tlsCertDER = certStore.registration.tlsCertificateDER,
-           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: tlsCertDER) {
-            metadata.append(serial)
-            log.info("  TLS cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
-        } else {
-            log.error("Failed to extract TLS cert serial number")
-        }
-
-        // TLS certificate SHA-256 fingerprint truncated to 20 bytes
-        if let tlsCertDER = certStore.registration.tlsCertificateDER {
-            let fullFingerprint = Data(SHA256.hash(data: tlsCertDER))
-            let truncatedFP = fullFingerprint.prefix(20)
-            metadata.append(truncatedFP)
-            log.info("  TLS cert fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
-        } else {
-            log.error("Failed to compute TLS cert fingerprint")
-        }
-
-        // TLS certificate SAN DER value (contains pdmid, devicetype, commands URIs)
-        if let tlsCertDER = certStore.registration.tlsCertificateDER,
-           let sanDER = O5CertificateStore.extractSANDER(fromDERCert: tlsCertDER) {
-            metadata.append(sanDER)
-            log.info("  TLS cert SAN DER (%{public}d bytes): %{public}@", sanDER.count, sanDER.hexadecimalString)
-        } else {
-            log.error("Failed to extract TLS cert SAN DER")
-        }
-
-        // INS02PG1 intermediate CA serial number
-        if let intermCertDER = certStore.registration.intermediateCACertDER,
-           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: intermCertDER) {
-            metadata.append(serial)
-            log.info("  INS02PG1 serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
-        } else {
-            log.error("Failed to extract INS02PG1 serial number")
-        }
-
-        // INS02PG1 intermediate CA fingerprint[:20]
-        if let intermCertDER = certStore.registration.intermediateCACertDER {
-            let truncatedFP = Data(SHA256.hash(data: intermCertDER)).prefix(20)
-            metadata.append(truncatedFP)
-            log.info("  INS02PG1 fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
-        }
-
-        // INS00PG1 root CA serial number
-        if let rootCertDER = certStore.registration.rootCACertDER,
-           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: rootCertDER) {
-            metadata.append(serial)
-            log.info("  INS00PG1 serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
-        } else {
-            log.error("Failed to extract INS00PG1 serial number")
-        }
-
-        // INS00PG1 root CA fingerprint[:20]
-        if let rootCertDER = certStore.registration.rootCACertDER {
-            let truncatedFP = Data(SHA256.hash(data: rootCertDER)).prefix(20)
-            metadata.append(truncatedFP)
-            log.info("  INS00PG1 fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
-        }
-
-        // Primary certificate serial number (v1 self-signed cert, typically 4 bytes)
-        // The primary cert is loaded 5 times during SPS2.1 per Frida logs — its metadata is sent to the pod.
-        if let primaryCertDER = certStore.registration.primaryCertificateDER,
-           let serial = O5CertificateStore.extractSerialNumber(fromDERCert: primaryCertDER) {
-            metadata.append(serial)
-            log.info("  Primary cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
-        } else {
-            log.error("Failed to extract primary cert serial number (cert may be nil or unparseable)")
-        }
-
-        // Primary certificate SHA-256 fingerprint[:20]
-        if let primaryCertDER = certStore.registration.primaryCertificateDER {
-            let truncatedFP = Data(SHA256.hash(data: primaryCertDER)).prefix(20)
-            metadata.append(truncatedFP)
-            log.info("  Primary cert fingerprint[:20]: %{public}@", truncatedFP.hexadecimalString)
-        }
-
-        compactProof.append(metadata)
-
-        let metadataSize = compactProof.count - keysEnd
-        log.default("Compact proof assembled: %{public}d bytes total (sig=%{public}d + keys=%{public}d + metadata=%{public}d). Target=634, gap=%{public}d",
-                    compactProof.count, signatureRaw.count, keysSize, metadataSize, 634 - compactProof.count)
-
-        // Encrypt with AES-CCM using the derived conf key
+        // Encrypt with AES-CCM: key=conf, nonce=13B, tag=8
         let nonce = keyExchange.getSPSNonce(direction: .write)
         let key = keyExchange.conf
-        log.info("Encrypting SPS2.1: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes", key.bytes.toHexString(), nonce.bytes.toHexString(), compactProof.count)
+        log.info("Encrypting SPS2.1: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes",
+                 key.bytes.toHexString(), nonce.bytes.toHexString(), plaintext.count)
         let encrypted: [UInt8]
         do {
-            let ccm = CCM(iv: nonce.bytes, tagLength: 8, messageLength: compactProof.count)
+            let ccm = CCM(iv: nonce.bytes, tagLength: 8, messageLength: plaintext.count)
             let aes = try AES(key: key.bytes, blockMode: ccm, padding: .noPadding)
-            encrypted = try aes.encrypt(compactProof.bytes)
+            encrypted = try aes.encrypt(plaintext.bytes)
         } catch {
-            log.error("AES-CCM encrypt FAILED for SPS2.1: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes, error=%{public}@", key.bytes.toHexString(), nonce.bytes.toHexString(), compactProof.count, String(describing: error))
+            log.error("AES-CCM encrypt FAILED for SPS2.1: %{public}@", String(describing: error))
             throw PodProtocolError.pairingException("SPS2.1 encrypt failed: \(error)")
         }
         keyExchange.incrementNonce(direction: .write)
-        log.default("SPS2.1 encrypted: %{public}d bytes (plaintext=%{public}d, target encrypted=642, target plaintext=634)", encrypted.count, compactProof.count)
+        log.default("SPS2.1 encrypted: %{public}d bytes (target=642)", encrypted.count)
         return Data(encrypted)
     }
 
@@ -431,16 +314,12 @@ class O5LTKExchanger {
 
     /// Decrypt and verify the pod's SPS2.1 response.
     ///
-    /// The pod sends its own compact proof (~634 bytes plaintext) containing:
-    ///   1. ECDSA signature over the pairing transcript (64 bytes raw r || s)
-    ///   2. Pod's public keys (pod cert, INS01PG1, INS00PG1, + 2 attestation keys)
-    ///   3. Pod certificate metadata
+    /// Pod SPS2.1 has the same structure as phone SPS2.1 (from native library decompile):
+    ///   plaintext = pod_cert_DER || signature(64)
+    ///   encrypted = AES_CCM_ENC(plaintext) || tag(8)
     ///
-    /// Key extraction offsets (from btsnoop analysis of pod → phone):
-    ///   - Signature:     bytes 0-63   (64 bytes)
-    ///   - Pod cert key:  offset 64    (65 bytes, uncompressed)
-    ///   - INS01PG1 key:  offset 208   (65 bytes)
-    ///   - INS00PG1 key:  offset 284   (65 bytes)
+    /// The pod's certificate is its INS01PG1-issued identity cert. The last 64 bytes
+    /// of the plaintext are the pod's ECDSA raw signature over the channel-binding transcript.
     private func o5validatePodSps2_1(_ msg: MessagePacket) throws {
         log.debug("Pod SPS2.1 raw message (%{public}d bytes): %{public}@", msg.payload.count, msg.payload.hexadecimalString)
         let payload: Data
@@ -465,196 +344,91 @@ class O5LTKExchanger {
             log.error("AES-CCM decrypt FAILED for pod SPS2.1: key=%{public}@, nonce=%{public}@, payload=%{public}d bytes, error=%{public}@", key.toHexString(), nonce.bytes.toHexString(), payload.count, String(describing: error))
             throw PodProtocolError.pairingException("Pod SPS2.1 decrypt failed (\(payload.count) bytes): \(error)")
         }
-        log.info("Decrypted SPS2.1 payload from pod (%d bytes): %{public}@", decryptedPayload.count, decryptedPayload.bytes.toHexString())
         keyExchange.incrementNonce(direction: .read)
 
-        guard decryptedPayload.count >= 64 + 65 else {
-            throw PodProtocolError.pairingException("Pod SPS2.1 payload too short: \(decryptedPayload.count) bytes (need >= 129)")
+        // Structure: cert_DER(N bytes) || signature(64 bytes)
+        guard decryptedPayload.count > 64 else {
+            throw PodProtocolError.pairingException("Pod SPS2.1 payload too short: \(decryptedPayload.count) bytes (need > 64)")
         }
 
-        // 1. Extract pod's ECDSA signature (first 64 bytes, raw r || s)
-        let podSignature = decryptedPayload.subdata(in: 0..<64)
+        let certLen = decryptedPayload.count - 64
+        let podCertDER = decryptedPayload.subdata(in: 0..<certLen)
+        let podSignature = decryptedPayload.subdata(in: certLen..<decryptedPayload.count)
+
+        log.default("Pod SPS2.1 decrypted: %{public}d bytes (cert_DER=%{public}d + sig=%{public}d)", decryptedPayload.count, certLen, podSignature.count)
+        log.info("Pod cert DER (%{public}d bytes): %{public}@", podCertDER.count, podCertDER.hexadecimalString)
         log.info("Pod signature (64 bytes): %{public}@", podSignature.hexadecimalString)
 
-        // 2. Extract pod's identity public key (offset 64, 65 bytes uncompressed)
-        let podCertPubKeyUncompressed = decryptedPayload.subdata(in: 64..<129)
-        log.info("Pod cert key (offset 64): %{public}@", podCertPubKeyUncompressed.hexadecimalString)
+        // Extract pod's public key from its DER certificate
+        if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
+            log.info("Pod cert public key: %{public}@", podPubKeyRaw.hexadecimalString)
 
-        // 3. Extract additional keys at known offsets (from btsnoop analysis)
-        //    The pod response may have metadata between keys at non-contiguous offsets
-        let knownOffsets: [(Int, String)] = [(208, "INS01PG1"), (284, "INS00PG1")]
-        for (offset, label) in knownOffsets {
-            if decryptedPayload.count >= offset + 65 {
-                let extractedKey = decryptedPayload.subdata(in: offset..<(offset + 65))
-                log.info("Pod %{public}@ key (offset %{public}d): %{public}@", label, offset, extractedKey.hexadecimalString)
-
-                // Verify against pre-loaded certificates
-                if extractedKey[0] == 0x04 {
-                    let rawKey = extractedKey.subdata(in: 1..<65)
-                    if label == "INS01PG1" {
-                        let expected = certStore.registration.podIntermediateCAPublicKeyRaw
-                        if rawKey == expected {
-                            log.info("  INS01PG1 key matches pre-loaded certificate ✓")
-                        } else {
-                            log.error("  INS01PG1 key MISMATCH: expected %{public}@", expected.hexadecimalString)
-                        }
-                    } else if label == "INS00PG1" {
-                        let expected = certStore.registration.rootCAPublicKeyRaw
-                        if rawKey == expected {
-                            log.info("  INS00PG1 key matches pre-loaded certificate ✓")
-                        } else {
-                            log.error("  INS00PG1 key MISMATCH: expected %{public}@", expected.hexadecimalString)
-                        }
-                    }
-                }
-            } else {
-                log.info("Pod SPS2.1 too short for %{public}@ at offset %{public}d (have %{public}d bytes)", label, offset, decryptedPayload.count)
-            }
-        }
-
-        // 4. Verify the pod's signature over the channel-binding transcript
-        if podCertPubKeyUncompressed[0] == 0x04 {
-            let podPubKeyRaw = podCertPubKeyUncompressed.subdata(in: 1..<65)
+            // Verify the pod's signature over the channel-binding transcript
             let transcript = keyExchange.buildChannelBindingTranscript()
             let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
             if signatureValid {
                 log.default("Pod SPS2.1 signature verification PASSED")
             } else {
-                log.error("Pod SPS2.1 signature verification FAILED — pod may use different transcript format")
+                log.error("Pod SPS2.1 signature verification FAILED — transcript format may differ")
                 // Don't throw — continue pairing and log for debugging
             }
+        } else {
+            log.error("Failed to extract P-256 public key from pod certificate DER")
         }
 
-        // 5. Log any data between/after keys for reverse engineering
-        if decryptedPayload.count > 129 {
-            let gapStart = 129
-            let gapEnd = min(208, decryptedPayload.count)
-            log.info("Pod SPS2.1 gap data (offset %{public}d-%{public}d, %{public}d bytes): %{public}@",
-                     gapStart, gapEnd, gapEnd - gapStart,
-                     decryptedPayload.subdata(in: gapStart..<gapEnd).hexadecimalString)
-        }
-        if decryptedPayload.count > 349 {
-            log.info("Pod SPS2.1 trailing data (offset 349, %{public}d bytes): %{public}@",
-                     decryptedPayload.count - 349,
-                     decryptedPayload.subdata(in: 349..<decryptedPayload.count).hexadecimalString)
+        // Extract and log the pod certificate serial for debugging
+        if let serial = O5CertificateStore.extractSerialNumber(fromDERCert: podCertDER) {
+            log.info("Pod cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
         }
     }
 
-    // MARK: - SPS2 (CMAC Confirmation)
+    // MARK: - SPS2 (Certificate Confirmation, Index 0)
 
-    /// Generate the SPS2 confirmation payload.
+    /// Build and encrypt the SPS2 payload.
     ///
-    /// BTSNOOP shows phone→pod SPS2 is ~960 bytes (encrypted) = ~952 bytes plaintext + 8 tag.
-    /// The exact structure is still being reverse-engineered from the native library (libb7fe0d.so).
+    /// From native library decompile (libb7fe0d.so sub_370e8):
+    ///   plaintext = cert_DER[index=0]
+    ///   encrypted = AES_CCM_ENC(plaintext) || tag(8)
     ///
-    /// Current best understanding:
-    ///   - CMAC confirmations over session data
-    ///   - Certificate/key binding data
-    ///   - ECDSA signature (signing key for SPS2 TBD — may use secondary or primary)
-    ///   - Public keys and attestation chain fragments
-    ///   - Session parameters (nonces, ECDH public keys, controller ID)
+    /// Index 0 uses the short path — just the raw certificate, no signature appended.
+    /// The certificate at index 0 is the TLS certificate (~951 bytes for our cert).
+    ///
+    /// Total: cert_size[0] + 8 (observed 951 + 8 = 959).
     private func o5sps2() throws -> Data {
-        let confKey = keyExchange.conf
-
-        var confirmationData = Data()
-
-        // Section 1: PDM confirmation CMAC (similar to DASH KC_2_U pattern)
-        let pdmConfPrefix = "KC_2_U".data(using: .utf8)!
-        var pdmConfInput = pdmConfPrefix
-        pdmConfInput.append(keyExchange.pdmNonce)
-        pdmConfInput.append(keyExchange.podNonce)
-        let pdmConf = try o5aesCmac(confKey, pdmConfInput)
-
-        // Section 2: Session binding via transcript hash
-        let transcript = keyExchange.buildChannelBindingTranscript()
-        let transcriptHash = Data(SHA256.hash(data: transcript))
-
-        // Section 3: Certificate binding data
-        let certBinding = buildCertificateBinding()
-
-        // Section 4: Sign the combined confirmation
-        // The signing key for SPS2 is TBD — using secondary here (same as SPS2.1).
-        var signatureInput = Data()
-        signatureInput.append(pdmConf)
-        signatureInput.append(transcriptHash)
-        signatureInput.append(certBinding)
-        let confirmationSignature = try certStore.sign(signatureInput)
-
-        // Assemble the full SPS2 payload
-        confirmationData.append(pdmConf)                          // 16 bytes
-        confirmationData.append(transcriptHash)                    // 32 bytes
-        confirmationData.append(certBinding)                       // variable
-        confirmationData.append(confirmationSignature)             // ~70-72 bytes (DER)
-
-        // Public keys (uncompressed, 65 bytes each — same 5 keys as SPS2.1)
-        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.secondaryPublicKeyRaw))
-        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.intermediateCAPublicKeyRaw))
-        confirmationData.append(O5CertificateStore.uncompressedPublicKey(certStore.registration.rootCAPublicKeyRaw))
-        if let attestLeafKey = certStore.registration.attestationLeafPublicKeyRaw {
-            confirmationData.append(O5CertificateStore.uncompressedPublicKey(attestLeafKey))
+        // Get the TLS certificate DER (index 0 in the cert list)
+        guard let certDER = certStore.registration.tlsCertificateDER else {
+            throw PodProtocolError.pairingException("SPS2: TLS certificate DER is nil")
         }
-        if let teeIntermKey = certStore.registration.teeIntermediatePublicKeyRaw {
-            confirmationData.append(O5CertificateStore.uncompressedPublicKey(teeIntermKey))
-        }
+        log.default("SPS2: cert[0] = TLS cert DER (%{public}d bytes)", certDER.count)
 
-        // Session parameters
-        confirmationData.append(keyExchange.controllerID)          // 4 bytes
-        confirmationData.append(O5LTKExchanger.FIRMWARE_ID)        // 6 bytes
-        confirmationData.append(keyExchange.pdmPublic)             // 64 bytes
-        confirmationData.append(keyExchange.podPublic)             // 64 bytes
-        confirmationData.append(keyExchange.pdmNonce)              // 16 bytes
-        confirmationData.append(keyExchange.podNonce)              // 16 bytes
-
-        // Registration payload (from register/complete)
-        if let regPayload = certStore.registration.registrationPayload {
-            confirmationData.append(regPayload)
-        }
-
-        // Final integrity CMAC over all confirmation data
-        let finalCmac = try o5aesCmac(confKey, confirmationData)
-        confirmationData.append(finalCmac)                         // 16 bytes
-
-        log.info("Generated SPS2 confirmation (%d bytes): %{public}@", confirmationData.count, confirmationData.bytes.toHexString())
-
-        // Encrypt the confirmation data with AES-CCM
+        // Encrypt with AES-CCM: key=conf, nonce=13B, tag=8
         let nonce = keyExchange.getSPSNonce(direction: .write)
         let key = keyExchange.conf
-        log.info("Encrypting SPS2: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes", key.bytes.toHexString(), nonce.bytes.toHexString(), confirmationData.count)
+        log.info("Encrypting SPS2: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes",
+                 key.bytes.toHexString(), nonce.bytes.toHexString(), certDER.count)
         let encrypted: [UInt8]
         do {
-            let ccm = CCM(iv: nonce.bytes, tagLength: 8, messageLength: confirmationData.count)
+            let ccm = CCM(iv: nonce.bytes, tagLength: 8, messageLength: certDER.count)
             let aes = try AES(key: key.bytes, blockMode: ccm, padding: .noPadding)
-            encrypted = try aes.encrypt(confirmationData.bytes)
+            encrypted = try aes.encrypt(certDER.bytes)
         } catch {
-            log.error("AES-CCM encrypt FAILED for SPS2: key=%{public}@, nonce=%{public}@, plaintext=%{public}d bytes, error=%{public}@", key.bytes.toHexString(), nonce.bytes.toHexString(), confirmationData.count, String(describing: error))
+            log.error("AES-CCM encrypt FAILED for SPS2: %{public}@", String(describing: error))
             throw PodProtocolError.pairingException("SPS2 encrypt failed: \(error)")
         }
         keyExchange.incrementNonce(direction: .write)
 
-        log.default("SPS2 encrypted payload: %{public}d bytes (plaintext was %{public}d bytes, btsnoop expects ~960)", encrypted.count, confirmationData.count)
+        log.default("SPS2 encrypted: %{public}d bytes (target ~959)", encrypted.count)
         return Data(encrypted)
     }
 
-    /// Build the certificate binding data for SPS2
-    private func buildCertificateBinding() -> Data {
-        var binding = Data()
-
-        // Certificate chain fingerprints (SHA-256 of DER certificates)
-        if let tlsCertDER = certStore.registration.tlsCertificateDER {
-            binding.append(Data(SHA256.hash(data: tlsCertDER)))
-        }
-
-        // PDM identity
-        binding.append(certStore.controllerID)
-
-        var pdmidExt = certStore.registration.pdmidExtension.bigEndian
-        binding.append(Data(bytes: &pdmidExt, count: 4))
-
-        return binding
-    }
-
     /// Validate the pod's SPS2 response.
-    /// The pod sends its own CMAC confirmation (~871 bytes).
+    ///
+    /// Pod SPS2 has the same structure as phone SPS2 (index 0, short path):
+    ///   plaintext = pod_cert_DER[index=0]
+    ///   encrypted = AES_CCM_ENC(plaintext) || tag(8)
+    ///
+    /// The pod's index-0 certificate is its identity cert (~894 bytes).
+    /// btsnoop shows pod SPS2 is ~902 bytes (894 cert + 8 tag).
     private func o5validatePodSps2(_ msg: MessagePacket) throws {
         log.debug("Pod SPS2 raw message (%{public}d bytes): %{public}@", msg.payload.count, msg.payload.hexadecimalString)
         let payload: Data
@@ -665,7 +439,6 @@ class O5LTKExchanger {
             throw error
         }
         log.default("Received pod SPS2: %{public}d bytes (btsnoop expects ~902)", payload.count)
-        log.info("Pod SPS2 payload: %{public}@", payload.bytes.toHexString())
 
         // Decrypt the pod's SPS2 payload
         let nonce = keyExchange.getSPSNonce(direction: .read)
@@ -680,35 +453,22 @@ class O5LTKExchanger {
             log.error("AES-CCM decrypt FAILED for pod SPS2: key=%{public}@, nonce=%{public}@, payload=%{public}d bytes, error=%{public}@", key.toHexString(), nonce.bytes.toHexString(), payload.count, String(describing: error))
             throw PodProtocolError.pairingException("Pod SPS2 decrypt failed (\(payload.count) bytes): \(error)")
         }
-        log.info("Decrypted pod SPS2 (%d bytes): %{public}@", decryptedPayload.count, decryptedPayload.bytes.toHexString())
         keyExchange.incrementNonce(direction: .read)
 
-        // Extract and verify the pod's CMAC confirmation
-        guard decryptedPayload.count >= 16 else {
-            throw PodProtocolError.pairingException("Pod SPS2 payload too short: \(decryptedPayload.count) bytes")
+        // Structure: raw pod certificate DER (index 0, no signature)
+        let podCertDER = decryptedPayload
+        log.default("Pod SPS2 decrypted: %{public}d bytes (pod cert DER)", podCertDER.count)
+        log.info("Pod cert[0] DER: %{public}@", podCertDER.hexadecimalString)
+
+        // Extract and log the pod certificate details
+        if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
+            log.info("Pod cert[0] public key: %{public}@", podPubKeyRaw.hexadecimalString)
+        } else {
+            log.error("Failed to extract P-256 public key from pod cert[0] DER")
         }
 
-        // The first 16 bytes should be the pod's CMAC confirmation
-        let podConf = decryptedPayload.subdata(in: 0..<16)
-        log.info("Pod CMAC confirmation: %{public}@", podConf.bytes.toHexString())
-
-        // Verify pod confirmation (similar to DASH KC_2_V pattern)
-        let confKey = keyExchange.conf
-        let podConfPrefix = "KC_2_V".data(using: .utf8)!
-        var podConfInput = podConfPrefix
-        podConfInput.append(keyExchange.podNonce)
-        podConfInput.append(keyExchange.pdmNonce)
-        let expectedPodConf = try o5aesCmac(confKey, podConfInput)
-
-        if podConf == expectedPodConf {
-            log.default("Pod SPS2 CMAC confirmation PASSED")
-        } else {
-            log.error("Pod SPS2 CMAC confirmation MISMATCH")
-            log.error("  expected: %{public}@", expectedPodConf.bytes.toHexString())
-            log.error("  received: %{public}@", podConf.bytes.toHexString())
-            log.error("  confKey:  %{public}@", confKey.bytes.toHexString())
-            log.error("  input:    %{public}@", podConfInput.bytes.toHexString())
-            // Don't throw - the exact format is still being determined
+        if let serial = O5CertificateStore.extractSerialNumber(fromDERCert: podCertDER) {
+            log.info("Pod cert[0] serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
         }
     }
 

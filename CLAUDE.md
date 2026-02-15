@@ -47,35 +47,41 @@ So `651 bytes TWi payload = 7 + 2 + 642 encrypted`. The 651/650 byte sizes in bt
 ### Identity
 - `OmnipodKit/Bluetooth/Id.swift` — Controller/pod ID management. O5 uses pdmid from certificate (not random).
 
-## SPS2.1 Compact Proof Structure (Phone → Pod)
+## SPS2.1 / SPS2 Payload Structure (from native library decompile)
 
-Target: **634 bytes plaintext** → 642 encrypted (+ 8 AES-CCM tag) → 651 TWi payload
+The native `libb7fe0d.so` was reverse engineered (see `Omnipod5APK/NATIVE_LIBRARY_DECOMPILE.md`).
+SPS2.1 and SPS2 are **not** custom "compact proofs" — they are raw DER certificates, optionally with a signature appended.
 
+The app loads certificates `[TLS_cert, INS02PG1]` (root excluded via `size - 1`), then iterates **backwards**:
+
+### SPS2.1 (Index 1, sent first) — `sub_36de4` extended path
 ```
-Section 1: ECDSA signature (64 bytes, raw r || s)
-  - Signs 171-byte channel-binding transcript with secondary key
-  - Transcript: [0x01] [FIRMWARE_ID(6)] [0x00000000(4)] [pdmNonce(16)] [pdmPublic(64)] [podNonce(16)] [podPublic(64)]
-
-Section 2: Five uncompressed public keys (5 × 65 = 325 bytes, each with 0x04 prefix)
-  Key 1: Secondary/TLS cert key (identity key, used for signing)
-  Key 2: INS02PG1 intermediate CA
-  Key 3: INS00PG1 root CA
-  Key 4: Attestation leaf (cert_0 from secondary attestation chain)
-  Key 5: TEE intermediate (cert_1 from secondary attestation chain)
-
-Section 3: Certificate metadata (~245 bytes, exact layout still being determined)
-  - TLS cert serial number (20 bytes)
-  - TLS cert SHA-256 fingerprint[:20] (20 bytes)
-  - TLS cert SAN DER value (~98 bytes, contains pdmid/devicetype/commands URIs)
-  - INS02PG1 serial number (20 bytes)
-  - INS02PG1 fingerprint[:20] (20 bytes)
-  - INS00PG1 serial number (20 bytes)
-  - INS00PG1 fingerprint[:20] (20 bytes)
-  Current total: 64 + 325 + 218 = 607 bytes (27 bytes short of 634 target)
-  The missing ~27 bytes may be: length prefixes, version bytes, padding, or additional fields
+plaintext = INS02PG1_cert_DER (570 bytes) || ECDSA_signature (64 bytes raw r||s)
+encrypted = AES_CCM_ENC(plaintext, key=conf, nonce=13B) || tag(8)
+Total: cert_size[1] + 72 = 570 + 72 = 642
 ```
 
-**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1. It's written to the pod during `setPodUid` activation.
+### SPS2 (Index 0, sent second) — `sub_370e8` short path
+```
+plaintext = TLS_cert_DER (~951 bytes)
+encrypted = AES_CCM_ENC(plaintext, key=conf, nonce=13B) || tag(8)
+Total: cert_size[0] + 8 = 951 + 8 = 959
+```
+
+### Channel-binding transcript (171 bytes, signed by secondary key for aux64)
+From native `sub_36690` — keys first, then nonces:
+```
+[0x01] [FIRMWARE_ID(6)] [FLAGS(4)] [pdmPublic(64)] [podPublic(64)] [pdmNonce(16)] [podNonce(16)]
+```
+
+### Size equations (from `getMyConfValSize`)
+- `index == 0`: `size = cert_size[0] + 8` (short path, cert only)
+- `index != 0`: `size = cert_size[index] + 72` (extended path, cert + 0x40 aux + 0x08 tag)
+
+### Native signature constraint
+- `"wrong u16_signature_sz size! Need to be 64 bytes!"` — signature is exactly 64 bytes, no recovery byte.
+
+**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1/SPS2. It's written to the pod during `setPodUid` activation.
 
 ## Active Registration: TEE Simulator pdmid 2584724
 
@@ -104,8 +110,7 @@ The **registration payload** (163 bytes from `register/complete`) is now availab
 - **KDF**: `SHA-256(len||FIRMWARE_ID || len||controllerID || len||pdmPub || len||podPub || len||sharedSecret)` → first 16 bytes = conf key, last 16 bytes = LTK
 - **FIRMWARE_ID**: `9b0ab96a76f4` (fixed 6-byte constant)
 - **AES-CCM**: 13-byte nonce (direction byte + 6 bytes from each nonce), 8-byte tag, conf key
-- **ECDSA**: SHA-256, secondary key signs channel-binding transcript (SPS2.1) and pod commands
-- **CMAC**: AES-CMAC with conf key for SPS2 confirmation
+- **ECDSA**: SHA-256, secondary key signs channel-binding transcript (SPS2.1 aux64) and pod commands
 - **Nonce increment**: First 8 bytes as little-endian UInt64 counter, preserving full 16-byte nonce length
 
 ## Known Issues / Recent Fixes
@@ -117,16 +122,14 @@ The **registration payload** (163 bytes from `register/complete`) is now availab
 - **Registration payload mismatch**: Old payload contained controller_id `0x0026bb60` (2538336). Set to nil.
 - **Heartbeat service error**: `applyConfiguration()` threw `unknownCharacteristic` when heartbeat service wasn't exposed by unpaired pods. Fixed by changing the notifying characteristics loop to `continue` instead of `throw` for missing services.
 
-### Current Issue: SPS2.1 Size Mismatch
-Our compact proof produces ~607 bytes plaintext vs the 634-byte target from btsnoop. The missing ~27 bytes need to be identified. This may require:
-- Decoding actual btsnoop SPS2.1 payloads byte-by-byte
-- Frida instrumentation of TwiSecPair SDK calls
-- Iterative testing against real pods
+### Resolved: SPS2.1/SPS2 Structure
+Native library decompile revealed the payload is simply `cert_DER || signature(64)` for SPS2.1
+and `cert_DER` for SPS2. The old "compact proof" approach (extracted keys, serials, fingerprints, SAN)
+was completely wrong. Rewritten to match native structure. Size now matches btsnoop exactly.
 
 ### Not Yet Implemented
-- **SPS2 exact structure**: The ~952-byte plaintext structure is speculative. Needs native library (`libb7fe0d.so`) analysis or Frida captures.
 - **Post-pairing command signing**: `EncryptedSignedMessage` (type 4) needs ECDSA with secondary key
-- **Registration payload**: Now available (163 bytes). Needed for `setPodUid` post-pairing, not SPS2.1
+- **Registration payload delivery**: Available (163 bytes). Needed for `setPodUid` post-pairing
 - **Heartbeat keep-alive**: UUID defined, notification subscription works, but actual keep-alive logic not implemented
 
 ## External Reference Files
