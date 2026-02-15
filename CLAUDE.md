@@ -69,11 +69,13 @@ Total: cert_size[0] + 8 = 951 + 8 = 959
 ```
 
 ### Channel-binding transcript (171 bytes, signed by secondary key for aux64)
-From native `sub_36690` — exact field order uncertain, currently testing keys-first:
+From native `sub_36690` (fully resolved, controller `ctx[4]==0` path):
 ```
-[0x01] [FIRMWARE_ID(6)] [FLAGS(4)] [pdmPublic(64)] [pdmNonce(16)] [podPublic(64)] [podNonce(16)]
+[0x01] [FIRMWARE_ID(6)] [controller_id(4)] [pdmPub(64)] [podPub(64)] [pdmNonce(16)] [podNonce(16)]
 ```
-Note: keys-first groups each side as `[pubkey(64)][nonce(16)]`, matching SPS1 wire format.
+- Bytes 7-10 are `controller_id` (e.g. `00277094`), NOT zeros.
+- Keys grouped together, then nonces grouped together (NOT interleaved per side).
+- Pod verification uses swapped variant: `[0x02] [controller_id(4)] [FIRMWARE_ID(6)] [podPub] [pdmPub] [podNonce] [pdmNonce]`.
 
 ### Size equations (from `getMyConfValSize`)
 - `index == 0`: `size = cert_size[0] + 8` (short path, cert only)
@@ -137,9 +139,12 @@ Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowled
 | 1 | Nonces-first transcript: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
 | 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same pod as #1, corrupted by bad MTU attempt |
 | 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant. Reverted. |
-| 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. Confirms keys-first also fails. |
+| 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. |
+| 5 | Fixed transcript: `controller_id` in bytes 7-10 (was zeros) + keys grouped then nonces grouped | **TESTING** | Native RE confirmed exact layout. Two bugs found. |
 
-Both transcript orders tested with correct framing → both fail. The issue is NOT transcript order.
+**Bugs found via native library RE (test #5):**
+1. Bytes 7-10 were `00000000` but should be `controller_id` (`00277094`)
+2. Key/nonce order was interleaved (`pdmPub||pdmNonce||podPub||podNonce`) but should be grouped (`pdmPub||podPub||pdmNonce||podNonce`)
 
 **Key learning (test #3):**
 `BlePacket_MAX_PAYLOAD_SIZE=244` for O5 is an application-level protocol constant that defines logical packet
@@ -148,12 +153,14 @@ Changing it to 20 switches to DASH-style framing which the O5 pod rejects with F
 Android explicitly calls `requestMtu(251)`, pod responds with 247. iOS auto-negotiates but stays at 23.
 This is fine — CoreBluetooth fragments internally.
 
-**Possible remaining causes (tests 1-2 are valid — disconnect after SPS2.1):**
-- **KDF is wrong** → wrong conf key → pod can't decrypt SPS2.1 at all
-- **Transcript field order** — still uncertain (keys-first vs nonces-first)
-- **Flags field** should be controllerID (`00277094`) instead of zeros
-- **Double-hashing** — CryptoKit `signature(for:)` hashes internally; if native lib also hashes, signature would differ
-- **Primary key** should be used instead of secondary key for SPS2.1 signing
+**Confirmed correct by native RE (no changes needed):**
+- KDF: plain SHA-256 with 8-byte BE length prefixes ✓
+- KDF input order: FIRMWARE_ID, controller_id, pdmPub, podPub, sharedSecret ✓
+- KDF output split: conf=digest[0:16], LTK=digest[16:32] ✓
+- Signing key: secondary (`com.twi.enclave.device.secondary`) ✓
+- Signature: SHA256withECDSA → raw r||s (64 bytes), no double-hash ✓
+- AES-CCM: nonce(13), tag(8), dir byte 0x01/0x02 ✓
+- FIRMWARE_ID: `9b0ab96a76f4` hardcoded ✓
 
 ### Not Yet Implemented
 - **Post-pairing command signing**: `EncryptedSignedMessage` (type 4) needs ECDSA with secondary key

@@ -363,8 +363,9 @@ class O5LTKExchanger {
         if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
             log.info("Pod cert public key: %{public}@", podPubKeyRaw.hexadecimalString)
 
-            // Verify the pod's signature over the channel-binding transcript
-            let transcript = keyExchange.buildChannelBindingTranscript()
+            // Verify the pod's signature over the pod's channel-binding transcript variant
+            // Pod signs with w1=1: [0x02][controller_id][FIRMWARE_ID][podPub][pdmPub][podNonce][pdmNonce]
+            let transcript = keyExchange.buildPodChannelBindingTranscript()
             let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
             if signatureValid {
                 log.default("Pod SPS2.1 signature verification PASSED")

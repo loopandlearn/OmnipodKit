@@ -168,41 +168,36 @@ class O5KeyExchange {
 
     /// Build the 171-byte channel-binding transcript for SPS2.1 signing.
     ///
-    /// From native library sub_36690 analysis:
+    /// From native library `sub_36690` (fully resolved, `ctx[4]==0` controller path):
     /// ```
-    /// Byte  0:       0x01          — version/type
-    /// Bytes 1-6:     9b0ab96a76f4  — FIRMWARE_ID (fixed, NOT session nonce)
-    /// Bytes 7-10:    00000000      — flags/counter
-    /// Bytes 11-74:   phone EC X,Y  — pdmPublic (64 bytes, ephemeral ECDH)
-    /// Bytes 75-90:   phone nonce   — pdmNonce (16 bytes)
-    /// Bytes 91-154:  pod EC X,Y    — podPublic (64 bytes, ephemeral ECDH)
-    /// Bytes 155-170: pod nonce     — podNonce (16 bytes)
+    /// Byte  0:       0x01            — type (w1==0 → 0x01)
+    /// Bytes 1-6:     FIRMWARE_ID     — 9b0ab96a76f4 (6 bytes, from ctx+0xff)
+    /// Bytes 7-10:    controller_id   — e.g. 00277094 (4 bytes, from ctx+0xfb)
+    /// Bytes 11-74:   pdmPublic       — phone ECDH public key (64 bytes)
+    /// Bytes 75-138:  podPublic       — pod ECDH public key (64 bytes)
+    /// Bytes 139-154: pdmNonce        — phone nonce (16 bytes)
+    /// Bytes 155-170: podNonce        — pod nonce (16 bytes)
     /// ```
     ///
-    /// Note: This matches SPS1 wire order: PubKey(64) + Nonce(16).
+    /// Note: Keys are grouped together, then nonces grouped together (NOT interleaved).
     func buildChannelBindingTranscript() -> Data {
         var transcript = Data(capacity: 171)
 
-        // From native library sub_36690, the channel-binding transcript is:
-        //   type(1) + fieldA(6) + fieldB(4) + 2×keyLen + 2×16 = 171 bytes (for P-256, keyLen=64)
-        // The exact field order (keys-first vs nonces-first) is uncertain from static analysis.
-        // Using keys-first order: pubkey(64) + nonce(16) for each side.
-
-        // Type byte (mode 0 → type 1)
+        // Type byte (controller context: ctx[4]==0, w1==ctx[4]==0 → type 0x01)
         transcript.append(Data([0x01]))
 
-        // Field A: FIRMWARE_ID (fixed 6-byte value)
+        // Field A: FIRMWARE_ID (6 bytes, from ctx+0xff)
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
 
-        // Field B: Flags (4 zero bytes)
-        transcript.append(Data([0x00, 0x00, 0x00, 0x00]))
+        // Field B: controller_id (4 bytes, from ctx+0xfb) — NOT zeros
+        transcript.append(controllerID)
 
-        // PDM: ECDH public key (64 bytes) + nonce (16 bytes)
+        // Both public keys grouped together (64 + 64 = 128 bytes)
         transcript.append(pdmPublic)
-        transcript.append(pdmNonce)
-
-        // Pod: ECDH public key (64 bytes) + nonce (16 bytes)
         transcript.append(podPublic)
+
+        // Both nonces grouped together (16 + 16 = 32 bytes)
+        transcript.append(pdmNonce)
         transcript.append(podNonce)
 
         if transcript.count != 171 {
@@ -210,6 +205,35 @@ class O5KeyExchange {
             log.error("  FIRMWARE_ID: %{public}d, pdmNonce: %{public}d, pdmPublic: %{public}d, podNonce: %{public}d, podPublic: %{public}d",
                        O5LTKExchanger.FIRMWARE_ID.count, pdmNonce.count, pdmPublic.count, podNonce.count, podPublic.count)
         }
+        return transcript
+    }
+
+    /// Build the pod's (peer) variant of the channel-binding transcript for verifying pod SPS2.1.
+    ///
+    /// The pod signs with `w1=1` (its own context has `ctx[4]==1`), which produces:
+    /// ```
+    /// [0x02] [controller_id(4)] [FIRMWARE_ID(6)] [podPub(64)] [pdmPub(64)] [podNonce(16)] [pdmNonce(16)]
+    /// ```
+    func buildPodChannelBindingTranscript() -> Data {
+        var transcript = Data(capacity: 171)
+
+        // Type byte (pod context: w1==1 → type 0x02)
+        transcript.append(Data([0x02]))
+
+        // Field A: controller_id (4 bytes) — swapped from controller transcript
+        transcript.append(controllerID)
+
+        // Field B: FIRMWARE_ID (6 bytes) — swapped from controller transcript
+        transcript.append(O5LTKExchanger.FIRMWARE_ID)
+
+        // Pod keys first (swapped from controller transcript)
+        transcript.append(podPublic)
+        transcript.append(pdmPublic)
+
+        // Pod nonces first (swapped from controller transcript)
+        transcript.append(podNonce)
+        transcript.append(pdmNonce)
+
         return transcript
     }
 
