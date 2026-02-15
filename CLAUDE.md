@@ -135,9 +135,11 @@ Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowled
 | # | Change | Result | Notes |
 |---|--------|--------|-------|
 | 1 | Nonces-first transcript: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
-| 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same behavior — but was this a valid test? See #3 |
-| 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant, not the physical MTU. CoreBluetooth handles L2CAP fragmentation. Reverted. |
-| 4 | Reverted packet size to 244, keys-first transcript | **TESTING** | Need fresh pod — previous pod may be in bad state from test #3 |
+| 2 | Keys-first transcript: `[pdmPublic][pdmNonce][podPublic][podNonce]` | Pod disconnect after SPS2.1 | Same pod as #1, corrupted by bad MTU attempt |
+| 3 | Adjusted `BlePacket_MAX_PAYLOAD_SIZE` to match MTU (244→20) | Pod FAIL on SP1+SP2 | **WRONG** — 244 is an app-level protocol constant. Reverted. |
+| 4 | Keys-first transcript, correct packet framing (244) | Pod disconnect after SPS2.1 | Same pod, recovered from #3. SP1/SPS0/SPS1 all OK. Confirms keys-first also fails. |
+
+Both transcript orders tested with correct framing → both fail. The issue is NOT transcript order.
 
 **Key learning (test #3):**
 `BlePacket_MAX_PAYLOAD_SIZE=244` for O5 is an application-level protocol constant that defines logical packet
