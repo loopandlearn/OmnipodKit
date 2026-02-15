@@ -27,9 +27,15 @@ extension PeripheralManager {
             throw PeripheralManagerError.notReady
         }
 
-        // O5 uses writeWithoutResponse on command characteristic (confirmed by btsnoop).
-        // DASH uses writeWithResponse.
-        let type: CBCharacteristicWriteType = (podType == omnipod5Type) ? .withoutResponse : .withResponse
+        // O5 default: .withoutResponse (confirmed by btsnoop).
+        // DASH: always .withResponse.
+        // Bit 7 of pairing config can override O5 to .withResponse for testing.
+        let type: CBCharacteristicWriteType
+        if podType == omnipod5Type {
+            type = O5PairingConfiguration.current.useWithResponseForCommands ? .withResponse : .withoutResponse
+        } else {
+            type = .withResponse
+        }
         try writeValue(Data([PodCommand.HELLO.rawValue, 0x01, 0x04]) + controllerId, for: characteristic, type: type, timeout: 5)
     }
     
@@ -195,9 +201,15 @@ extension PeripheralManager {
             throw PeripheralManagerError.notReady
         }
 
-        // O5 uses writeWithoutResponse on command characteristic (confirmed by btsnoop).
-        // DASH uses writeWithResponse.
-        let type: CBCharacteristicWriteType = (podType == omnipod5Type) ? .withoutResponse : .withResponse
+        // O5 default: .withoutResponse (confirmed by btsnoop).
+        // DASH: always .withResponse.
+        // Bit 7 of pairing config can override O5 to .withResponse for testing.
+        let type: CBCharacteristicWriteType
+        if podType == omnipod5Type {
+            type = O5PairingConfiguration.current.useWithResponseForCommands ? .withResponse : .withoutResponse
+        } else {
+            type = .withResponse
+        }
         try writeValue(Data([command.rawValue]), for: characteristic, type: type, timeout: timeout)
     }
 

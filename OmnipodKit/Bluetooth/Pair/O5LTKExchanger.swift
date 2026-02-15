@@ -46,12 +46,21 @@ class O5LTKExchanger {
     }
 
     func o5negotiateLTK() throws -> PairResult {
-        // All flags use confirmed correct defaults from btsnoop capture (pdmid 2587928, 2026-02-15).
-        // No flag cycling needed — correct values are hard-coded in O5KeyExchange.
+        // Cycle through pairing configurations on each attempt.
+        // Combination 0 = all defaults (current confirmed-correct behavior).
+        // Each subsequent attempt toggles different settings to find what works.
+        let config = O5PairingConfiguration.nextConfiguration()
+        config.logConfiguration()
+        config.apply(to: keyExchange)
+
+        log.default("O5 pairing attempt using %{public}@", config.shortDescription)
+
         do {
-            return try o5negotiateLTKBody()
+            let result = try o5negotiateLTKBody()
+            log.default("O5 pairing SUCCEEDED with %{public}@", config.shortDescription)
+            return result
         } catch {
-            log.error("O5 pairing failed: %{public}@", String(describing: error))
+            log.error("O5 pairing FAILED with %{public}@: %{public}@", config.shortDescription, String(describing: error))
             throw error
         }
     }
