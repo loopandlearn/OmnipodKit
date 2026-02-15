@@ -69,10 +69,11 @@ Total: cert_size[0] + 8 = 951 + 8 = 959
 ```
 
 ### Channel-binding transcript (171 bytes, signed by secondary key for aux64)
-From native `sub_36690` — keys first, then nonces:
+From native `sub_36690` — exact field order uncertain, currently testing keys-first:
 ```
-[0x01] [FIRMWARE_ID(6)] [FLAGS(4)] [pdmPublic(64)] [podPublic(64)] [pdmNonce(16)] [podNonce(16)]
+[0x01] [FIRMWARE_ID(6)] [FLAGS(4)] [pdmPublic(64)] [pdmNonce(16)] [podPublic(64)] [podNonce(16)]
 ```
+Note: keys-first groups each side as `[pubkey(64)][nonce(16)]`, matching SPS1 wire format.
 
 ### Size equations (from `getMyConfValSize`)
 - `index == 0`: `size = cert_size[0] + 8` (short path, cert only)
@@ -126,6 +127,22 @@ The **registration payload** (163 bytes from `register/complete`) is now availab
 Native library decompile revealed the payload is simply `cert_DER || signature(64)` for SPS2.1
 and `cert_DER` for SPS2. The old "compact proof" approach (extracted keys, serials, fingerprints, SAN)
 was completely wrong. Rewritten to match native structure. Size now matches btsnoop exactly.
+
+### SPS2.1 Pairing Troubleshooting Log
+
+Pod disconnects immediately after receiving SPS2.1. The send succeeds (acknowledged) but the pod rejects the payload and drops the BLE connection.
+
+| # | Transcript Order | Result | Notes |
+|---|-----------------|--------|-------|
+| 1 | Nonces-first: `[pdmNonce][pdmPublic][podNonce][podPublic]` | Pod disconnect after SPS2.1 | Original order, tested twice |
+| 2 | Keys-first: `[pdmPublic][pdmNonce][podPublic][podNonce]` | **TESTING** | Matches SPS1 wire format (pubkey+nonce) |
+
+**Possible remaining causes if keys-first also fails:**
+- **KDF is wrong** → wrong conf key → pod can't decrypt SPS2.1 at all (most likely)
+- **Flags field** should be controllerID (`00277094`) instead of zeros
+- **MTU 23** may cause issues (btsnoop used MTU 247) — try requesting larger MTU
+- **Double-hashing** — CryptoKit `signature(for:)` hashes internally; if native lib also hashes, signature would differ
+- **Primary key** should be used instead of secondary key for SPS2.1 signing
 
 ### Not Yet Implemented
 - **Post-pairing command signing**: `EncryptedSignedMessage` (type 4) needs ECDSA with secondary key

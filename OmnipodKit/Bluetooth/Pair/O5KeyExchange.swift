@@ -168,26 +168,25 @@ class O5KeyExchange {
 
     /// Build the 171-byte channel-binding transcript for SPS2.1 signing.
     ///
-    /// Verified against real btsnoop capture (SPS21_KEYS_PRIMARY.md Section 6):
+    /// From native library sub_36690 analysis:
     /// ```
     /// Byte  0:       0x01          — version/type
     /// Bytes 1-6:     9b0ab96a76f4  — FIRMWARE_ID (fixed, NOT session nonce)
     /// Bytes 7-10:    00000000      — flags/counter
-    /// Bytes 11-26:   phone nonce   — pdmNonce (16 bytes)
-    /// Bytes 27-90:   phone EC X,Y  — pdmPublic (64 bytes, ephemeral ECDH)
-    /// Bytes 91-106:  pod nonce     — podNonce (16 bytes)
-    /// Bytes 107-170: pod EC X,Y    — podPublic (64 bytes, ephemeral ECDH)
+    /// Bytes 11-74:   phone EC X,Y  — pdmPublic (64 bytes, ephemeral ECDH)
+    /// Bytes 75-90:   phone nonce   — pdmNonce (16 bytes)
+    /// Bytes 91-154:  pod EC X,Y    — podPublic (64 bytes, ephemeral ECDH)
+    /// Bytes 155-170: pod nonce     — podNonce (16 bytes)
     /// ```
     ///
-    /// Note: SPS1 payloads are sent over BLE as PubKey(64) + Nonce(16),
-    /// but in the transcript they appear as Nonce(16) + PubKey(64) (reversed order).
+    /// Note: This matches SPS1 wire order: PubKey(64) + Nonce(16).
     func buildChannelBindingTranscript() -> Data {
         var transcript = Data(capacity: 171)
 
         // From native library sub_36690, the channel-binding transcript is:
         //   type(1) + fieldA(6) + fieldB(4) + 2×keyLen + 2×16 = 171 bytes (for P-256, keyLen=64)
         // The exact field order (keys-first vs nonces-first) is uncertain from static analysis.
-        // Using nonces-first order (matching SPS1 wire payload format: nonce(16) + pubkey(64)).
+        // Using keys-first order: pubkey(64) + nonce(16) for each side.
 
         // Type byte (mode 0 → type 1)
         transcript.append(Data([0x01]))
@@ -198,13 +197,13 @@ class O5KeyExchange {
         // Field B: Flags (4 zero bytes)
         transcript.append(Data([0x00, 0x00, 0x00, 0x00]))
 
-        // PDM: nonce (16 bytes) + ECDH public key (64 bytes)
-        transcript.append(pdmNonce)
+        // PDM: ECDH public key (64 bytes) + nonce (16 bytes)
         transcript.append(pdmPublic)
+        transcript.append(pdmNonce)
 
-        // Pod: nonce (16 bytes) + ECDH public key (64 bytes)
-        transcript.append(podNonce)
+        // Pod: ECDH public key (64 bytes) + nonce (16 bytes)
         transcript.append(podPublic)
+        transcript.append(podNonce)
 
         if transcript.count != 171 {
             log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
