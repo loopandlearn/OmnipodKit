@@ -499,6 +499,24 @@ extension PeripheralManager {
         switch peripheral.state {
         case .connected:
             clearCommsQueues()
+
+            // Log the negotiated MTU and adjust packet sizes for O5 pods
+            let mtu = peripheral.maximumWriteValueLength(for: .withoutResponse)
+            self.log.default("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d", mtu)
+            if self.podType == omnipod5Type && mtu > 20 {
+                // Use the negotiated MTU for O5 packet sizing instead of assuming 244
+                let effectiveMaxPayload = min(mtu, 244)
+                if effectiveMaxPayload != BlePacket_MAX_PAYLOAD_SIZE {
+                    self.log.default("Adjusting BlePacket_MAX_PAYLOAD_SIZE from %{public}d to %{public}d based on negotiated MTU", BlePacket_MAX_PAYLOAD_SIZE, effectiveMaxPayload)
+                    BlePacket_MAX_PAYLOAD_SIZE = effectiveMaxPayload
+                    FirstBlePacket_CAPACITY_WITHOUT_MIDDLE_PACKETS = BlePacket_MAX_PAYLOAD_SIZE - BleFirstPacket_HEADER_SIZE_WITHOUT_MIDDLE_PACKETS
+                    FirstBlePacket_CAPACITY_WITH_MIDDLE_PACKETS = BlePacket_MAX_PAYLOAD_SIZE - BleFirstPacket_HEADER_SIZE_WITH_MIDDLE_PACKETS
+                    FirstBlePacket_CAPACITY_WITH_THE_OPTIONAL_PLUS_ONE_PACKET = FirstBlePacket_CAPACITY_WITH_MIDDLE_PACKETS
+                    MiddleBlePacket_CAPACITY = BlePacket_MAX_PAYLOAD_SIZE - 1
+                    LastBlePacket_CAPACITY = BlePacket_MAX_PAYLOAD_SIZE - LastBlePacket_HEADER_SIZE
+                }
+            }
+
             self.log.debug("PeripheralManager - didConnect - running assertConfiguration")
             assertConfiguration()
 

@@ -198,16 +198,20 @@ extension PeripheralManager {
     /// - Throws: PeripheralManagerError
     func sendData(_ value: Data, timeout: TimeInterval) throws {
         dispatchPrecondition(condition: .onQueue(queue))
-        
+
         guard let characteristic = peripheral.getDataCharacteristic() else {
             log.error("Unable to get characteristic... peripheral status: %{PUBLIC}@", peripheral.state.description)
             throw PeripheralManagerError.notReady
         }
-        
+
         var type: CBCharacteristicWriteType
         switch self.podType {
         case omnipod5Type:
             type = .withoutResponse
+            let maxWrite = peripheral.maximumWriteValueLength(for: .withoutResponse)
+            if value.count > maxWrite {
+                log.error("O5 sendData: packet size %{public}d exceeds maximumWriteValueLength %{public}d!", value.count, maxWrite)
+            }
         case dashType:
             type = .withResponse
         default:
