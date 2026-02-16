@@ -28,14 +28,14 @@ class O5KeyExchange {
     /// Keys-grouped layout: keys together then nonces together (confirmed by native RE sub_36690).
     var keysNonceFirst: Bool = false
 
-    /// Confirmed: bytes 7-10 of channel-binding transcript are the real controllerID (not zeros).
-    var bytesAsControllerId: Bool = true
+    /// Confirmed by Config#10 (2026-02-16): bytes 7-10 of channel-binding transcript use ZEROS (not real controllerID).
+    var bytesAsControllerId: Bool = false
 
     /// Confirmed: KDF uses 8-byte UInt64 BE length prefixes (matching real session KDF input).
     var useUInt32LengthPrefixes: Bool = false
 
-    /// Confirmed: KDF uses real controllerID (not zeros).
-    var kdfZeroControllerID: Bool = false
+    /// Confirmed by Config#10 (2026-02-16): KDF uses ZEROS for controllerID (not real controllerID).
+    var kdfZeroControllerID: Bool = true
 
     /// Confirmed: SPS2.1 = INS02PG1 intermediate cert, SPS2 = TLS leaf cert (default order).
     var swapCertIndexes: Bool = false

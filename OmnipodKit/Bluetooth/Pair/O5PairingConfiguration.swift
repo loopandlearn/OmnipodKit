@@ -63,15 +63,21 @@ struct O5PairingConfiguration {
 
     // MARK: - Cycling
 
-    /// Returns the next configuration to try and advances the persistent counter.
-    /// Call this once at the start of each pairing attempt.
+    /// Returns the current configuration for pairing.
+    ///
+    /// Bitmask cycling disabled — Config#10 confirmed correct (2026-02-16).
+    /// Defaults locked in O5KeyExchange.swift. Always returns mask 0 so that
+    /// O5KeyExchange's own default values (the confirmed-correct ones) are used.
     static func nextConfiguration() -> O5PairingConfiguration {
-        let counter = UserDefaults.standard.integer(forKey: counterKey)
-        let config = O5PairingConfiguration(mask: UInt32(counter))
+        // Bitmask cycling disabled — Config#10 confirmed correct (2026-02-16).
+        // Defaults locked in O5KeyExchange.swift.
+        let config = O5PairingConfiguration(mask: 0)
 
-        // Advance counter for next attempt, wrapping around
-        let next = (counter + 1) % totalCombinations
-        UserDefaults.standard.set(next, forKey: counterKey)
+        // --- Counter increment disabled: no longer cycling through combinations ---
+        // let counter = UserDefaults.standard.integer(forKey: counterKey)
+        // let config = O5PairingConfiguration(mask: UInt32(counter))
+        // let next = (counter + 1) % totalCombinations
+        // UserDefaults.standard.set(next, forKey: counterKey)
 
         // Store as the current active configuration
         current = config
