@@ -70,8 +70,8 @@ struct O5PairingConfiguration {
     /// O5KeyExchange's own default values (the confirmed-correct ones) are used.
     static func nextConfiguration() -> O5PairingConfiguration {
         // Bitmask cycling disabled — Config#10 confirmed correct (2026-02-16).
-        // Defaults locked in O5KeyExchange.swift.
-        let config = O5PairingConfiguration(mask: 0)
+        // Mask 0x0A = bits 1+3 set: bytesAsControllerId=false, kdfZeroControllerID=true.
+        let config = O5PairingConfiguration(mask: 0x0A)
 
         // --- Counter increment disabled: no longer cycling through combinations ---
         // let counter = UserDefaults.standard.integer(forKey: counterKey)
