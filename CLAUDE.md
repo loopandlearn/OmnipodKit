@@ -610,6 +610,120 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
     - Compare BLE traffic against Pod2 Frida captures
     - Confirm pod state transitions: FILLED -> UID_SET -> ENGAGING_CLUTCH_DRIVE -> CLUTCH_DRIVE_ENGAGED
 
+## Debugging Reference (Quick Guide for New Agents)
+
+This section consolidates the most critical debugging knowledge from 21+ test iterations. Read this FIRST when investigating O5 activation failures.
+
+### Pod Failure Modes and What They Mean
+
+**1. Pod disconnects (CBError code=7) after HELLO or during EAP-AKA:**
+- Double HELLO: `blePairAndSetupPod()` established a second EAP-AKA session when `completeConfiguration()` already did. Check `needsSessionEstablishment` flag.
+- RTS sent to O5 pod: O5 NEVER uses RTS/CTS. Check that `doRTS=false` for all O5 code paths.
+- Tainted pod: pod was used in a failed attempt. Manufacturer data byte changes `0x00` to `0x80`. Use a factory-fresh pod.
+
+**2. "Pod ACKs but no data response" (`emptyValue` error):**
+When the pod sends SUCCESS (0x04) on the CMD characteristic but never sends data on the DATA characteristic, it means the pod received and parsed the TWi frame correctly but could NOT process the inner payload. The pod does NOT send error responses for crypto/parse failures -- it just silently drops the command. Common causes:
+- **Wrong nonce state**: AES-CCM decrypt failure. Typically caused by a double command (e.g., double getPodVersion shifting nonce by 3) or a rejected command that still incremented the nonce.
+- **Malformed inner payload**: Wrong SLPE format (e.g., using `formatKeys()` length prefixes for AID commands which should be plain ASCII).
+- **Missing getPodVersion**: `getPodVersion` (AssignAddress with 0xffffffff) MUST be the first encrypted command after each new EAP-AKA session. Without it, the pod ignores subsequent commands.
+- **Command not valid for pod state**: Pod at FILLED (state 2) rejects GetStatus with error 19, but the error response itself desynchronizes nonce state, causing the NEXT command to fail silently.
+
+**3. Pod responds with wrong data format (`unknownBlockType`):**
+- Check the SLPE GET suffix. Standard Omnipod commands must use `,G0.0` (not `,G3.12`). AID-specific commands use their own suffixes.
+- `,G3.12` tells the pod to respond in AID status format (`3.12=` prefix) instead of standard format (`0.0=` prefix).
+
+### AID Commands vs Standard Omnipod Commands (CRITICAL DISTINCTION)
+
+These are two COMPLETELY DIFFERENT payload formats that share the same BLE transport:
+
+| Aspect | Standard Omnipod Commands | O5 AID Commands |
+|--------|--------------------------|-----------------|
+| Examples | getPodVersion, setPodUid, programAlert, programBolus | UtcCommand, TdiCommand, TargetBgProfile, EgvCommand |
+| SLPE wrapping | `S0.0=` + 2-byte length + Message bytes + `,G0.0` | Plain ASCII: `SE255.2=1771222561` or `S3.2=0003000E00,G3.2` |
+| Length prefix | YES -- `StringLengthPrefixEncoding.formatKeys()` adds 2-byte big-endian length | **NO** -- plain string concatenation, no length bytes |
+| Inner Message struct | YES -- 4-byte address + sequence + CRC at bytes 0-3 | **NO** -- raw ASCII key-value, no address/sequence/CRC |
+| Response parsing | `StringLengthPrefixEncoding.parseKeys()` strips `0.0=` prefix + length | Strip ASCII prefix (e.g., `ES255.2=`, `3.2=`) directly from string |
+| Implementation | `PodCommsSession` / `BleMessageTransport.getCmdMessage()` | `O5AidCommands.swift` / `BlePodComms.sendO5AidCommand()` |
+| Frida reference | Payload starts with `ffffffff0006...` (hex of Message struct) | Payload is raw ASCII bytes: `53453235352E323D...` = `"SE255.2=..."` |
+
+**Test #21 root cause**: `O5AidCommands` used `StringLengthPrefixEncoding.formatKeys()` which added 2-byte length prefixes. Frida shows the real app sends `"SE255.2=1771222561"` (18 bytes, plain ASCII). OmnipodKit was sending `"SE255.2=" + 0x000A + "1771276453"` (20 bytes, with length prefix). Pod received it, ACKed transport, but couldn't parse the inner payload.
+
+### Double getPodVersion Prevention
+
+`getPodVersion` (AssignAddress with address 0xffffffff) is sent at two points in the code:
+1. **Inside `pairPod()`**: Sent as the last step of normal pairing, after EAP-AKA success.
+2. **Inside `blePairAndSetupPod()`**: Sent before `o5PreSetupSteps()`, needed for the resume path when `pairPod()` was skipped.
+
+On the initial pairing path, BOTH would run, causing a double getPodVersion. Each getPodVersion exchange shifts nonce state by 3 (encrypt command, decrypt response, encrypt ACK). The second one succeeds but leaves the nonce out of sync for subsequent AID commands.
+
+**Fix**: `pairPodRanGetPodVersion` boolean flag is set to `true` when `pairPod()` runs. The `blePairAndSetupPod()` getPodVersion is only sent when this flag is `false` (resume path where `pairPod()` was skipped).
+
+### Pod Progress States and Valid Commands
+
+| State | Value | Name | Valid Commands | Invalid Commands |
+|-------|-------|------|---------------|-----------------|
+| 2 | FILLED | "Reminder initialized" (fresh O5 pod) | getPodVersion, AID commands, setPodUid | GetStatus (error 19) |
+| 3 | UID_SET | "pairingCompleted" (after setPodUid) | programAlert, programBolus, getPodStatus | -- |
+| 4 | ENGAGING_CLUTCH_DRIVE | (during prime) | getPodStatus (polling) | -- |
+| 5 | CLUTCH_DRIVE_ENGAGED | (prime complete) | programAlert, Phase 2 commands | -- |
+
+**Key rule**: GetStatus does NOT work at state 2 (FILLED). Sending it causes error 19 (`ERR_ILLEGAL_CMD_STATE`). The error response itself is a valid encrypted exchange that increments the nonce, so subsequent commands will use wrong nonce and fail silently with `emptyValue`.
+
+### Session Establishment Rules
+
+1. Each new BLE connection needs HELLO (0x06 on CMD char) + EAP-AKA before encrypted commands work.
+2. You CANNOT establish two EAP-AKA sessions on the same connection -- pod disconnects (CBError 7) on second HELLO.
+3. `needsSessionEstablishment` flag tracks whether `completeConfiguration()` already established a session.
+4. `blePairAndSetupPod()` has three-branch logic:
+   - **Fresh pair**: `pairPod()` handles HELLO + EAP-AKA + getPodVersion internally.
+   - **Session already active** (`!needsSessionEstablishment` and `ck` valid): Skip HELLO + EAP-AKA entirely.
+   - **Need new session** (reconnect with no active session): Send HELLO + establish EAP-AKA + getPodVersion.
+
+### Firmware Version Differences
+
+| Source | Firmware | Notes |
+|--------|----------|-------|
+| Pod2 Frida capture (reference) | FW 4.23.1.21, productId=5 | All protocol analysis and byte-level validation is based on this version |
+| Recent test pods (2026-02-16) | FW 9.0.4 / 6.0.0 | Different firmware, same protocol so far. VersionResponse parsing may display differently depending on code path. |
+
+Protocol behavior has been consistent across firmware versions tested, but be aware the reference captures are from 4.23.1.21.
+
+### Comparing OmnipodKit Output Against Frida Reference
+
+The primary reference for correct command encoding is the Pod2 Frida capture:
+`/Users/james/Downloads/Pod2-o5app-beforeinsert.txt`
+
+**For AID commands:**
+- Frida logs each AID command as: `[pod-log] ... AID/QN Pod command: <Name>: <hex of ASCII payload>`
+- The hex is the raw ASCII bytes, e.g., `53453235352E323D31373731323232353631` = `"SE255.2=1771222561"`
+- OmnipodKit logs: `O5 AID Send: <name> payload=<ascii string> (<N> bytes)`
+- Convert the Frida hex to ASCII and compare character-by-character against OmnipodKit's payload string.
+
+**For standard commands (getPodVersion, setPodUid, programAlert, programBolus):**
+- Frida logs plaintext as hex of the inner Message struct: `ffffffff0006...` (starts with 4-byte address)
+- OmnipodKit logs the Message hex before encryption in `o5Send()`.
+- Compare the hex bytes directly.
+
+**For encrypted output:**
+- Encrypted content will DIFFER between runs (different ephemeral keys, nonces, timestamps).
+- Sizes and framing MUST match: same number of bytes, same TWi header structure, same SLPE prefix format.
+
+### Key Log Patterns for Debugging
+
+| Log Pattern | Meaning | Action |
+|-------------|---------|--------|
+| `[BLE RAW] WRITE ... type=withoutResponse` | Outgoing BLE write | Verify `withoutResponse` for O5 (not `withResponse`) |
+| `[BLE RAW] CMD RECV: 0400010000` | Pod SUCCESS acknowledgment on CMD char | Transport OK, but does NOT mean command succeeded |
+| `waitForCommand: got expected 0x04` | Transport-level ACK received | Good -- pod received the TWi frame |
+| `Error reading message: emptyValue` | Pod didn't respond with data after ACK | Decrypt/parse failure -- see "Pod ACKs but no data response" above |
+| `Disconnecting due to unresponsive pod` | OmnipodKit-initiated disconnect after timeout | Preceded by `emptyValue` -- check nonce state and payload format |
+| `CBError code=7` | Pod-initiated BLE disconnect | Double HELLO, RTS on O5, or tainted pod state |
+| `unknownBlockType(rawVal: 0)` | Response has wrong SLPE prefix format | Check GET suffix: should be `,G0.0` for standard commands |
+| `Error reading message: podReturnedErrorCode(19)` | Pod rejected command (ERR_ILLEGAL_CMD_STATE) | Command not valid for pod's current progress state |
+| `O5 AID Send: <name> payload=...` | AID command being sent | Compare payload string against Frida hex reference |
+| `Session already established by completeConfiguration` | EAP-AKA session reuse | Good -- avoids double session establishment |
+| `pairPodRanGetPodVersion=true, skipping second getPodVersion` | Double-getPodVersion prevention | Good -- prevents nonce desync |
+
 ## External Reference Files
 
 ### Successful pairing capture (pdmid 2587928)
