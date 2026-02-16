@@ -306,6 +306,163 @@ class BlePodComms: PodComms {
         }
     }
 
+    // MARK: - O5 Pre-SetupPod Steps
+
+    /// Performs the O5-specific intermediate steps between AssignAddress and SetupPod.
+    ///
+    /// From btsnoop analysis of a successful O5 activation:
+    ///   [1] AssignAddress -> VersionResponse  (already done in pairPod)
+    ///   [2] GetStatus -> StatusResponse       (verify pod state)
+    ///   [3] Short command -> StatusResponse   (unknown, skipped)
+    ///   [4] Large 212B exchange               (unknown O5 config, skipped)
+    ///   [5-6] Short exchanges                 (unknown, skipped)
+    ///   [7-9] Registration payload x3         (setPodUid)
+    ///   [10] GetStatus -> VersionResponse     (pre-SetupPod check)
+    ///   [11] SetupPod -> VersionResponse
+    ///
+    /// We implement the known steps: GetStatus, registration delivery, GetStatus.
+    /// Unknown steps (3-6) are skipped — the pod may still accept SetupPod without them,
+    /// or we'll get a different error that tells us what's missing.
+    private func o5PreSetupSteps(blePodMessageTransport: BlePodMessageTransport) throws {
+        // We should already be holding podStateLock during calls to this function
+        assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
+
+        log.info("O5: Beginning pre-SetupPod intermediate steps")
+
+        // Helper to save transport state after each successful step
+        let saveState = { [self] in
+            if self.podState != nil {
+                self.podState!.bleMessageTransportState = blePodMessageTransport.state
+                log.debug("O5: Saved transport state: msgSeq=%{public}d, nonceSeq=%{public}d, messageNumber=%{public}d",
+                         blePodMessageTransport.msgSeq, blePodMessageTransport.nonceSeq, blePodMessageTransport.messageNumber)
+            }
+        }
+
+        // Step 1: Send GetStatus to check pod state after AssignAddress
+        log.info("O5: Step 1 — Sending GetStatus after AssignAddress")
+        do {
+            let statusResponse = try o5SendGetStatus(transport: blePodMessageTransport)
+            log.info("O5: GetStatus response — podProgress=%{public}@, deliveryStatus=%{public}@",
+                     String(describing: statusResponse.podProgressStatus),
+                     String(describing: statusResponse.deliveryStatus))
+            saveState()
+        } catch {
+            log.error("O5: GetStatus after AssignAddress failed: %{public}@", String(describing: error))
+            // Continue anyway — the pod might still accept registration
+            log.info("O5: Continuing despite GetStatus failure")
+        }
+
+        // Step 2: Send the registration payload (setPodUid)
+        // The btsnoop shows 3 consecutive 184B encrypted messages each carrying ~163B.
+        // Our registration payload is exactly 163 bytes.
+        // Analysis: all 3 messages are the same size, suggesting the same payload sent 3 times,
+        // OR 3 different sub-payloads. Since we only have one 163B payload from register/complete,
+        // we send it 3 times as observed in the btsnoop.
+        log.info("O5: Step 2 — Sending registration payload (setPodUid)")
+        do {
+            try o5SendRegistrationPayload(transport: blePodMessageTransport)
+            log.info("O5: Registration payload delivery complete")
+            saveState()
+        } catch {
+            log.error("O5: Registration payload delivery failed: %{public}@", String(describing: error))
+            // This is likely critical — but continue to see what happens
+            log.info("O5: Continuing despite registration failure")
+        }
+
+        // Step 3: Send GetStatus before SetupPod
+        // The btsnoop shows this returns a VersionResponse (37B), not a StatusResponse
+        log.info("O5: Step 3 — Sending GetStatus before SetupPod")
+        do {
+            let statusResponse = try o5SendGetStatus(transport: blePodMessageTransport)
+            log.info("O5: Pre-SetupPod GetStatus response — podProgress=%{public}@",
+                     String(describing: statusResponse.podProgressStatus))
+            saveState()
+        } catch {
+            log.error("O5: Pre-SetupPod GetStatus failed: %{public}@", String(describing: error))
+            log.info("O5: Continuing to SetupPod despite GetStatus failure")
+        }
+
+        log.info("O5: Pre-SetupPod steps complete, proceeding to SetupPod")
+    }
+
+    /// Sends a GetStatus command via the encrypted transport and returns the StatusResponse.
+    /// Falls back to returning a minimal synthetic StatusResponse if the pod returns a
+    /// VersionResponse instead (observed in btsnoop for the pre-SetupPod GetStatus).
+    private func o5SendGetStatus(transport: BlePodMessageTransport) throws -> StatusResponse {
+        let getStatus = GetStatusCommand(podInfoType: .normal)
+        let message = Message(address: 0xffffffff, messageBlocks: [getStatus], sequenceNum: transport.messageNumber)
+
+        log.debug("O5 GetStatus: sending message %@", String(describing: message))
+
+        let response = try transport.sendMessage(message)
+
+        // The pod may respond with a StatusResponse or a VersionResponse
+        if let statusResponse = response.messageBlocks[0] as? StatusResponse {
+            return statusResponse
+        } else if let versionResponse = response.messageBlocks[0] as? VersionResponse {
+            // Pre-SetupPod GetStatus returns VersionResponse in the btsnoop
+            log.info("O5 GetStatus got VersionResponse instead: %{public}@", String(describing: versionResponse))
+            // Return a synthetic StatusResponse
+            return StatusResponse(
+                deliveryStatus: .suspended,
+                podProgressStatus: versionResponse.podProgressStatus,
+                timeActive: 0,
+                reservoirLevel: Pod.reservoirLevelAboveThresholdMagicNumber,
+                insulinDelivered: 0,
+                bolusNotDelivered: 0,
+                lastProgrammingMessageSeqNum: 0,
+                alerts: AlertSet(rawValue: 0)
+            )
+        } else {
+            log.error("O5 GetStatus unexpected response type: %{public}@", String(describing: response))
+            throw PodCommsError.unexpectedResponse(response: response.messageBlocks[0].blockType)
+        }
+    }
+
+    /// Sends the O5 registration payload to the pod (setPodUid operation).
+    ///
+    /// The btsnoop shows 3 consecutive 184-byte encrypted messages with 15-byte ACK responses.
+    /// Each 184B encrypted message carries approximately 163 bytes of inner data.
+    ///
+    /// The 163-byte registration payload from register/complete contains:
+    ///   - Length prefix (4B) + version (4B) + flags (6B)
+    ///   - Controller ID (4B) + secondary public key (64B)
+    ///   - Timestamp/flags (7B) + commands (10B) + signature (65B)
+    ///
+    /// Strategy: Send the full 163-byte payload 3 times (as the btsnoop shows 3 identical-size sends).
+    /// The pod may need 3 separate deliveries for different processing stages, or this may be a retry
+    /// mechanism. If sending 3x fails, we'll adjust based on pod response.
+    private func o5SendRegistrationPayload(transport: BlePodMessageTransport) throws {
+        guard let registrationPayload = O5RegistrationData.active.registrationPayload else {
+            log.error("O5: No registration payload available")
+            throw PodCommsError.diagnosticMessage(str: "O5 registration payload not available")
+        }
+
+        log.info("O5: Registration payload size: %{public}d bytes", registrationPayload.count)
+        log.debug("O5: Registration payload (hex): %{public}@", registrationPayload.hexadecimalString)
+
+        // Verify payload structure
+        if registrationPayload.count >= 18 {
+            let controllerIdInPayload = registrationPayload.subdata(in: 14..<18)
+            log.info("O5: Registration payload controller ID: %{public}@", controllerIdInPayload.hexadecimalString)
+        }
+
+        // From the btsnoop, the registration is sent 3 times with ACK responses.
+        // Send the payload 3 times as raw O5 data.
+        for i in 1...3 {
+            log.info("O5: Sending registration payload %{public}d/3", i)
+            do {
+                try transport.sendRawO5DataExpectingAck(registrationPayload)
+                log.info("O5: Registration payload %{public}d/3 acknowledged", i)
+            } catch {
+                log.error("O5: Registration payload %{public}d/3 failed: %{public}@", i, String(describing: error))
+                throw error
+            }
+        }
+
+        log.info("O5: All 3 registration payloads sent and acknowledged")
+    }
+
     private func setupPod(timeZone: TimeZone) throws {
         guard let manager = manager else { throw PodCommsError.podNotConnected }
 
@@ -401,6 +558,22 @@ class BlePodComms: PodComms {
                 guard self.podState != nil else {
                     block(.failure(PodCommsError.noPodPaired))
                     return
+                }
+
+                // O5 pods require intermediate steps between AssignAddress and SetupPod.
+                // The pod rejected SetupPod with 0x21 (unexpected command) because it
+                // expects registration payload delivery and status checks first.
+                if self.podState!.setupProgress.isPaired == false && self.podType == omnipod5Type {
+                    self.log.info("O5: Running pre-SetupPod intermediate steps")
+                    let preSetupTransport = BlePodMessageTransport(
+                        manager: manager, myId: myId, podId: podId,
+                        state: self.podState!.bleMessageTransportState
+                    )
+                    preSetupTransport.messageLogger = self.messageLogger
+                    try self.o5PreSetupSteps(blePodMessageTransport: preSetupTransport)
+                    // Save transport state back to podState after the intermediate steps
+                    self.podState!.bleMessageTransportState = preSetupTransport.state
+                    self.log.info("O5: Pre-SetupPod steps complete, transport state saved")
                 }
 
                 if self.podState!.setupProgress.isPaired == false {

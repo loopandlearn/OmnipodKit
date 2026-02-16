@@ -87,6 +87,10 @@ class BlePodMessageTransport: MessageTransport {
     private let COMMAND_SUFFIX = ",G0.0"
     private let RESPONSE_PREFIX = "0.0="
 
+    // O5 pods use "3.12" protocol version for some responses
+    private let O5_COMMAND_SUFFIX = ",G3.12"
+    private let O5_RESPONSE_PREFIX = "3.12="
+
     private let manager: PeripheralManager
 
     /// O5 pods never use RTS/CTS; DASH pods always do
@@ -234,8 +238,11 @@ class BlePodMessageTransport: MessageTransport {
 
         incrementMsgSeq()
 
+        // O5 pods use ",G3.12" suffix; DASH pods use ",G0.0"
+        let suffix = isO5 ? O5_COMMAND_SUFFIX : COMMAND_SUFFIX
+
         let wrapped = StringLengthPrefixEncoding.formatKeys(
-            keys: [COMMAND_PREFIX, COMMAND_SUFFIX],
+            keys: [COMMAND_PREFIX, suffix],
             payloads: [cmd.encoded(), Data()]
         )
 
@@ -283,7 +290,19 @@ class BlePodMessageTransport: MessageTransport {
 
     private func parseResponse(decrypted: MessagePacket) throws -> Message {
 
-        let data = try StringLengthPrefixEncoding.parseKeys([RESPONSE_PREFIX], decrypted.payload)[0]
+        // Try standard "0.0=" prefix first (works for DASH and some O5 responses like unsolicited status)
+        // Then try O5 "3.12=" prefix if "0.0=" fails
+        let data: Data
+        do {
+            data = try StringLengthPrefixEncoding.parseKeys([RESPONSE_PREFIX], decrypted.payload)[0]
+        } catch {
+            if isO5 {
+                log.debug("O5: Standard '0.0=' prefix not found, trying '3.12=' prefix")
+                data = try StringLengthPrefixEncoding.parseKeys([O5_RESPONSE_PREFIX], decrypted.payload)[0]
+            } else {
+                throw error
+            }
+        }
         log.debug("Received decrypted response: %{public}@ in packet: %{public}@", data.hexadecimalString, decrypted.payload.hexadecimalString)
 
         // Dash pods generates a CRC16 for Omnipod Messages, but the actual algorithm is not understood and doesn't match the CRC16
@@ -312,6 +331,175 @@ class BlePodMessageTransport: MessageTransport {
             eqos: 0
         )
         return try enDecrypt.encrypt(msg, nonceSeq)
+    }
+
+    /// Whether the pod is an Omnipod 5 (vs DASH)
+    var isO5: Bool {
+        return manager.podType == omnipod5Type
+    }
+
+    // MARK: - O5 Raw Data Send/Receive
+
+    /// Sends raw data (not a standard Omnipod Message) as an encrypted Type 1 message,
+    /// reads and ACKs the pod response, and returns the raw decrypted response payload.
+    ///
+    /// This is used for O5-specific operations like registration payload delivery (setPodUid)
+    /// where the payload is NOT a standard Omnipod command message.
+    ///
+    /// The data is wrapped in SLPE format: "S0.0=" + len + data + ",G3.12"
+    /// The response is unwrapped from whichever SLPE prefix the pod uses.
+    ///
+    /// - Parameter rawData: The raw bytes to send (will be SLPE-wrapped and encrypted)
+    /// - Returns: The raw decrypted response payload (after SLPE unwrapping)
+    func sendRawO5Data(_ rawData: Data) throws -> Data {
+        guard let enDecrypt = self.enDecrypt else {
+            throw PodCommsError.podNotConnected
+        }
+
+        guard manager.peripheral.state == .connected else {
+            throw PodCommsError.podNotConnected
+        }
+
+        // Wrap the raw data in SLPE format
+        let suffix = O5_COMMAND_SUFFIX
+        let wrapped = StringLengthPrefixEncoding.formatKeys(
+            keys: [COMMAND_PREFIX, suffix],
+            payloads: [rawData, Data()]
+        )
+
+        incrementMsgSeq()
+
+        let msg = MessagePacket(
+            type: MessageType.ENCRYPTED,
+            source: self.myId,
+            destination: self.podId,
+            payload: wrapped,
+            sequenceNumber: UInt8(msgSeq),
+            eqos: 1
+        )
+
+        incrementNonceSeq()
+        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
+
+        log.default("O5 SendRaw(Hex): %{public}@ (%{public}d bytes)", rawData.hexadecimalString, rawData.count)
+        messageLogger?.didSend(rawData)
+
+        let writeResult = manager.sendMessagePacket(encrypted, doRTS: useRTS)
+        switch writeResult {
+        case .sentWithAcknowledgment:
+            break
+        case .sentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        case .unsentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        }
+
+        // Read and ACK the response
+        let readResponse = try manager.readMessagePacket(doRTS: useRTS)
+        guard let readMessage = readResponse else {
+            throw PodProtocolError.messageIOException("Could not read raw O5 response")
+        }
+
+        incrementNonceSeq()
+        let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
+
+        // Extract the raw response payload from SLPE wrapping
+        // Try "0.0=" first, then "3.12="
+        let responseData: Data
+        do {
+            responseData = try StringLengthPrefixEncoding.parseKeys([RESPONSE_PREFIX], decrypted.payload)[0]
+        } catch {
+            do {
+                responseData = try StringLengthPrefixEncoding.parseKeys([O5_RESPONSE_PREFIX], decrypted.payload)[0]
+            } catch {
+                // If neither prefix works, return the raw payload as-is
+                log.debug("O5 Raw response has no recognized SLPE prefix, returning raw payload")
+                responseData = decrypted.payload
+            }
+        }
+
+        log.default("O5 RecvRaw(Hex): %{public}@ (%{public}d bytes)", responseData.hexadecimalString, responseData.count)
+        messageLogger?.didReceive(responseData)
+
+        // Send ACK
+        incrementMsgSeq()
+        incrementNonceSeq()
+        let ack = try getAck(response: decrypted)
+        let ackResult = manager.sendMessagePacket(ack, doRTS: useRTS)
+        guard case .sentWithAcknowledgment = ackResult else {
+            throw PodProtocolError.messageIOException("Could not send ACK for raw O5 response")
+        }
+
+        return responseData
+    }
+
+    /// Sends raw data as an encrypted Type 1 message that expects only a short ACK
+    /// (no meaningful response payload). Used for registration payload delivery where the
+    /// pod just ACKs receipt of each chunk.
+    ///
+    /// - Parameter rawData: The raw bytes to send
+    func sendRawO5DataExpectingAck(_ rawData: Data) throws {
+        guard let enDecrypt = self.enDecrypt else {
+            throw PodCommsError.podNotConnected
+        }
+
+        guard manager.peripheral.state == .connected else {
+            throw PodCommsError.podNotConnected
+        }
+
+        // Wrap the raw data in SLPE format
+        let suffix = O5_COMMAND_SUFFIX
+        let wrapped = StringLengthPrefixEncoding.formatKeys(
+            keys: [COMMAND_PREFIX, suffix],
+            payloads: [rawData, Data()]
+        )
+
+        incrementMsgSeq()
+
+        let msg = MessagePacket(
+            type: MessageType.ENCRYPTED,
+            source: self.myId,
+            destination: self.podId,
+            payload: wrapped,
+            sequenceNumber: UInt8(msgSeq),
+            eqos: 1
+        )
+
+        incrementNonceSeq()
+        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
+
+        log.default("O5 SendRawAck(Hex): %{public}@ (%{public}d bytes)", rawData.hexadecimalString, rawData.count)
+        messageLogger?.didSend(rawData)
+
+        let writeResult = manager.sendMessagePacket(encrypted, doRTS: useRTS)
+        switch writeResult {
+        case .sentWithAcknowledgment:
+            break
+        case .sentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        case .unsentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        }
+
+        // Read the ACK response (15 bytes in btsnoop — likely minimal/empty SLPE response)
+        let readResponse = try manager.readMessagePacket(doRTS: useRTS)
+        guard let readMessage = readResponse else {
+            throw PodProtocolError.messageIOException("Could not read ACK for raw O5 data")
+        }
+
+        incrementNonceSeq()
+        let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
+
+        log.default("O5 RecvAck payload: %{public}@ (%{public}d bytes)", decrypted.payload.hexadecimalString, decrypted.payload.count)
+
+        // Send our ACK back
+        incrementMsgSeq()
+        incrementNonceSeq()
+        let ack = try getAck(response: decrypted)
+        let ackResult = manager.sendMessagePacket(ack, doRTS: useRTS)
+        guard case .sentWithAcknowledgment = ackResult else {
+            throw PodProtocolError.messageIOException("Could not send ACK after raw O5 ACK response")
+        }
     }
 
     func assertOnSessionQueue() {
