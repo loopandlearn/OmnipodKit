@@ -323,6 +323,25 @@ NOT all post-pairing commands use Type 4 signing. The AAD type byte determines s
 
 During Phase 1 activation, only `programBolus` (prime 1) uses Type 4. All other commands -- including `setPodUid`, `programAlert`, and all 8 O5 AID commands -- use Type 1.
 
+### Inner Omnipod Message Address Rules (Pod2 Frida, 2026-02-16)
+
+There are two levels of addressing in the O5 protocol:
+1. **TWi header (outer)**: source/destination IDs in the 16-byte header. Always controller/pod IDs from pairing.
+2. **Inner Message address**: 4-byte address at bytes 0-3 of the Omnipod Message struct inside the encrypted payload.
+
+The inner address transitions from `0xFFFFFFFF` to the assigned pod address **immediately after setPodUid completes**:
+
+| # | Command | Inner Address | Has Message Wrapper? | Frida Evidence |
+|---|---------|--------------|---------------------|----------------|
+| 0 | getPodVersion | `0xFFFFFFFF` | Yes (`S0.0=` + Message) | Line 844: `ffffffff0006...` |
+| 1-9 | All AID commands | **N/A** | **No** (raw SLPE, no Message struct) | Lines 957-2134: raw ASCII payloads |
+| 10 | setPodUid | `0xFFFFFFFF` | Yes (`S0.0=` + Message) | Line 2256: `ffffffff0815...` |
+| 11+ | programAlert, programBolus, getPodStatus | **assigned podId** (e.g., `0x00277d1a`) | Yes (`S0.0=` + Message) | Lines 2371+: `00277d1a...` |
+
+**Key insight**: O5 AID commands (`SE255.2=`, `S3.2=`, `G3.12`, etc.) bypass the inner Message struct entirely. They are raw SLPE-formatted ASCII payloads with no address, sequence, or CRC fields. Only legacy/ER commands (`S0.0=...,G0.0`) have the inner Message wrapper.
+
+OmnipodKit implementation is correct: `sendO5AidCommand()` sends raw SLPE payloads; `getPodVersion` and `setPodUid` use `0xffffffff`; post-SetupPod commands use `podState.address`.
+
 ### Type 4 Message Signing Flow (EncryptedSignedMessage)
 
 For Type 4 messages, the ECDSA signature covers the **complete encrypted message**, NOT the plaintext:

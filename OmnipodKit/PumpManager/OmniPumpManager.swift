@@ -1236,12 +1236,28 @@ extension OmniPumpManager {
         } else {
             self.log.default("Pod already paired. Continuing.")
 
-            // Resuming the pod setup, try to ensure pod comms will work right away
-            self.resumingPodSetup()
+            // O5 pods that have podState (LTK established) but setupProgress.isPaired == false
+            // still need the full pre-setup sequence: getPodVersion + AID commands + setPodUid.
+            // Route these through blePairAndSetupPod which already handles this case --
+            // it will re-establish the EAP-AKA session, run o5PreSetupSteps, and setupPod
+            // before returning a session for priming.
+            if let blePodComms = self.podComms as? BlePodComms,
+               self.state.podType == omnipod5Type,
+               self.state.podState?.setupProgress.isPaired == false
+            {
+                self.log.default("O5 pod needs pre-setup (getPodVersion + AID + setPodUid). Running blePairAndSetupPod.")
+                blePodComms.blePairAndSetupPod(timeZone: .currentFixed, insulinType: insulinType, messageLogger: self) { (result) in
+                    // Calls completion
+                    primeSession(result)
+                }
+            } else {
+                // Resuming the pod setup, try to ensure pod comms will work right away
+                self.resumingPodSetup()
 
-            self.runSession(withName: "Prime pod") { (result) in
-                // Calls completion
-                primeSession(result)
+                self.runSession(withName: "Prime pod") { (result) in
+                    // Calls completion
+                    primeSession(result)
+                }
             }
         }
         #endif
@@ -1362,8 +1378,21 @@ extension OmniPumpManager {
 
     // Called when resuming a pod setup operation which sometimes can fail on the first pod command in various situations.
     // Attempting a getStatus and sleeping a couple of seconds on errors greatly improves the odds for first pod command success.
+    // NOTE: O5 pods in pre-setup state (FILLED, setupProgress < podPaired) reject GetStatus with error 19
+    // (ERR_ILLEGAL_CMD_STATE), so we skip the getStatus probe for those pods entirely.
      func resumingPodSetup() {
         let sleepTime:UInt32 = 2
+
+        // O5 pods before setPodUid (setupProgress.isPaired == false) reject GetStatus
+        // with ERR_ILLEGAL_CMD_STATE (error 19). Skip the getStatus probe for these pods.
+        if self.state.podType == omnipod5Type && self.state.podState?.setupProgress.isPaired == false {
+            self.log.debug("### Pod setup resume: O5 pod in pre-setup state, skipping getStatus probe")
+            if !hasConnection {
+                self.log.debug("### Pod setup resume pod not connected, sleeping %d seconds", sleepTime)
+                sleep(sleepTime)
+            }
+            return
+        }
 
         if !hasConnection {
             self.log.debug("### Pod setup resume pod not connected, sleeping %d seconds", sleepTime)
