@@ -20,62 +20,59 @@ import Foundation
 
 /// Constructs O5 AID command payloads for the pre-SetupPod activation sequence.
 ///
-/// These commands use SLPE (StringLengthPrefixEncoding) wrapping with ASCII key-value
-/// pairs instead of binary Omnipod message blocks. The data values can be ASCII text
+/// These commands use plain ASCII key-value format (NOT the SLPE length-prefixed encoding
+/// used by standard S0.0= commands). The data values can be ASCII text
 /// (e.g., "8" for DIA) or hex-encoded binary (e.g., "0003000E00" for TDI).
 struct O5AidCommands {
 
-    // MARK: - SLPE Payload Construction
+    // MARK: - AID Payload Construction
+    //
+    // AID commands use plain ASCII key-value format with NO length prefix.
+    // This is different from standard Omnipod SLPE (S0.0=...,G0.0) which uses
+    // 2-byte big-endian length prefixes via StringLengthPrefixEncoding.formatKeys().
+    //
+    // Frida capture confirms the wire format is just: key + data + suffix
+    // e.g., "SE255.2=1771222561" NOT "SE255.2=" + 0x000A + "1771222561"
 
-    /// Constructs a SET+GET command payload in SLPE format.
+    /// Constructs a SET+GET command payload.
     ///
-    /// Wire format: `S[f].[a]=` + [2-byte BE length] + data + `,G[f].[a]`
+    /// Wire format: `S[f].[a]=[data],G[f].[a]`
     ///
     /// - Parameters:
     ///   - feature: The feature number (e.g., "3", "255")
     ///   - attribute: The attribute number (e.g., "2", "1")
     ///   - data: The ASCII data string to SET (e.g., "0003000E00", "8")
-    /// - Returns: SLPE-encoded Data ready for the encrypted transport
+    /// - Returns: ASCII-encoded Data ready for the encrypted transport
     static func setGetPayload(feature: String, attribute: String, data: String) -> Data {
-        let setKey = "S\(feature).\(attribute)="
-        let getKey = ",G\(feature).\(attribute)"
-        return StringLengthPrefixEncoding.formatKeys(
-            keys: [setKey, getKey],
-            payloads: [Data(data.utf8), Data()]
-        )
+        let command = "S\(feature).\(attribute)=\(data),G\(feature).\(attribute)"
+        return Data(command.utf8)
     }
 
-    /// Constructs a GET-only command payload in SLPE format.
+    /// Constructs a GET-only command payload.
     ///
-    /// Wire format: `G[f].[a]` (just the key string, no length prefix or data)
+    /// Wire format: `G[f].[a]`
     ///
     /// - Parameters:
     ///   - feature: The feature number (e.g., "3")
     ///   - attribute: The attribute number (e.g., "12")
-    /// - Returns: SLPE-encoded Data ready for the encrypted transport
+    /// - Returns: ASCII-encoded Data ready for the encrypted transport
     static func getPayload(feature: String, attribute: String) -> Data {
-        let getKey = "G\(feature).\(attribute)"
-        return StringLengthPrefixEncoding.formatKeys(
-            keys: [getKey],
-            payloads: [Data()]
-        )
+        let command = "G\(feature).\(attribute)"
+        return Data(command.utf8)
     }
 
-    /// Constructs an Extended SET command payload in SLPE format.
+    /// Constructs an Extended SET command payload.
     ///
-    /// Wire format: `SE[f].[a]=` + [2-byte BE length] + data
+    /// Wire format: `SE[f].[a]=[data]`
     ///
     /// - Parameters:
     ///   - feature: The feature number (e.g., "255", "2")
     ///   - attribute: The attribute number (e.g., "2", "1")
     ///   - data: The ASCII data string to SET
-    /// - Returns: SLPE-encoded Data ready for the encrypted transport
+    /// - Returns: ASCII-encoded Data ready for the encrypted transport
     static func extendedSetPayload(feature: String, attribute: String, data: String) -> Data {
-        let setKey = "SE\(feature).\(attribute)="
-        return StringLengthPrefixEncoding.formatKeys(
-            keys: [setKey],
-            payloads: [Data(data.utf8)]
-        )
+        let command = "SE\(feature).\(attribute)=\(data)"
+        return Data(command.utf8)
     }
 
     /// Returns the expected response prefix for a SET+GET or GET-only command.
@@ -145,10 +142,10 @@ struct O5AidCommands {
             let targetValues = targets ?? Array(repeating: defaultTargetMgdl, count: 48)
             assert(targetValues.count == 48, "Target BG profile must have exactly 48 half-hour entries")
 
-            // Build the hex string: "00c0" prefix + 48 x 8-char hex values
-            var hexString = "00c0"
+            // Build the hex string: "00C0" prefix + 48 x 8-char hex values (uppercase to match real O5 app)
+            var hexString = "00C0"
             for target in targetValues {
-                hexString += String(format: "%08x", target)
+                hexString += String(format: "%08X", target)
             }
 
             let payload = O5AidCommands.setGetPayload(feature: feature, attribute: attribute, data: hexString)
@@ -216,9 +213,9 @@ struct O5AidCommands {
                 recordData = Array(repeating: Data(count: bytesPerRecord), count: recordsPerBatch)
             }
 
-            // Build hex string: "00a8" prefix + 168 bytes of record data as hex
+            // Build hex string: "00A8" prefix + 168 bytes of record data as hex (uppercase to match real O5 app)
             let totalBytes = recordsPerBatch * bytesPerRecord  // 168
-            var hexString = String(format: "%04x", totalBytes)  // "00a8"
+            var hexString = String(format: "%04X", totalBytes)  // "00A8"
             for record in recordData {
                 assert(record.count == bytesPerRecord, "Each record must be exactly \(bytesPerRecord) bytes")
                 hexString += record.hexadecimalString

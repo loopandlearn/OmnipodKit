@@ -571,16 +571,17 @@ class BlePodMessageTransport: MessageTransport {
         incrementNonceSeq()
         let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
 
-        // Extract response data using the caller-provided response prefix
-        let responseData: Data
-        do {
-            responseData = try StringLengthPrefixEncoding.parseKeys([responsePrefix], decrypted.payload)[0]
-        } catch {
-            // If the expected prefix isn't found, log and return raw payload for debugging
+        // Extract response data using the caller-provided response prefix.
+        // AID responses use plain ASCII key=value format (no SLPE length prefix),
+        // so we just strip the prefix and return everything after it.
+        let prefixData = Data(responsePrefix.utf8)
+        guard decrypted.payload.count >= prefixData.count,
+              decrypted.payload.prefix(prefixData.count) == prefixData else {
             log.error("O5 AID response prefix '%{public}@' not found in payload: %{public}@",
                        responsePrefix, decrypted.payload.hexadecimalString)
-            throw error
+            throw PodProtocolError.messageIOException("AID response prefix '\(responsePrefix)' not found in payload")
         }
+        let responseData = decrypted.payload.suffix(from: prefixData.count)
 
         log.default("O5 AID Recv (%{public}d bytes): %{public}@",
                      responseData.count, responseData.hexadecimalString)
