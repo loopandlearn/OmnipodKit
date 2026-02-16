@@ -581,16 +581,27 @@ class BlePodComms: PodComms {
                     return
                 }
 
-                // O5 pods require intermediate steps between AssignAddress and SetupPod.
-                // The pod rejected SetupPod with 0x21 (unexpected command) because it
-                // expects registration payload delivery and status checks first.
+                // O5 pods require getPodVersion (AssignAddress) as the first encrypted command
+                // after each new EAP-AKA session, followed by AID setup commands, then SetupPod.
                 if self.podState!.setupProgress.isPaired == false && self.podType == omnipod5Type {
-                    self.log.info("O5: Running pre-SetupPod intermediate steps")
                     let preSetupTransport = BlePodMessageTransport(
                         manager: manager, myId: myId, podId: podId,
                         state: self.podState!.bleMessageTransportState
                     )
                     preSetupTransport.messageLogger = self.messageLogger
+
+                    // getPodVersion (AssignAddress with 0xffffffff) must be sent first.
+                    // In the initial pairing flow this is done inside pairPod(), but on
+                    // resume we skipped pairPod() so we need to send it here.
+                    self.log.info("O5: Sending getPodVersion (AssignAddress) before AID commands")
+                    let assignAddress = AssignAddressCommand(address: 0xffffffff)
+                    let message = Message(address: 0xffffffff, messageBlocks: [assignAddress], sequenceNum: preSetupTransport.messageNumber)
+                    let versionResponse = try self.bleSendPairMessage(blePodMessageTransport: preSetupTransport, message: message)
+                    self.log.info("O5: getPodVersion response: FW %{public}@, progress %{public}@",
+                                 String(describing: versionResponse.firmwareVersion),
+                                 String(describing: versionResponse.podProgressStatus))
+
+                    self.log.info("O5: Running pre-SetupPod intermediate steps (AID commands)")
                     try self.o5PreSetupSteps(blePodMessageTransport: preSetupTransport)
                     // Save transport state back to podState after the intermediate steps
                     self.podState!.bleMessageTransportState = preSetupTransport.state
