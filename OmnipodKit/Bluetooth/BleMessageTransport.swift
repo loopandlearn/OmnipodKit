@@ -92,8 +92,7 @@ class BlePodMessageTransport: MessageTransport {
     private let COMMAND_SUFFIX = ",G0.0"
     private let RESPONSE_PREFIX = "0.0="
 
-    // O5 pods use "3.12" protocol version for some responses
-    private let O5_COMMAND_SUFFIX = ",G3.12"
+    // O5 AID-specific responses use "3.12=" prefix (used only as fallback in parseResponse)
     private let O5_RESPONSE_PREFIX = "3.12="
 
     private let manager: PeripheralManager
@@ -252,11 +251,10 @@ class BlePodMessageTransport: MessageTransport {
 
         incrementMsgSeq()
 
-        // O5 pods use ",G3.12" suffix; DASH pods use ",G0.0"
-        let suffix = isO5 ? O5_COMMAND_SUFFIX : COMMAND_SUFFIX
-
+        // Standard Omnipod commands always use ",G0.0" for both O5 and DASH.
+        // AID-specific commands (3.2, 3.12, etc.) use their own suffixes via sendO5AidCommand().
         let wrapped = StringLengthPrefixEncoding.formatKeys(
-            keys: [COMMAND_PREFIX, suffix],
+            keys: [COMMAND_PREFIX, COMMAND_SUFFIX],
             payloads: [cmd.encoded(), Data()]
         )
 
@@ -374,10 +372,9 @@ class BlePodMessageTransport: MessageTransport {
             throw PodCommsError.podNotConnected
         }
 
-        // Wrap the raw data in SLPE format
-        let suffix = O5_COMMAND_SUFFIX
+        // Wrap the raw data in SLPE format — standard Omnipod commands use ",G0.0"
         let wrapped = StringLengthPrefixEncoding.formatKeys(
-            keys: [COMMAND_PREFIX, suffix],
+            keys: [COMMAND_PREFIX, COMMAND_SUFFIX],
             payloads: [rawData, Data()]
         )
 
@@ -461,10 +458,9 @@ class BlePodMessageTransport: MessageTransport {
             throw PodCommsError.podNotConnected
         }
 
-        // Wrap the raw data in SLPE format
-        let suffix = O5_COMMAND_SUFFIX
+        // Wrap the raw data in SLPE format — standard Omnipod commands use ",G0.0"
         let wrapped = StringLengthPrefixEncoding.formatKeys(
-            keys: [COMMAND_PREFIX, suffix],
+            keys: [COMMAND_PREFIX, COMMAND_SUFFIX],
             payloads: [rawData, Data()]
         )
 
@@ -651,8 +647,10 @@ class BlePodMessageTransport: MessageTransport {
 
         incrementMsgSeq()
 
+        // Standard Omnipod commands use ",G0.0" even for O5 signed messages.
+        // AID-specific commands use their own suffixes via sendO5AidCommand().
         let wrapped = StringLengthPrefixEncoding.formatKeys(
-            keys: [COMMAND_PREFIX, O5_COMMAND_SUFFIX],
+            keys: [COMMAND_PREFIX, COMMAND_SUFFIX],
             payloads: [cmd.encoded(), Data()]
         )
 

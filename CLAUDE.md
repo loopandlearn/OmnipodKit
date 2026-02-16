@@ -44,6 +44,9 @@ So `651 bytes TWi payload = 7 + 2 + 642 encrypted`. The 651/650 byte sizes in bt
 - `OmnipodKit/Bluetooth/MessagePacket.swift` — TWi message framing (16-byte header: "TW" magic, flags, seq, ack, size, src/dst addresses)
 - `OmnipodKit/Bluetooth/StringLengthPrefixEncoding.swift` — Key-value encoding for pairing messages: `[key_string][2-byte big-endian length][payload]`
 
+### Post-Pairing / Activation
+- `OmnipodKit/Bluetooth/O5AidCommands.swift` — O5 AID command constructors for pre-SetupPod sequence (UtcCommand, TdiCommand, TargetBgProfile, DiaCommand, EgvCommand, AlgorithmInsulinHistory, UnifiedAidPodStatus). Uses ASCII key-value SLPE format.
+
 ### Identity
 - `OmnipodKit/Bluetooth/Id.swift` — Controller/pod ID management. O5 uses pdmid from certificate (not random).
 
@@ -93,7 +96,7 @@ From native `sub_36690` (fully resolved, controller `ctx[4]==0` path):
 ### Native signature constraint
 - `"wrong u16_signature_sz size! Need to be 64 bytes!"` — signature is exactly 64 bytes, no recovery byte.
 
-**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1/SPS2. It's written to the pod during `setPodUid` activation.
+**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1/SPS2. It was previously assumed to be written to the pod during `setPodUid` activation, but the Pod2 Frida capture (2026-02-16) shows it is NOT sent during activation at all. It may be delivered via a separate mechanism or during an earlier session.
 
 ## Active Registration: TEE Simulator pdmid 2587928 (SUCCESSFUL PAIRING)
 
@@ -106,7 +109,8 @@ HAR capture: `/Users/james/Downloads/O5keys/KEYS/HTTPToolkit_2026-02-15_14-39.ha
 | pdmid | 2587928 |
 | pdmidExtension | 4300804 |
 | Controller ID | `00277d18` (big-endian) |
-| Pod ID (assigned) | `00277d19` (2587929) |
+| Pod1 ID (assigned, 2026-02-15) | `00277d19` (2587929) |
+| Pod2 ID (assigned, 2026-02-16) | `00277d1a` (2587930) |
 | Secondary key scalar | `0bf11c04dab072a65f8faca060288188cb006845490bc618440d2af918099e24` (32 bytes) |
 | Secondary public key | `5b04057ec3625db9a54ff3eba0518950f912d11af7cce09bf7149d3ef38acda4416cc723f3dd127e5a65b89356c5b4506303c287017fe8ed4dc8d347ef0f19c0` (64 bytes, x\|\|y) |
 | Primary key scalar | `4d0e2b45250130b4ee4c449454bd29a91fec6bde5ad69a502e15b7218e6f440e` (32 bytes) |
@@ -134,7 +138,7 @@ The **registration payload** (163 bytes from `register/complete`) structure:
 [89-97] 061306160617061c061f  Commands (matches SAN)
 [98-162] 1ec56a79...0a0e  Signature (65 bytes)
 ```
-This payload is written to the pod during `setPodUid`, NOT included in SPS2.1/SPS2.
+This payload is NOT included in SPS2.1/SPS2. Pod2 Frida capture (2026-02-16) shows it is also NOT sent during the activation sequence. Delivery mechanism TBD.
 
 ### Previous Registration: pdmid 2584724 (FAILED — all tests disconnected at SPS2.1)
 
@@ -168,6 +172,12 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **Heartbeat service error**: `applyConfiguration()` threw `unknownCharacteristic` when heartbeat service wasn't exposed by unpaired pods. Fixed by changing the notifying characteristics loop to `continue` instead of `throw` for missing services.
 - **O5 EAP-AKA session establishment (2026-02-16)**: `SessionEstablisher` and `BleMessageTransport` now use `doRTS=false` for O5 pods. O5 pods never use RTS/CTS flow control; sending RTS (0x00) caused immediate disconnect (CBError code=7). Files: `SessionEstablisher.swift`, `BleMessageTransport.swift`, `BlePodComms.swift`.
 - **O5 KDF controllerID (Config#10, 2026-02-16)**: Pod uses ZEROS (`00000000`) for controllerID in both the KDF input and the channel-binding transcript (bytes 7-10), not the real controllerID. Config#10 (bitmask `00001010`: `kdfZeroControllerID=true`, `bytesAsControllerId=false`) produced P0=0xa5 on a fresh pod (UUID `74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F`). Defaults locked in `O5KeyExchange.swift`; bitmask cycling disabled in `O5PairingConfiguration.swift`.
+- **O5 AID setup commands implemented (2026-02-16)**: 8 AID commands now sent between getPodVersion and setPodUid during activation. Implemented in `O5AidCommands.swift` and called from `BlePodComms.swift`. Uses ASCII key-value SLPE format (SET+GET, GET-only, Extended SET).
+- **Activation order corrected (Pod2 Frida, 2026-02-16)**: Removed basal schedule programming from Phase 1 (before priming). Pod2 Frida capture confirms NO basal is sent before prime 1 -- basal is deferred to Phase 2. Previously assumed from historical btsnoop that 3x ProgramBasal preceded prime.
+- **Alert parameters corrected (Pod2 Frida, 2026-02-16)**: Low reservoir threshold is 5U (not 10U), beepRepeat=1 (not 2). Prime bolus beep parameter is 0x7C (completion beep ON + 60min reminder), not no beeps. User expiry triggers at 3968 min (~66h, ~5h52m before 72h), not 68h.
+- **Registration payload removed from activation (Pod2 Frida, 2026-02-16)**: The 163-byte registration payload is NOT sent between AssignAddress and SetupPod. Pod2 Frida log shows no registration payload delivery during the entire Phase 1 activation.
+- **Message type signing rules clarified (Pod2 Frida, 2026-02-16)**: Only `programBolus` (prime/delivery) uses TWi Type 4 (encrypted + ECDSA signed). All other commands -- including setPodUid, programAlert, AID commands -- use TWi Type 1 (encrypted only, no signature). Previously assumed all post-pairing commands used Type 4.
+- **SLPE suffix fix — `,G3.12` → `,G0.0` for standard commands (Pod3, 2026-02-16)**: `getCmdMessage()` was sending `,G3.12` as the SLPE GET suffix for ALL O5 commands. This tells the pod "respond with AID status format" — the pod complied, returning `3.12=` prefixed AID data instead of the expected `0.0=` VersionResponse. Caused `unknownBlockType(rawVal: 0)` on the first post-pairing getPodVersion command. The real O5 app uses `S0.0=...,G0.0` for ALL standard Omnipod commands; only AID-specific commands use AID suffixes. Fixed all 4 locations in `BleMessageTransport.swift` to use `COMMAND_SUFFIX` (`,G0.0`). AID commands already use their own suffixes via `sendO5AidCommand()` / `O5AidCommands.swift`.
 
 ### Resolved: SPS2.1/SPS2 Structure — SUCCESSFUL PAIRING ACHIEVED
 Native library decompile revealed the payloads are raw DER certificates. Btsnoop capture of a successful
@@ -195,6 +205,7 @@ attestation, which the pod accepted.
 | 13 | **Fixed: O5 command characteristic write type `.withResponse` → `.withoutResponse`** | **Pending test** | Btsnoop shows Android uses ATT Write Command (`.withoutResponse`) for all command char writes. OmnipodKit was using ATT Write Request (`.withResponse`), inherited from DASH. Fixed `sendHello()` and `sendCommandType()` to use `.withoutResponse` for O5. **Both the original btsnoop analysis AND the independent GATT-level comparison confirmed this as the primary remaining discrepancy.** **Test with a fresh pod** (not the tainted one from #11/#12). |
 | 14 | **Config#10 (bitmask 00001010): `kdfZeroControllerID=true`, `bytesAsControllerId=false`** | **P0 = 0xa5 SUCCESS** | Fresh pod UUID `74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F`. Key finding: pod uses ZEROS for controllerID in both KDF input and channel-binding transcript bytes 7-10. Signature verification failed locally (cosmetic, doesn't affect pairing). Post-pairing: pod disconnects during EAP-AKA session establishment (CBError code=7) when RTS is sent. **Remaining work**: fix EAP session establishment (try `doRTS=false`, add delay, or handle disconnect/reconnect). |
 | 15 | **Fixed: `doRTS=false` for O5 EAP-AKA session and encrypted messages** | **Pending test** | After Config#10 pairing succeeded (P0=0xa5), pod disconnected (CBError code=7) when EAP-AKA session tried to send RTS (0x00). Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior), but O5 pods NEVER use RTS/CTS. Btsnoop evidence: zero occurrences of RTS (0x00) or CTS (0x01) in entire O5 capture — only CMD writes are HELLO (0x06, once) and SUCCESS (0x04, after each message). Fix: Added `podType` parameter to `SessionEstablisher`, pass `doRTS: false` for O5 in all three EAP message operations. Also updated `BleMessageTransport` to derive `useRTS` from `manager.podType` for encrypted command/response messages. |
+| 16 | **Pairing + EAP success, first encrypted command fails with `unknownBlockType(rawVal: 0)`** | **Pod3 failed** | Fresh pod (seq `0022F3BC`). Pairing P0=0xa5, EAP-AKA session established. First getPodVersion command sent successfully, pod responds, but decrypted response has `3.12=` prefix (AID status data, 22 bytes) instead of `0.0=` prefix (VersionResponse). Root cause: `getCmdMessage()` used `,G3.12` suffix for ALL O5 commands — this tells the pod to respond in AID format. Real O5 app uses `,G0.0` for standard commands. Fix: changed all SLPE suffix references from `O5_COMMAND_SUFFIX` to `COMMAND_SUFFIX`. Retry attempts failed at SPS0 because pod was already in paired state from first attempt. |
 
 **Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
 (uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
@@ -289,19 +300,30 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 | V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **DONE (test #15)** | Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior). O5 pods never use RTS/CTS. Fixed: `doRTS=false` for O5 in `SessionEstablisher` and `useRTS` derived from `podType` in `BleMessageTransport`. |
 
 ### Not Yet Implemented
-- **Post-pairing command signing**: Design now understood (see "Post-Pairing Command Protocol" below). ECDSA signature covers the complete encrypted message (AAD + ciphertext + CCM tag). Signing key is `com.twi.enclave.device.secondary` (P-256). **Implementation needed.**
-- **Registration payload delivery**: Available (163 bytes). Needed for `setPodUid` post-pairing
 - **Command sequence counter**: Counter tracked in `TwiCaching` value (bytes 40-42), increments per command exchange. Must be persisted across reconnections. **Implementation needed.**
 - **Session persistence**: `.twi_session` (4140 bytes, AES/GCM encrypted with `com.twi.enclave.session` key) stores session state. Must save/restore on reconnect. **Implementation needed.**
 - ~~**Heartbeat keep-alive**~~: **NOT NEEDED.** Frida session (2026-02-15) confirmed the heartbeat service UUID `7DED7A6C` is NOT discovered on connected pods. Only three BLE services exist: GAP (0x1800), GATT (0x1801), and Omnipod custom (1a7e4024). The app polls via normal encrypted commands every ~20-30 seconds instead.
+- ~~**Post-pairing command signing**~~: **IMPLEMENTED** for programBolus (Type 4). See "TWi Message Type Signing Rules" section. Only programBolus requires Type 4 signing; other commands use Type 1 (encrypted only).
+- ~~**Registration payload delivery**~~: **NOT NEEDED during activation.** Pod2 Frida capture (2026-02-16) shows the 163-byte registration payload is NOT sent between AssignAddress and SetupPod. May be delivered via a separate mechanism or earlier session.
 
-## Post-Pairing Command Protocol (from Frida 2026-02-15)
+## Post-Pairing Command Protocol (from Frida 2026-02-15 and Pod2 2026-02-16)
 
-Captured from a running, pod-connected Omnipod 5 app (pod serial 2587929, pod ID `00277d19`, BLE address `B4:3D:6B:FF:15:6E`) using comprehensive Frida instrumentation.
+Captured from a running, pod-connected Omnipod 5 app using comprehensive Frida instrumentation. Pod1 session (2026-02-15, pod 2587929) provided steady-state command signing. Pod2 activation (2026-02-16, pod 2587930) provided the complete Phase 1 activation sequence with plaintext captures.
+
+### TWi Message Type Signing Rules (Pod2 Frida, 2026-02-16)
+
+NOT all post-pairing commands use Type 4 signing. The AAD type byte determines signing:
+
+| TWi Type | AAD Byte | Signing | Used By |
+|----------|----------|---------|---------|
+| **Type 1** | `01` | Encrypted only, **no signature** | getPodVersion, all AID commands, setPodUid, programAlert, getPodStatus |
+| **Type 4** | `04` | Encrypted + **ECDSA signed** | programBolus (prime, delivery), keepalive |
+
+During Phase 1 activation, only `programBolus` (prime 1) uses Type 4. All other commands -- including `setPodUid`, `programAlert`, and all 8 O5 AID commands -- use Type 1.
 
 ### Type 4 Message Signing Flow (EncryptedSignedMessage)
 
-Post-pairing commands use TWi message type 4 (encrypted + signed). The ECDSA signature covers the **complete encrypted message**, NOT the plaintext:
+For Type 4 messages, the ECDSA signature covers the **complete encrypted message**, NOT the plaintext:
 
 ```
 signing_input (80 bytes) = AAD (16 bytes) + AES-CCM ciphertext (56 bytes) + CCM tag (8 bytes)
@@ -351,13 +373,15 @@ Only two characteristics used on the Omnipod custom service (`1a7e4024`):
 - **Data** (`1a7e2443`): NOTIFY + WRITE_NO_RESP — primary data channel
 - **Control** (`1a7e2441`): INDICATE + WRITE — acknowledgment/control channel
 
-Full command cycle:
-1. **WRITE** on `2443` (data) — send encrypted+signed command
-2. **NOTIFY** responses on `2443` — receive encrypted response data
-3. **INDICATE** on `2441` (control) — pod signals completion
-4. **WRITE** ack on `2441` — controller acknowledges
+Full command cycle (validated by Pod2 Frida, 2026-02-16):
+1. **WRITE** on `2443` (data) — send encrypted command (+ 64B ECDSA signature for Type 4 only)
+2. **NOTIFY** on `2441` (control) — pod sends `04 00 01 00 00` (SUCCESS acknowledgment)
+3. **NOTIFY** on `2443` (data) — pod sends encrypted response
+4. **WRITE** on `2441` (control) — controller sends `04` (acknowledgment byte)
+5. **ACK** on `2443` (data) — AES-CCM with empty plaintext, 31 bytes: `[7B frag] + [16B AAD] + [8B tag]`
 
 BLE writes include a **7-byte fragmentation header** before the TWi packet data.
+Pattern: `0000XXXXXXXXXXXX` (first 2 bytes `0000`, remaining 5 vary per message).
 
 No separate heartbeat mechanism exists. The app polls the pod every ~20-30 seconds via normal encrypted commands on the data characteristic.
 
@@ -428,58 +452,131 @@ AES-CCM parameters: tag length parameter = 1 (meaning 8-byte tags), consistent w
 | `hmac-secret` | Secret | HMAC operations |
 | `secured-sharedpreferences-secret` | Secret | SharedPreferences encryption |
 
+## O5 Phase 1 Activation Flow (Pod2 Frida-Validated, 2026-02-16)
+
+The complete Phase 1 activation sequence, validated against a live Pod2 activation (pdmid 2587928, podId 0x277d1a). See `POST_PAIR_COMMANDS.md` for full byte-level encoding details.
+
+### Activation Command Sequence
+
+```
+EAP-AKA Success
+    |
+    v
+Phase 0: getPodVersion (0x07)                    [Type 1, 26B plaintext]
+    |     AssignAddress with 0xFFFFFFFF
+    |     Response: FW 4.23.1.21, productId=5, state=FILLED
+    v
+O5 AID Setup (8 commands, all Type 1):
+    1. UtcCommand          SE255.2=[unix_timestamp]
+    2. TdiCommand          S3.2=0003000E00,G3.2         (TDI=14U)
+    3. TargetBgProfile     S3.1=00C0[48x 0000006E],G3.1 (110 mg/dL)
+    4. DiaCommand          S3.9=8,G3.9                   (DIA=8 hours)
+    5. EgvCommand          S3.7=3670015,G3.7             (Low=55)
+    6-8. AlgorithmInsulinHistory x3  SE2.1=00A8[24 x 7B records]
+    9. UnifiedAidPodStatus G3.12
+    --- "activation (QN setup) 0/2 finished" ---
+    |
+    v
+Phase 1: Pod Setup ("activation 1/2"):
+    10. setPodUid (0x03)                          [Type 1, 41B] state->UID_SET
+    11. programAlert slot #4: low reservoir       [Type 1, 32B] 5U threshold
+    12. programAlert slot #7: LOC/setup reminder  [Type 1, 32B] 5min/55min
+    13. programBolus: prime 1 (2.6U, 52 pulses)  [Type 4 SIGNED, 56B + 64B sig]
+        ... poll getPodStatus page 7 until done (~52 sec) ...
+    14. programAlert slot #3: user expiry         [Type 1, 32B] 3968 min
+    --- ACTIVATION_COMPLETED_PHASE_1 ---
+```
+
+### O5 AID Command SLPE Formats
+
+Three wrapping formats for AID commands (distinct from legacy `S0.0=`/`,G0.0` wrapping):
+- **SET+GET**: `S[feature].[attr]=[data],G[feature].[attr]` -- sets value and reads back confirmation
+- **GET only**: `G[feature].[attr]` -- reads current value
+- **Extended SET**: `SE[feature].[attr]=[data]` -- extended feature set, response prefix `ES[feature].[attr]=`
+
+### Alert Parameters (Pod2 Frida-validated)
+
+| Alert | Slot | BeepReps | BeepType | Duration | AlertType | Threshold |
+|-------|------|----------|----------|----------|-----------|-----------|
+| Low Reservoir | 4 | 1 | 2 | 0 | volume | 100 uL (5U) |
+| LOC/Setup Reminder | 7 | 8 | 2 | 55 min | time | 5 min |
+| User Expiry | 3 | 3 | 2 | 0 | time | 3968 min (66.13h) |
+
+### Prime Bolus Parameters (Pod2 Frida-validated)
+
+| Parameter | Value |
+|-----------|-------|
+| Pulses | 520 partial (52 pulses = 2.6U) |
+| Delay | 100000 us (1 sec/pulse) |
+| Beep | 0x7C (completion beep ON, 60min reminder) |
+| Message type | 0x12 (WITH_PDM_VALUE) |
+| TWi type | Type 4 (ECDSA signed) |
+
+### Pod State Transitions During Activation
+
+```
+FILLED (2) -> [after setPodUid] -> UID_SET (3) -> [after programBolus prime] ->
+ENGAGING_CLUTCH_DRIVE (4) -> [after prime completes] -> CLUTCH_DRIVE_ENGAGED (5)
+```
+
+### Key Corrections from Pod2 Frida
+
+- **NO basal schedule before priming.** Basal is deferred to Phase 2. Historical btsnoop showed 3x ProgramBasal before prime -- that was a different app/firmware version.
+- **Registration payload NOT sent during activation.** Previously assumed to be sent 3 times between AssignAddress and SetupPod based on btsnoop -- this was incorrect.
+- **Only programBolus uses Type 4 (signed).** All other Phase 1 commands use Type 1 (encrypted only). See "TWi Message Type Signing Rules" above.
+- **Status polling uses page 7** (`0x0e 01 07`), not page 0.
+- **Low reservoir threshold is 5U**, not 10U.
+- **User expiry at 3968 min (66.13h)**, approximately 5h52m before 72h pod life.
+- **Prime beep parameter is 0x7C**, not 0 (no beeps). Completion beep ON + 60min reminder.
+
 ## Next Steps / Implementation Checklist
 
-Ordered steps to implement post-pairing pod communication in OmnipodKit:
+Ordered steps to implement post-pairing pod communication in OmnipodKit.
 
-### Phase 1: Command Construction
-1. **Implement Type 4 signed message construction**
-   - After AES-CCM encryption, construct 80-byte signing input: `AAD(16) + ciphertext + tag(8)`
-   - Sign with secondary key (`com.twi.enclave.device.secondary`, SHA256withECDSA)
-   - Append 64-byte raw r||s signature to the encrypted message
-   - Test: verify signature matches Frida-captured examples using known key material
+### DONE (Phase 1 activation sequence implemented)
+1. ~~**Type 4 signed message construction**~~ -- **DONE.** Implemented in `PodCommsSession.o5Send()`. Only used for `programBolus` (prime/delivery). AAD(16) + ciphertext + tag(8) signed with secondary key, 64-byte raw r||s appended.
+2. ~~**O5 AID setup commands**~~ -- **DONE.** 8 AID commands implemented in `O5AidCommands.swift`, called from `BlePodComms.swift` between getPodVersion and setPodUid.
+3. ~~**Phase 1 activation order**~~ -- **DONE.** Corrected to match Pod2 Frida: getPodVersion, AID setup, setPodUid, alerts, prime 1, poll, expiry alert. No basal before priming.
+4. ~~**Alert parameters**~~ -- **DONE.** Low reservoir=5U (slot #4), LOC=5min/55min (slot #7), user expiry=3968min (slot #3). Prime beep=0x7C.
+5. ~~**Registration payload removed**~~ -- **DONE.** Not sent during activation (Pod2 Frida confirmed).
 
-2. **Implement command sequence counter management**
+### TODO: Remaining Implementation
+6. **Implement command sequence counter management**
    - Track counter per session (observed: `9f492c` → `9f4935`, incrementing per command exchange)
    - Persist counter in session state for reconnection
    - Counter appears in TWi header and TwiCaching value (bytes 43-45)
 
-3. **Implement ACK message construction**
+7. **Implement ACK message construction**
    - ACK = AES-CCM encrypt with empty plaintext, producing 8-byte tag only
    - ACK is written to control characteristic (`2441`) after receiving pod response on data characteristic (`2443`)
+   - ACK AAD uses type byte `81` (acknowledgment frame)
 
-### Phase 2: BLE Communication
-4. **Implement BLE polling loop (every ~20-30 seconds)**
-   - Send encrypted status query commands on data characteristic
-   - No separate heartbeat/keep-alive mechanism needed
-   - Handle NOTIFY responses on data characteristic
-   - Handle INDICATE on control characteristic with WRITE ack
-
-5. **Implement BLE fragmentation header**
+8. **Implement BLE fragmentation header**
    - 7-byte fragmentation header prepended to TWi packet on BLE writes
    - Parse incoming fragments and reassemble TWi packets
+   - Pattern: `0000XXXXXXXXXXXX` where first 2 bytes are `0000`, remaining 5 vary per message
 
-### Phase 3: Session Management
-6. **Implement session persistence (save/restore)**
-   - Save: LTK derivative, nonce state, command counter, pod ID, session metadata
-   - Restore: reload on app restart for reconnection without re-pairing
-   - Model after TwiCaching 93-byte value structure
+9. **Implement Phase 2 activation** (after prime 1 completes)
+   - ProgramBasal: full 24-hour basal schedule (deferred from Phase 1)
+   - ProgramAlert: clear LOC (#7), program system expiry (#2) and imminent expiry (#0)
+   - ProgramBolus: prime 2 / cannula fill (Type 4 signed)
+   - CGM activation
+   - Final status verification
 
-7. **Implement reconnection using stored session**
-   - Skip pairing flow when LTK exists
-   - Resume AES-CCM encryption with persisted nonce/counter state
-   - Re-establish BLE subscriptions (NOTIFY on 2443, INDICATE on 2441)
+10. **Implement session persistence (save/restore)**
+    - Save: LTK derivative, nonce state, command counter, pod ID, session metadata
+    - Restore: reload on app restart for reconnection without re-pairing
+    - Model after TwiCaching 93-byte value structure
 
-### Phase 4: Pod Activation
-8. **Implement setPodUid with registration payload**
-   - Send 163-byte registration payload to pod
-   - Determine if this uses Type 3 or Type 4 message format
-   - Must happen after pairing, before first basal program
+11. **Implement reconnection using stored session**
+    - Skip pairing flow when LTK exists
+    - Resume AES-CCM encryption with persisted nonce/counter state
+    - Re-establish BLE subscriptions (NOTIFY on 2443, INDICATE on 2441)
 
-### Phase 5: Validation
-9. **End-to-end test: send a status query and parse response**
-   - Verify encryption, signing, sequence counter, ACK cycle
-   - Compare BLE traffic against Frida captures
+12. **End-to-end test: complete Phase 1 activation on a real pod**
+    - Verify full sequence: getPodVersion through expiry alert
+    - Compare BLE traffic against Pod2 Frida captures
+    - Confirm pod state transitions: FILLED -> UID_SET -> ENGAGING_CLUTCH_DRIVE -> CLUTCH_DRIVE_ENGAGED
 
 ## External Reference Files
 
@@ -504,10 +601,17 @@ All in `/Users/james/Downloads/O5keys/KEYS/`:
 - `sps2_phone_cert.hex` — SPS2 phone→pod encrypted cert+sig (1089 bytes: TLS DER + ECDSA sig + tag)
 - `sps2_pod_cert.hex` — SPS2 pod→phone encrypted cert+sig (895 bytes)
 
-### Frida session capture (2026-02-15, pod-connected app)
+### Frida session captures
+**Pod1 steady-state session (2026-02-15, pod 2587929)**:
 All in `/Users/james/Downloads/O5keys/KEYS/`:
 - `frida_output_20260215_215748.log` — Complete Frida instrumentation log: BLE state dump, AES-CCM encrypt/decrypt, ECDSA signing, TwiCaching updates, session files, AndroidKeyStore enumeration
 - `FRIDA_QUESTIONS.md` — Prioritized extraction plan documenting what to hook and why
+
+**Pod2 activation session (2026-02-16, pod 2587930)**:
+- `/Users/james/Downloads/Pod2-o5app-beforeinsert.txt` — Complete Frida log of Pod2 Phase 1 activation (pdmid 2587928, podId 0x277d1a). Includes AES-CCM plaintext captures for all commands, BLE write hex, ECDSA signing for prime bolus, pod state transitions (FILLED -> UID_SET -> ENGAGING_CLUTCH_DRIVE -> CLUTCH_DRIVE_ENGAGED). Primary source for the corrected activation order and alert parameters.
+
+### Post-pairing command reference
+- `/Users/james/repos/Omnipod5APK/POST_PAIR_COMMANDS.md` — Complete post-pairing command sequence documentation. Includes byte-level encoding for all commands (GetVersion, SetUniqueId, ProgramAlert, ProgramBolus, ProgramBasal, GetPodStatus, etc.), O5 AID command format, TWi message type signing rules, alert configurations, insulin schedule encoding, and full Phase 1/Phase 2 activation sequence validated against Pod2 Frida capture.
 
 ### Previous analysis (pdmid 2584724)
 All in `/Users/james/repos/Omnipod5APK/`:
