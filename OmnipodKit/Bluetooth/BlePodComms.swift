@@ -19,7 +19,7 @@ class BlePodComms: PodComms {
     // successful pairing (O5PairLogSuccess1.txt, 2026-02-16). This allows testing
     // EAP-AKA session establishment and post-pairing commands without re-pairing.
     // The pod must be the same one that was paired (UUID 74CF60D7-..., podId 0x277d19).
-    static let useHardcodedO5PairingResult = true
+    static let useHardcodedO5PairingResult = false
 
     var manager: PeripheralManager? {
         didSet {
