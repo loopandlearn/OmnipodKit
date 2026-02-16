@@ -558,11 +558,13 @@ class BlePodComms: PodComms {
                     self.podStateLock.unlock()
                 }
 
+                var pairPodRanGetPodVersion = false
                 if (!self.isPaired) {
                     // Fresh pod: full pairing sequence (HELLO + LTK + EAP-AKA)
                     try manager.sendHello(myId: myId)
                     try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
                     try self.pairPod(insulinType: insulinType)
+                    pairPodRanGetPodVersion = true  // pairPod() sends getPodVersion internally
                 } else if !self.needsSessionEstablishment,
                           let ck = self.podState?.bleMessageTransportState.ck,
                           !ck.isEmpty {
@@ -590,16 +592,21 @@ class BlePodComms: PodComms {
                     )
                     preSetupTransport.messageLogger = self.messageLogger
 
-                    // getPodVersion (AssignAddress with 0xffffffff) must be sent first.
-                    // In the initial pairing flow this is done inside pairPod(), but on
-                    // resume we skipped pairPod() so we need to send it here.
-                    self.log.info("O5: Sending getPodVersion (AssignAddress) before AID commands")
-                    let assignAddress = AssignAddressCommand(address: 0xffffffff)
-                    let message = Message(address: 0xffffffff, messageBlocks: [assignAddress], sequenceNum: preSetupTransport.messageNumber)
-                    let versionResponse = try self.bleSendPairMessage(blePodMessageTransport: preSetupTransport, message: message)
-                    self.log.info("O5: getPodVersion response: FW %{public}@, progress %{public}@",
-                                 String(describing: versionResponse.firmwareVersion),
-                                 String(describing: versionResponse.podProgressStatus))
+                    // getPodVersion (AssignAddress with 0xffffffff) must be the first encrypted
+                    // command after each EAP-AKA session. pairPod() sends it during initial pairing;
+                    // on resume (pairPod skipped) we must send it here. Sending it TWICE
+                    // desynchronizes nonce state — pod ACKs transport but can't decrypt AID commands.
+                    if !pairPodRanGetPodVersion {
+                        self.log.info("O5: Sending getPodVersion (AssignAddress) before AID commands")
+                        let assignAddress = AssignAddressCommand(address: 0xffffffff)
+                        let message = Message(address: 0xffffffff, messageBlocks: [assignAddress], sequenceNum: preSetupTransport.messageNumber)
+                        let versionResponse = try self.bleSendPairMessage(blePodMessageTransport: preSetupTransport, message: message)
+                        self.log.info("O5: getPodVersion response: FW %{public}@, progress %{public}@",
+                                     String(describing: versionResponse.firmwareVersion),
+                                     String(describing: versionResponse.podProgressStatus))
+                    } else {
+                        self.log.info("O5: Skipping getPodVersion (already sent by pairPod)")
+                    }
 
                     self.log.info("O5: Running pre-SetupPod intermediate steps (AID commands)")
                     try self.o5PreSetupSteps(blePodMessageTransport: preSetupTransport)
