@@ -14,12 +14,11 @@ import os.log
 
 class BlePodComms: PodComms {
 
-    // MARK: - O5 Debug: Skip LTK exchange and use hardcoded pairing result
-    // Set to true to skip the O5 LTK exchange and use the LTK from a previous
-    // successful pairing (O5PairLogSuccess1.txt, 2026-02-16). This allows testing
-    // EAP-AKA session establishment and post-pairing commands without re-pairing.
-    // The pod must be the same one that was paired (UUID 74CF60D7-..., podId 0x277d19).
-    static let useHardcodedO5PairingResult = false
+    // MARK: - O5 Debug: Skip LTK exchange and use a cached pairing result
+    // Set to a saved pairing result to skip LTK exchange and pod discovery,
+    // connecting directly to the pod by BLE UUID and re-establishing the EAP-AKA
+    // session with the stored LTK. Set to nil for normal pairing.
+    static let savedO5PairingResult: O5SavedPairingResult? = .pod3
 
     var manager: PeripheralManager? {
         didSet {
@@ -56,9 +55,9 @@ class BlePodComms: PodComms {
 
     func connectToNewPod(_ completion: @escaping (Result<Omni, Error>) -> Void) {
         // O5 Debug: skip scanning and connect directly to known pod UUID
-        if BlePodComms.useHardcodedO5PairingResult {
-            let knownUUID = "74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F"
-            log.info("O5 DEBUG: Skipping pod discovery, connecting directly to %{public}@", knownUUID)
+        if let saved = BlePodComms.savedO5PairingResult {
+            let knownUUID = saved.bleUUID
+            log.info("O5 DEBUG: Skipping pod discovery, connecting directly to %{public}@ (%{public}@)", saved.name, knownUUID)
 
             setServicePodType(podType: self.podType)
             guard let device = bluetoothManager.retrieveAndConnectKnownPod(uuidString: knownUUID) else {
@@ -178,11 +177,11 @@ class BlePodComms: PodComms {
             response = try ltkExchanger.negotiateLTK()
             ltk = response.ltk
         case omnipod5Type:
-            if BlePodComms.useHardcodedO5PairingResult {
-                // Skip LTK exchange — use result from O5PairLogSuccess1.txt
-                log.info("O5 DEBUG: Using hardcoded LTK from previous successful pairing")
-                ltk = Data(hexadecimalString: "f43fde8e37f453bca32a5c448b2abe52")!
-                response = PairResult(ltk: ltk, address: 0x277d19, msgSeq: 6)
+            if let saved = BlePodComms.savedO5PairingResult {
+                // Skip LTK exchange — use saved pairing result
+                log.info("O5 DEBUG: Using saved LTK from %{public}@", saved.name)
+                ltk = Data(hexadecimalString: saved.ltk)!
+                response = PairResult(ltk: ltk, address: saved.podAddress, msgSeq: saved.msgSeq)
             } else {
                 ids = Ids(myId: self.myId, podId: self.podId)
                 let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
@@ -199,7 +198,8 @@ class BlePodComms: PodComms {
         }
 
         log.info("Establish an Eap Session")
-        guard let bleMessageTransportState = try establishSession(ltk: ltk, eapSeq: 1, msgSeq: Int(response.msgSeq)) else {
+        let eapSeq = BlePodComms.savedO5PairingResult?.eapSeq ?? 1
+        guard let bleMessageTransportState = try establishSession(ltk: ltk, eapSeq: eapSeq, msgSeq: Int(response.msgSeq)) else {
             log.debug("pairPod: failed to create messageTransportState!")
             throw PodCommsError.noPodPaired
         }
