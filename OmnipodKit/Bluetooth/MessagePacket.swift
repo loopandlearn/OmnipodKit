@@ -9,7 +9,7 @@
 import Foundation
 
 enum MessageType: UInt8 {
-    case CLEAR = 0, ENCRYPTED, SESSION_ESTABLISHMENT, PAIRING
+    case CLEAR = 0, ENCRYPTED, SESSION_ESTABLISHMENT, PAIRING, ENCRYPTED_SIGNED
 }
 
 struct MessagePacket {
@@ -48,7 +48,8 @@ struct MessagePacket {
             throw PodProtocolError.couldNotParseMessageException("Wrong payload size")
         }
 
-        let payloadEnd = Int(16 + size + (type == MessageType.ENCRYPTED ? 8 : 0))
+        let hasTag = (type == .ENCRYPTED || type == .ENCRYPTED_SIGNED)
+        let payloadEnd = Int(16 + size + (hasTag ? 8 : 0))
 
         return MessagePacket(
             type: type,
@@ -127,7 +128,8 @@ struct MessagePacket {
         bb.append(f2.value)
         bb.append(self.sequenceNumber)
         bb.append(self.ackNumber)
-        let size = payload.count - ((type == MessageType.ENCRYPTED && !forEncryption) ? 8 : 0)
+        let hasTag = (type == .ENCRYPTED || type == .ENCRYPTED_SIGNED)
+        let size = payload.count - ((hasTag && !forEncryption) ? 8 : 0)
         bb.append(UInt8(size >> 3))
         bb.append(UInt8((size << 5) & 0xff))
         bb.append(self.source.address)

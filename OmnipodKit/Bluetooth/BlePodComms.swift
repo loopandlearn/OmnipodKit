@@ -308,21 +308,21 @@ class BlePodComms: PodComms {
 
     // MARK: - O5 Pre-SetupPod Steps
 
-    /// Performs the O5-specific intermediate steps between AssignAddress and SetupPod.
+    /// Performs the O5-specific intermediate steps between AssignAddress (getPodVersion) and SetupPod.
     ///
-    /// From btsnoop analysis of a successful O5 activation:
-    ///   [1] AssignAddress -> VersionResponse  (already done in pairPod)
-    ///   [2] GetStatus -> StatusResponse       (verify pod state)
-    ///   [3] Short command -> StatusResponse   (unknown, skipped)
-    ///   [4] Large 212B exchange               (unknown O5 config, skipped)
-    ///   [5-6] Short exchanges                 (unknown, skipped)
-    ///   [7-9] Registration payload x3         (setPodUid)
-    ///   [10] GetStatus -> VersionResponse     (pre-SetupPod check)
-    ///   [11] SetupPod -> VersionResponse
-    ///
-    /// We implement the known steps: GetStatus, registration delivery, GetStatus.
-    /// Unknown steps (3-6) are skipped — the pod may still accept SetupPod without them,
-    /// or we'll get a different error that tells us what's missing.
+    /// From Frida capture of real O5 app activation (Pod2, pdmid 2587928):
+    ///   Real O5 activation sequence (after pairing + EAP-AKA):
+    ///     [1] getPodVersion (AssignAddress with 0xffffffff) -> VersionResponse (FILLED)
+    ///     [2] GetStatus -> StatusResponse (verify pod state)
+    ///     [3] UtcCommand: SE255.2=[timestamp]         (set pod UTC time)
+    ///     [4] TdiCommand: S3.2=0003000E00,G3.2        (therapy delivery info)
+    ///     [5] TargetBgProfile: S3.1=00c0[...],G3.1    (48 half-hour BG targets)
+    ///     [6] DiaCommand: S3.9=8,G3.9                 (duration of insulin action)
+    ///     [7] EgvCommand: S3.7=3670015,G3.7           (CGM/EGV config)
+    ///     [8-10] AlgorithmInsulinHistory x3: SE2.1=   (insulin history, 24 records each)
+    ///     [11] UnifiedAidPodStatus: G3.12              (AID status query)
+    ///     [12] GetStatus before SetupPod
+    ///     [13] SetupPod -> VersionResponse (UID_SET)
     private func o5PreSetupSteps(blePodMessageTransport: BlePodMessageTransport) throws {
         // We should already be holding podStateLock during calls to this function
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
@@ -330,10 +330,10 @@ class BlePodComms: PodComms {
         log.info("O5: Beginning pre-SetupPod intermediate steps")
 
         // Helper to save transport state after each successful step
-        let saveState = { [self] in
+        let saveState = {
             if self.podState != nil {
                 self.podState!.bleMessageTransportState = blePodMessageTransport.state
-                log.debug("O5: Saved transport state: msgSeq=%{public}d, nonceSeq=%{public}d, messageNumber=%{public}d",
+                self.log.debug("O5: Saved transport state: msgSeq=%{public}d, nonceSeq=%{public}d, messageNumber=%{public}d",
                          blePodMessageTransport.msgSeq, blePodMessageTransport.nonceSeq, blePodMessageTransport.messageNumber)
             }
         }
@@ -348,30 +348,16 @@ class BlePodComms: PodComms {
             saveState()
         } catch {
             log.error("O5: GetStatus after AssignAddress failed: %{public}@", String(describing: error))
-            // Continue anyway — the pod might still accept registration
             log.info("O5: Continuing despite GetStatus failure")
         }
 
-        // Step 2: Send the registration payload (setPodUid)
-        // The btsnoop shows 3 consecutive 184B encrypted messages each carrying ~163B.
-        // Our registration payload is exactly 163 bytes.
-        // Analysis: all 3 messages are the same size, suggesting the same payload sent 3 times,
-        // OR 3 different sub-payloads. Since we only have one 163B payload from register/complete,
-        // we send it 3 times as observed in the btsnoop.
-        log.info("O5: Step 2 — Sending registration payload (setPodUid)")
-        do {
-            try o5SendRegistrationPayload(transport: blePodMessageTransport)
-            log.info("O5: Registration payload delivery complete")
-            saveState()
-        } catch {
-            log.error("O5: Registration payload delivery failed: %{public}@", String(describing: error))
-            // This is likely critical — but continue to see what happens
-            log.info("O5: Continuing despite registration failure")
-        }
+        // Steps 2-10: O5 AID setup commands (UTC, TDI, TargetBG, DIA, EGV, InsulinHistory x3, AidStatus)
+        log.info("O5: Steps 2-10 — Sending AID setup commands")
+        try o5SendAidSetupCommands(transport: blePodMessageTransport)
+        saveState()
 
-        // Step 3: Send GetStatus before SetupPod
-        // The btsnoop shows this returns a VersionResponse (37B), not a StatusResponse
-        log.info("O5: Step 3 — Sending GetStatus before SetupPod")
+        // Step 11: Send GetStatus before SetupPod
+        log.info("O5: Step 11 — Sending GetStatus before SetupPod")
         do {
             let statusResponse = try o5SendGetStatus(transport: blePodMessageTransport)
             log.info("O5: Pre-SetupPod GetStatus response — podProgress=%{public}@",
@@ -383,6 +369,112 @@ class BlePodComms: PodComms {
         }
 
         log.info("O5: Pre-SetupPod steps complete, proceeding to SetupPod")
+    }
+
+    /// Sends the O5-specific AID setup commands between GetStatus and SetupPod.
+    ///
+    /// These 9 command exchanges use an ASCII key-value protocol (SET+GET, GET-only, Extended SET)
+    /// wrapped in SLPE, sent through the encrypted Type 1 transport. The sequence matches the
+    /// real O5 app behavior observed via Frida (Pod2, pdmid 2587928).
+    ///
+    /// Command sequence:
+    ///   1. UtcCommand — SE255.2=[unix_timestamp]
+    ///   2. TdiCommand — S3.2=0003000E00,G3.2
+    ///   3. TargetBgProfileCommand — S3.1=00c0[48 x 4-byte targets],G3.1
+    ///   4. DiaCommand — S3.9=8,G3.9
+    ///   5. EgvCommand — S3.7=3670015,G3.7
+    ///   6-8. AlgorithmInsulinHistoryCommand x3 — SE2.1=00a8[168 bytes zeros]
+    ///   9. UnifiedAidPodStatusCommand — G3.12
+    private func o5SendAidSetupCommands(transport: BlePodMessageTransport) throws {
+
+        // Command 1: UTC time
+        log.info("O5 AID [1/9]: UtcCommand — setting pod UTC time")
+        do {
+            let (payload, prefix) = O5AidCommands.UtcCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
+            log.info("O5 AID [1/9]: UtcCommand response: %{public}@", responseStr)
+        } catch {
+            log.error("O5 AID [1/9]: UtcCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        // Command 2: TDI (Therapy Delivery Information)
+        log.info("O5 AID [2/9]: TdiCommand — setting therapy delivery info")
+        do {
+            let (payload, prefix) = O5AidCommands.TdiCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
+            log.info("O5 AID [2/9]: TdiCommand response: %{public}@", responseStr)
+        } catch {
+            log.error("O5 AID [2/9]: TdiCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        // Command 3: Target BG Profile (48 half-hour targets, all 110 mg/dL)
+        log.info("O5 AID [3/9]: TargetBgProfileCommand — setting 48 half-hour BG targets (all 110 mg/dL)")
+        do {
+            let (payload, prefix) = O5AidCommands.TargetBgProfileCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            log.info("O5 AID [3/9]: TargetBgProfileCommand response: %{public}d bytes", response.count)
+        } catch {
+            log.error("O5 AID [3/9]: TargetBgProfileCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        // Command 4: DIA (Duration of Insulin Action)
+        log.info("O5 AID [4/9]: DiaCommand — setting DIA=8")
+        do {
+            let (payload, prefix) = O5AidCommands.DiaCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
+            log.info("O5 AID [4/9]: DiaCommand response: %{public}@", responseStr)
+        } catch {
+            log.error("O5 AID [4/9]: DiaCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        // Command 5: EGV (Estimated Glucose Value config)
+        log.info("O5 AID [5/9]: EgvCommand — setting EGV config=3670015")
+        do {
+            let (payload, prefix) = O5AidCommands.EgvCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
+            log.info("O5 AID [5/9]: EgvCommand response: %{public}@", responseStr)
+        } catch {
+            log.error("O5 AID [5/9]: EgvCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        // Commands 6-8: Algorithm Insulin History (3 batches of 24 zero records)
+        for batch in 1...3 {
+            log.info("O5 AID [%{public}d/9]: AlgorithmInsulinHistoryCommand batch %{public}d/3", batch + 5, batch)
+            do {
+                let (payload, prefix) = O5AidCommands.AlgorithmInsulinHistoryCommand.payload()
+                let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+                let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
+                log.info("O5 AID [%{public}d/9]: AlgorithmInsulinHistory batch %{public}d/3 response: %{public}@",
+                         batch + 5, batch, responseStr)
+            } catch {
+                log.error("O5 AID [%{public}d/9]: AlgorithmInsulinHistory batch %{public}d/3 failed: %{public}@",
+                          batch + 5, batch, String(describing: error))
+                throw error
+            }
+        }
+
+        // Command 9: Unified AID Pod Status query
+        log.info("O5 AID [9/9]: UnifiedAidPodStatusCommand — querying AID status")
+        do {
+            let (payload, prefix) = O5AidCommands.UnifiedAidPodStatusCommand.payload()
+            let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
+            log.info("O5 AID [9/9]: UnifiedAidPodStatus response: %{public}d bytes — %{public}@",
+                     response.count, response.hexadecimalString)
+        } catch {
+            log.error("O5 AID [9/9]: UnifiedAidPodStatusCommand failed: %{public}@", String(describing: error))
+            throw error
+        }
+
+        log.info("O5 AID: All 9 AID setup command exchanges complete")
     }
 
     /// Sends a GetStatus command via the encrypted transport and returns the StatusResponse.
@@ -419,49 +511,22 @@ class BlePodComms: PodComms {
         }
     }
 
-    /// Sends the O5 registration payload to the pod (setPodUid operation).
-    ///
-    /// The btsnoop shows 3 consecutive 184-byte encrypted messages with 15-byte ACK responses.
-    /// Each 184B encrypted message carries approximately 163 bytes of inner data.
-    ///
-    /// The 163-byte registration payload from register/complete contains:
-    ///   - Length prefix (4B) + version (4B) + flags (6B)
-    ///   - Controller ID (4B) + secondary public key (64B)
-    ///   - Timestamp/flags (7B) + commands (10B) + signature (65B)
-    ///
-    /// Strategy: Send the full 163-byte payload 3 times (as the btsnoop shows 3 identical-size sends).
-    /// The pod may need 3 separate deliveries for different processing stages, or this may be a retry
-    /// mechanism. If sending 3x fails, we'll adjust based on pod response.
-    private func o5SendRegistrationPayload(transport: BlePodMessageTransport) throws {
-        guard let registrationPayload = O5RegistrationData.active.registrationPayload else {
-            log.error("O5: No registration payload available")
-            throw PodCommsError.diagnosticMessage(str: "O5 registration payload not available")
-        }
-
-        log.info("O5: Registration payload size: %{public}d bytes", registrationPayload.count)
-        log.debug("O5: Registration payload (hex): %{public}@", registrationPayload.hexadecimalString)
-
-        // Verify payload structure
-        if registrationPayload.count >= 18 {
-            let controllerIdInPayload = registrationPayload.subdata(in: 14..<18)
-            log.info("O5: Registration payload controller ID: %{public}@", controllerIdInPayload.hexadecimalString)
-        }
-
-        // From the btsnoop, the registration is sent 3 times with ACK responses.
-        // Send the payload 3 times as raw O5 data.
-        for i in 1...3 {
-            log.info("O5: Sending registration payload %{public}d/3", i)
-            do {
-                try transport.sendRawO5DataExpectingAck(registrationPayload)
-                log.info("O5: Registration payload %{public}d/3 acknowledged", i)
-            } catch {
-                log.error("O5: Registration payload %{public}d/3 failed: %{public}@", i, String(describing: error))
-                throw error
-            }
-        }
-
-        log.info("O5: All 3 registration payloads sent and acknowledged")
-    }
+    // MARK: - Registration payload (currently unused)
+    //
+    // The o5SendRegistrationPayload method was removed because Frida capture of a real
+    // O5 app activation (Pod2, 2026-02-16) confirmed the 163-byte registration payload
+    // from register/complete is NOT sent during pod activation. The "setPodUid" command
+    // in the Frida log is just the standard SetUniqueId command (41 bytes plaintext
+    // assigning the pod address), not the 163-byte registration payload.
+    //
+    // The previous implementation incorrectly sent the registration payload 3 times
+    // between AssignAddress and SetupPod based on a misidentification of btsnoop messages.
+    // The registration payload may be delivered via a different mechanism or at a different
+    // time (e.g., embedded in the TLS certificate SAN during BLE pairing, or not needed
+    // at all for pod activation).
+    //
+    // The registration payload data is still available in O5RegistrationData.active.registrationPayload
+    // if needed in the future.
 
     private func setupPod(timeZone: TimeZone) throws {
         guard let manager = manager else { throw PodCommsError.podNotConnected }
@@ -588,7 +653,10 @@ class BlePodComms: PodComms {
                 // Run a session now for any post-pairing commands
                 let blePodMessageTransport = BlePodMessageTransport(manager: manager, myId: myId, podId: podId, state: self.podState!.bleMessageTransportState)
                 blePodMessageTransport.messageLogger = self.messageLogger
-                let podSession = PodCommsSession(podState: self.podState!, transport: blePodMessageTransport, delegate: self)
+
+                // For O5 pods, create the certificate store for Type 4 signed message sending
+                let certStore: O5CertificateStore? = self.podType == omnipod5Type ? (try? O5CertificateStore()) : nil
+                let podSession = PodCommsSession(podState: self.podState!, transport: blePodMessageTransport, delegate: self, o5CertStore: certStore)
 
                 block(.success(session: podSession))
             } catch let error as PodCommsError {
@@ -621,7 +689,10 @@ class BlePodComms: PodComms {
 
             let blePodMessageTransport = BlePodMessageTransport(manager: manager, myId: self.myId, podId: self.podId, state: self.podState!.bleMessageTransportState)
             blePodMessageTransport.messageLogger = self.messageLogger
-            let podSession = PodCommsSession(podState: self.podState!, transport: blePodMessageTransport, delegate: self)
+
+            // For O5 pods, create the certificate store for Type 4 signed message sending
+            let certStore: O5CertificateStore? = self.podType == omnipod5Type ? (try? O5CertificateStore()) : nil
+            let podSession = PodCommsSession(podState: self.podState!, transport: blePodMessageTransport, delegate: self, o5CertStore: certStore)
             block(.success(session: podSession))
         }
     }

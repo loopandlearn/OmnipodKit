@@ -20,18 +20,20 @@ struct BleMessageTransportState: MessageTransportState {
     var msgSeq: Int // 8-bit Dash MessagePacket sequence # (with ck)
     var nonceSeq: Int // nonce sequence # (with noncePrefix)
     var messageNumber: Int // 4-bit Omnipod Message # (for Omnipod command/responses Messages)
+    var cmdSeqCounter: Int // O5 command sequence counter (increments per signed command exchange)
 
     init() {
         self.init(ck: nil, noncePrefix: nil)
     }
 
-    init(ck: Data?, noncePrefix: Data?, eapSeq: Int = 1, msgSeq: Int = 0, nonceSeq: Int = 0, messageNumber: Int = 0) {
+    init(ck: Data?, noncePrefix: Data?, eapSeq: Int = 1, msgSeq: Int = 0, nonceSeq: Int = 0, messageNumber: Int = 0, cmdSeqCounter: Int = 0) {
         self.ck = ck
         self.noncePrefix = noncePrefix
         self.eapSeq = eapSeq
         self.msgSeq = msgSeq
         self.nonceSeq = nonceSeq
         self.messageNumber = messageNumber
+        self.cmdSeqCounter = cmdSeqCounter
     }
 
     // RawRepresentable
@@ -51,6 +53,7 @@ struct BleMessageTransportState: MessageTransportState {
         self.msgSeq = msgSeq
         self.nonceSeq = nonceSeq
         self.messageNumber = messageNumber
+        self.cmdSeqCounter = rawValue["cmdSeqCounter"] as? Int ?? 0
     }
 
     var rawValue: RawValue {
@@ -60,7 +63,8 @@ struct BleMessageTransportState: MessageTransportState {
             "eapSeq": eapSeq,
             "msgSeq": msgSeq,
             "nonceSeq": nonceSeq,
-            "messageNumber": messageNumber
+            "messageNumber": messageNumber,
+            "cmdSeqCounter": cmdSeqCounter
         ]
     }
 
@@ -78,6 +82,7 @@ extension BleMessageTransportState: CustomDebugStringConvertible {
             "msgSeq: \(msgSeq)",
             "nonceSeq: \(nonceSeq)",
             "messageNumber: \(messageNumber)",
+            "cmdSeqCounter: \(cmdSeqCounter)",
         ].joined(separator: "\n")
     }
 }
@@ -161,6 +166,15 @@ class BlePodMessageTransport: MessageTransport {
         }
         set {
             state.messageNumber = newValue
+        }
+    }
+
+    private(set) var cmdSeqCounter: Int {
+        get {
+            return state.cmdSeqCounter
+        }
+        set {
+            state.cmdSeqCounter = newValue
         }
     }
 
@@ -500,6 +514,245 @@ class BlePodMessageTransport: MessageTransport {
         guard case .sentWithAcknowledgment = ackResult else {
             throw PodProtocolError.messageIOException("Could not send ACK after raw O5 ACK response")
         }
+    }
+
+    // MARK: - O5 AID Command Support
+
+    /// Sends a pre-SLPE-wrapped AID command through the encrypted transport and returns
+    /// the raw response data after SLPE unwrapping.
+    ///
+    /// AID commands use ASCII key-value protocol (e.g., `S3.2=0003000E00,G3.2`)
+    /// that is already SLPE-wrapped by `O5AidCommands`. This method handles the
+    /// encrypt/send/receive/decrypt/ACK cycle and extracts the response payload.
+    ///
+    /// - Parameters:
+    ///   - wrappedPayload: SLPE-wrapped command data (from O5AidCommands)
+    ///   - responsePrefix: The SLPE key to extract from the response (e.g., "3.2=", "ES255.2=")
+    /// - Returns: The raw response data after SLPE unwrapping
+    func sendO5AidCommand(_ wrappedPayload: Data, responsePrefix: String) throws -> Data {
+        guard let enDecrypt = self.enDecrypt else {
+            throw PodCommsError.podNotConnected
+        }
+
+        guard manager.peripheral.state == .connected else {
+            throw PodCommsError.podNotConnected
+        }
+
+        incrementMsgSeq()
+
+        let msg = MessagePacket(
+            type: MessageType.ENCRYPTED,
+            source: self.myId,
+            destination: self.podId,
+            payload: wrappedPayload,
+            sequenceNumber: UInt8(msgSeq),
+            eqos: 1
+        )
+
+        incrementNonceSeq()
+        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
+
+        log.default("O5 AID Send (%{public}d bytes wrapped): %{public}@",
+                     wrappedPayload.count, wrappedPayload.hexadecimalString)
+        messageLogger?.didSend(wrappedPayload)
+
+        let writeResult = manager.sendMessagePacket(encrypted, doRTS: useRTS)
+        switch writeResult {
+        case .sentWithAcknowledgment:
+            break
+        case .sentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        case .unsentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        }
+
+        // Read the response
+        let readResponse = try manager.readMessagePacket(doRTS: useRTS)
+        guard let readMessage = readResponse else {
+            throw PodProtocolError.messageIOException("Could not read AID command response")
+        }
+
+        incrementNonceSeq()
+        let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
+
+        // Extract response data using the caller-provided response prefix
+        let responseData: Data
+        do {
+            responseData = try StringLengthPrefixEncoding.parseKeys([responsePrefix], decrypted.payload)[0]
+        } catch {
+            // If the expected prefix isn't found, log and return raw payload for debugging
+            log.error("O5 AID response prefix '%{public}@' not found in payload: %{public}@",
+                       responsePrefix, decrypted.payload.hexadecimalString)
+            throw error
+        }
+
+        log.default("O5 AID Recv (%{public}d bytes): %{public}@",
+                     responseData.count, responseData.hexadecimalString)
+        messageLogger?.didReceive(responseData)
+
+        // Send ACK
+        incrementMsgSeq()
+        incrementNonceSeq()
+        let ack = try getAck(response: decrypted)
+        let ackResult = manager.sendMessagePacket(ack, doRTS: useRTS)
+        guard case .sentWithAcknowledgment = ackResult else {
+            throw PodProtocolError.messageIOException("Could not send ACK for AID command response")
+        }
+
+        return responseData
+    }
+
+    // MARK: - O5 Signed (Type 4) Message Support
+
+    /// Sends an Omnipod Message as a Type 4 (encrypted + signed) message for O5 steady-state commands.
+    /// The ECDSA signature covers the complete encrypted message: AAD(16) + ciphertext + tag(8).
+    /// Returns the pod's decrypted response.
+    func sendO5SignedMessage(_ message: Message, certStore: O5CertificateStore) throws -> Message {
+        guard manager.peripheral.state == .connected else {
+            throw PodCommsError.podNotConnected
+        }
+
+        messageNumber = message.sequenceNum
+        incrementMessageNumber()
+
+        let dataToSend = message.encoded()
+        log.default("O5Sign Send(Hex): %{public}@", dataToSend.hexadecimalString)
+        messageLogger?.didSend(dataToSend)
+
+        let sendMessage = try getO5SignedCmdMessage(cmd: message, certStore: certStore)
+
+        let writeResult = manager.sendMessagePacket(sendMessage, doRTS: false) // O5 never uses RTS
+        switch writeResult {
+        case .sentWithAcknowledgment:
+            break
+        case .sentWithError(let error):
+            messageLogger?.didError("Unacknowledged signed message. seq:\(message.sequenceNum), error = \(error)")
+            throw PodCommsError.unacknowledgedMessage(sequenceNumber: message.sequenceNum, error: error)
+        case .unsentWithError(let error):
+            throw PodCommsError.commsError(error: error)
+        }
+
+        do {
+            let response = try readAndAckO5SignedResponse(certStore: certStore)
+            incrementMessageNumber()
+            cmdSeqCounter += 1  // increment command sequence counter after successful exchange
+            return response
+        } catch {
+            messageLogger?.didError("Unacknowledged signed message. seq:\(message.sequenceNum), error = \(error)")
+            throw PodCommsError.unacknowledgedMessage(sequenceNumber: message.sequenceNum, error: error)
+        }
+    }
+
+    /// Creates a Type 4 encrypted+signed command message.
+    private func getO5SignedCmdMessage(cmd: Message, certStore: O5CertificateStore) throws -> MessagePacket {
+        guard let enDecrypt = self.enDecrypt else {
+            throw PodCommsError.podNotConnected
+        }
+
+        incrementMsgSeq()
+
+        let wrapped = StringLengthPrefixEncoding.formatKeys(
+            keys: [COMMAND_PREFIX, O5_COMMAND_SUFFIX],
+            payloads: [cmd.encoded(), Data()]
+        )
+
+        // Create Type 4 message packet
+        let msg = MessagePacket(
+            type: MessageType.ENCRYPTED_SIGNED,
+            source: self.myId,
+            destination: self.podId,
+            payload: wrapped,
+            sequenceNumber: UInt8(msgSeq),
+            eqos: 1
+        )
+
+        incrementNonceSeq()
+        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
+
+        // Sign: AAD (16 bytes TWi header) + ciphertext + tag (8 bytes)
+        let signingInput = encrypted.asData(forEncryption: false).prefix(16) + encrypted.payload
+        log.debug("O5Sign signing input (%{public}d bytes): AAD=%{public}@ payload=%{public}d bytes",
+                  signingInput.count, signingInput.prefix(16).hexadecimalString, encrypted.payload.count)
+
+        let signature = try certStore.signRaw(signingInput)
+        assert(signature.count == 64, "ECDSA raw signature must be 64 bytes")
+
+        // Append 64-byte signature to the encrypted payload
+        var signedPacket = encrypted
+        signedPacket.payload.append(signature)
+
+        return signedPacket
+    }
+
+    /// Reads and ACKs a Type 4 signed response from the pod.
+    private func readAndAckO5SignedResponse(certStore: O5CertificateStore) throws -> Message {
+        guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
+
+        let readResponse = try manager.readMessagePacket(doRTS: false) // O5 never uses RTS
+        guard let readMessage = readResponse else {
+            throw PodProtocolError.messageIOException("Could not read signed response")
+        }
+
+        // For Type 4 responses, the payload has: ciphertext + tag(8) + signature(64)
+        // Strip the 64-byte signature before decryption
+        var messageForDecrypt = readMessage
+        if readMessage.type == .ENCRYPTED_SIGNED && readMessage.payload.count >= 72 {
+            // Signature is the last 64 bytes
+            let signatureStart = readMessage.payload.count - 64
+            let podSignature = readMessage.payload.suffix(from: signatureStart)
+            messageForDecrypt.payload = readMessage.payload.prefix(signatureStart)
+
+            // Pod signature verification would require the pod's TLS public key
+            // (extracted during SPS2 pairing). For now, log but don't verify.
+            log.debug("O5Sign: Pod response has %{public}d-byte signature (verification not yet implemented)",
+                      podSignature.count)
+        }
+
+        incrementNonceSeq()
+        let decrypted = try enDecrypt.decrypt(messageForDecrypt, nonceSeq)
+
+        let response = try parseResponse(decrypted: decrypted)
+
+        // Send signed ACK
+        incrementMsgSeq()
+        incrementNonceSeq()
+        let ack = try getO5SignedAck(response: decrypted, certStore: certStore)
+        let ackResult = manager.sendMessagePacket(ack, doRTS: false)
+        guard case .sentWithAcknowledgment = ackResult else {
+            throw PodProtocolError.messageIOException("Could not send signed ACK")
+        }
+
+        guard response.sequenceNum == messageNumber else {
+            throw MessageError.invalidSequence
+        }
+
+        return response
+    }
+
+    /// Creates a Type 4 signed ACK message (empty plaintext → 8-byte tag only + 64-byte signature).
+    private func getO5SignedAck(response: MessagePacket, certStore: O5CertificateStore) throws -> MessagePacket {
+        guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
+
+        let ackNumber = (UInt(response.sequenceNumber) + 1) & 0xff
+        let msg = MessagePacket(
+            type: MessageType.ENCRYPTED_SIGNED,
+            source: response.destination.toUInt32(),
+            destination: response.source.toUInt32(),
+            payload: Data(), // empty plaintext → ACK produces 8-byte tag only
+            sequenceNumber: UInt8(msgSeq),
+            ack: true,
+            ackNumber: UInt8(ackNumber),
+            eqos: 0
+        )
+        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
+
+        // Sign the encrypted ACK
+        let signingInput = encrypted.asData(forEncryption: false).prefix(16) + encrypted.payload
+        let signature = try certStore.signRaw(signingInput)
+
+        var signedAck = encrypted
+        signedAck.payload.append(signature)
+        return signedAck
     }
 
     func assertOnSessionQueue() {

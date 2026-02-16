@@ -225,7 +225,7 @@ class PodCommsSession: MessageTransportDelegate {
 
     let log = OSLog(category: "PodCommsSession")
 
-    private var podState: PodState {
+    var podState: PodState {
         didSet {
             assertOnSessionQueue()
             delegate.podCommsSession(self, didChange: podState)
@@ -233,7 +233,11 @@ class PodCommsSession: MessageTransportDelegate {
     }
 
     private unowned let delegate: PodCommsSessionDelegate
-    private var transport: MessageTransport
+    var transport: MessageTransport
+
+    /// O5 certificate store for Type 4 signed message sending. Set when creating
+    /// a PodCommsSession for O5 pods that need signed programming commands.
+    var o5CertStore: O5CertificateStore?
 
     // used for testing
     var mockCurrentDate: Date?
@@ -241,10 +245,11 @@ class PodCommsSession: MessageTransportDelegate {
         return mockCurrentDate ?? Date()
     }
 
-    init(podState: PodState, transport: MessageTransport, delegate: PodCommsSessionDelegate) {
+    init(podState: PodState, transport: MessageTransport, delegate: PodCommsSessionDelegate, o5CertStore: O5CertificateStore? = nil) {
         self.podState = podState
         self.transport = transport
         self.delegate = delegate
+        self.o5CertStore = o5CertStore
         self.transport.delegate = self
     }
 
@@ -413,8 +418,88 @@ class PodCommsSession: MessageTransportDelegate {
         throw PodCommsError.nonceResyncFailed
     }
 
+    // MARK: - O5 Type 4 Signed Message Sending
+
+    /// Sends message blocks as a Type 4 (encrypted + ECDSA signed) message for O5 pods.
+    /// This is required for all O5 programming commands (ConfigureAlerts, ProgramBolus, ProgramBasal, etc.).
+    ///
+    /// The Frida log confirms ALL O5 programming commands must be sent as Type 4 signed messages.
+    /// The ECDSA signature covers AAD(16) + ciphertext + tag(8) and is appended as 64 bytes raw r||s.
+    ///
+    /// - Parameters:
+    ///   - messageBlocks: The message blocks to send
+    ///   - expectFollowOnMessage: If true, the pod will expect another message within 4 minutes
+    /// - Returns: The received message response
+    /// - Throws: PodCommsError if cert store not available, transport not BLE, or communication fails
+    func o5Send<T: MessageBlock>(_ messageBlocks: [MessageBlock], expectFollowOnMessage: Bool = false) throws -> T {
+
+        guard let certStore = o5CertStore else {
+            log.error("o5Send: O5CertificateStore not available, cannot send signed message")
+            throw PodCommsError.diagnosticMessage(str: "O5 certificate store not available for signed message sending")
+        }
+
+        guard let bleTransport = transport as? BlePodMessageTransport else {
+            log.error("o5Send: Transport is not BlePodMessageTransport, cannot send signed message")
+            throw PodCommsError.diagnosticMessage(str: "O5 signed messages require BLE transport")
+        }
+
+        // Handle nonce advancement for nonce-resyncable blocks (same as send())
+        if messageBlocks.contains(where: { $0 as? NonceResyncableMessageBlock != nil }) {
+            podState.advanceToNextNonce()
+        }
+
+        let messageNumber = transport.messageNumber
+        let message = Message(address: podState.address, messageBlocks: messageBlocks, sequenceNum: messageNumber, expectFollowOnMessage: expectFollowOnMessage)
+
+        // Clear the lastDeliveryStatusReceived variable (same as send())
+        podState.lastDeliveryStatusReceived = nil
+
+        log.info("O5 Signed Send: %{public}@", String(describing: messageBlocks.map { $0.blockType }))
+        let response = try bleTransport.sendO5SignedMessage(message, certStore: certStore)
+
+        if let responseMessageBlock = response.messageBlocks[0] as? T {
+            log.info("O5 Signed Response: %{public}@", String(describing: responseMessageBlock))
+            return responseMessageBlock
+        }
+
+        if let fault = response.fault {
+            try throwPodFault(fault: fault)
+        }
+
+        let responseType = response.messageBlocks[0].blockType
+        guard let errorResponse = response.messageBlocks[0] as? ErrorResponse else {
+            log.error("O5 Signed: Unexpected response: %{public}@", String(describing: response.messageBlocks[0]))
+            throw PodCommsError.unexpectedResponse(response: responseType)
+        }
+
+        switch errorResponse.errorResponseType {
+        case .badNonce(let nonceResyncKey):
+            // For O5 signed messages, nonce resync is not expected but handle gracefully
+            log.error("O5 Signed: Unexpected bad nonce response (nonceResyncKey=%{public}04x)", nonceResyncKey)
+            throw PodCommsError.nonceResyncFailed
+        case .nonretryableError(let errorCode, let faultEventCode, let podProgress):
+            log.error("O5 Signed: Command error: code %u, %{public}@, pod progress %{public}@",
+                      errorCode, String(describing: faultEventCode), String(describing: podProgress))
+            throw PodCommsError.rejectedMessage(errorCode: errorCode)
+        }
+    }
+
+    /// O5-aware configureAlerts: uses standard Type 1 (encrypted, unsigned) sending.
+    /// Frida evidence (Pod2, 2026-02-16) shows ProgramAlert commands use Type 1,
+    /// NOT Type 4 (signed). Only ProgramBolus uses Type 4 signing.
+    @discardableResult
+    func o5ConfigureAlerts(_ alerts: [PodAlert], acknowledgeAll: Bool = false, beepBlock: MessageBlock? = nil) throws -> StatusResponse {
+        // O5 alerts use the same Type 1 encrypted transport as DASH
+        return try configureAlerts(alerts, acknowledgeAll: acknowledgeAll, beepBlock: beepBlock)
+    }
+
     // Returns time at which prime is expected to finish.
     func prime() throws -> TimeInterval {
+        // O5 pods use a different activation sequence (no basal before priming)
+        if podState.podType == omnipod5Type {
+            return try o5Prime()
+        }
+
         let primeDuration: TimeInterval = .seconds(Pod.primeUnits / Pod.primeDeliveryRate) + 3 // as per PDM
 
         // If priming has never been attempted on this pod, handle the pre-prime setup tasks.
@@ -546,7 +631,7 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    private func markSetupProgressCompleted(statusResponse: StatusResponse) {
+    func markSetupProgressCompleted(statusResponse: StatusResponse) {
         if (podState.setupProgress != .completed) {
             podState.setupProgress = .completed
             podState.setupUnitsDelivered = statusResponse.insulinDelivered // stash the current insulin delivered value as the baseline
@@ -555,6 +640,11 @@ class PodCommsSession: MessageTransportDelegate {
     }
 
     func insertCannula(optionalAlerts: [PodAlert] = [], silent: Bool) throws -> TimeInterval {
+        // O5 pods use a different activation sequence for cannula insertion
+        if podState.podType == omnipod5Type {
+            return try o5InsertCannula(optionalAlerts: optionalAlerts, silent: silent)
+        }
+
         let cannulaInsertionUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
 
         guard podState.activatedAt != nil else {
