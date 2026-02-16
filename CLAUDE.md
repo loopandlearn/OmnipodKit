@@ -166,6 +166,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **Wrong attestation chain**: cert_0-cert_3 were from pdmid 2538336 Pixel TEE (wrong public key `7d76fc46...`). Replaced with correct TEE simulator certs from KEYS/ that match our secondary key `e3c48e61...`.
 - **Registration payload mismatch**: Old payload contained controller_id `0x0026bb60` (2538336). Set to nil.
 - **Heartbeat service error**: `applyConfiguration()` threw `unknownCharacteristic` when heartbeat service wasn't exposed by unpaired pods. Fixed by changing the notifying characteristics loop to `continue` instead of `throw` for missing services.
+- **O5 EAP-AKA session establishment (2026-02-16)**: `SessionEstablisher` and `BleMessageTransport` now use `doRTS=false` for O5 pods. O5 pods never use RTS/CTS flow control; sending RTS (0x00) caused immediate disconnect (CBError code=7). Files: `SessionEstablisher.swift`, `BleMessageTransport.swift`, `BlePodComms.swift`.
 - **O5 KDF controllerID (Config#10, 2026-02-16)**: Pod uses ZEROS (`00000000`) for controllerID in both the KDF input and the channel-binding transcript (bytes 7-10), not the real controllerID. Config#10 (bitmask `00001010`: `kdfZeroControllerID=true`, `bytesAsControllerId=false`) produced P0=0xa5 on a fresh pod (UUID `74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F`). Defaults locked in `O5KeyExchange.swift`; bitmask cycling disabled in `O5PairingConfiguration.swift`.
 
 ### Resolved: SPS2.1/SPS2 Structure — SUCCESSFUL PAIRING ACHIEVED
@@ -193,6 +194,7 @@ attestation, which the pod accepted.
 | 12 | Fixed: derive O5 controller ID from certificate in `OmniPumpManagerState` init | Pod disconnect after SPS2.1 | HELLO ID now correct (`0x277D18`). Same pod as #11 — manufacturer data changed `0x00→0x80`, pod may be in tainted state from previous failed attempt. All message structure verified byte-for-byte against btsnoop. |
 | 13 | **Fixed: O5 command characteristic write type `.withResponse` → `.withoutResponse`** | **Pending test** | Btsnoop shows Android uses ATT Write Command (`.withoutResponse`) for all command char writes. OmnipodKit was using ATT Write Request (`.withResponse`), inherited from DASH. Fixed `sendHello()` and `sendCommandType()` to use `.withoutResponse` for O5. **Both the original btsnoop analysis AND the independent GATT-level comparison confirmed this as the primary remaining discrepancy.** **Test with a fresh pod** (not the tainted one from #11/#12). |
 | 14 | **Config#10 (bitmask 00001010): `kdfZeroControllerID=true`, `bytesAsControllerId=false`** | **P0 = 0xa5 SUCCESS** | Fresh pod UUID `74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F`. Key finding: pod uses ZEROS for controllerID in both KDF input and channel-binding transcript bytes 7-10. Signature verification failed locally (cosmetic, doesn't affect pairing). Post-pairing: pod disconnects during EAP-AKA session establishment (CBError code=7) when RTS is sent. **Remaining work**: fix EAP session establishment (try `doRTS=false`, add delay, or handle disconnect/reconnect). |
+| 15 | **Fixed: `doRTS=false` for O5 EAP-AKA session and encrypted messages** | **Pending test** | After Config#10 pairing succeeded (P0=0xa5), pod disconnected (CBError code=7) when EAP-AKA session tried to send RTS (0x00). Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior), but O5 pods NEVER use RTS/CTS. Btsnoop evidence: zero occurrences of RTS (0x00) or CTS (0x01) in entire O5 capture — only CMD writes are HELLO (0x06, once) and SUCCESS (0x04, after each message). Fix: Added `podType` parameter to `SessionEstablisher`, pass `doRTS: false` for O5 in all three EAP message operations. Also updated `BleMessageTransport` to derive `useRTS` from `manager.podType` for encrypted command/response messages. |
 
 **Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
 (uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
@@ -284,7 +286,7 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 | V2 | Log `maximumWriteValueLength` at SPS2.1 send time | **TODO** | Add log line in `sendData()` or `o5sps2_1()` to confirm actual write length at the moment of SPS2.1 transmission. |
 | V3 | Verify MTU negotiation timing | **TODO** | Check if iOS negotiates a larger MTU after initial connection. `maximumWriteValueLength` at connection time (20) may differ from the value when SPS2.1 is actually sent. |
 | V4 | Compare OmnipodKit SPS2.1 encrypted payload against btsnoop | **TODO** | After V1 succeeds or fails, capture the actual encrypted bytes OmnipodKit sends and compare structure against `sps21_phone_transport.hex`. The encrypted content will differ (different ECDH ephemeral keys) but the framing/sizes should match exactly. |
-| V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **TODO** | After successful pairing (P0=0xa5), pod disconnects with CBError code=7 when RTS is sent. Try `doRTS=false`, add delay before RTS, or implement disconnect/reconnect handling. |
+| V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **DONE (test #15)** | Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior). O5 pods never use RTS/CTS. Fixed: `doRTS=false` for O5 in `SessionEstablisher` and `useRTS` derived from `podType` in `BleMessageTransport`. |
 
 ### Not Yet Implemented
 - **Post-pairing command signing**: Design now understood (see "Post-Pairing Command Protocol" below). ECDSA signature covers the complete encrypted message (AAD + ciphertext + CCM tag). Signing key is `com.twi.enclave.device.secondary` (P-256). **Implementation needed.**
@@ -520,6 +522,12 @@ All in `/Users/james/repos/Omnipod5APK/`:
 ### Insulet PKI certificates
 - `/Users/james/Downloads/O5keys/KEYS/certificates/fullchain.pem` — Latest (pdmid 2587928)
 - `/Users/james/repos/Omnipod5APK/KEYS/` — Previous copies
+
+## O5 vs DASH: RTS/CTS Flow Control
+
+- **DASH**: Uses RTS/CTS flow control for all message exchanges (pairing, EAP, encrypted commands). RTS (0x00) is written to CMD characteristic before sending data; pod responds with CTS (0x01).
+- **O5**: NEVER uses RTS/CTS. All messages are sent directly on the DATA characteristic. The only CMD characteristic writes are HELLO (0x06, once at connection) and SUCCESS (0x04, sent after each message as acknowledgment).
+- O5 btsnoop post-pairing flow: P0 → SUCCESS ack → EAP Challenge (direct on DATA) → EAP Response → SUCCESS ack → EAP Success → encrypted commands.
 
 ## Protocol Constants (confirmed across all btsnoop captures)
 

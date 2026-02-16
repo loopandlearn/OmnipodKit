@@ -262,19 +262,27 @@ class O5KeyExchange {
         return transcript
     }
 
-    /// Build the pod's (peer) variant of the channel-binding transcript for verifying pod SPS2.1.
+    /// Build the pod's (peer) variant of the channel-binding transcript for verifying pod SPS2.
     ///
-    /// Layout is controlled by two boolean flags (same as controller transcript, but type=0x02
-    /// and the fixed fields are swapped: bytes7_10 first, then FIRMWARE_ID).
+    /// **IMPORTANT — Nonce adjustment:**
+    /// This method is called from `o5validatePodSps2()`, AFTER:
+    ///   1. Controller sent SPS2.1    → pdmNonce incremented (+1)
+    ///   2. Controller recv pod SPS2.1 → podNonce incremented (+1)
+    ///   3. Controller sent SPS2      → pdmNonce incremented (+2 total)
+    ///   4. Controller recv pod SPS2   → podNonce incremented (+2 total)
     ///
-    /// **keysNonceFirst == false** (keys-grouped, native RE layout):
-    /// ```
-    /// [0x02][bytes7_10(4)][FIRMWARE_ID(6)][podPublic(64)][pdmPublic(64)][podNonce(16)][pdmNonce(16)]
-    /// ```
+    /// The pod built its transcript AFTER receiving controller SPS2 (step 6 from pod's view)
+    /// but BEFORE encrypting its own SPS2 response. At that point the pod's nonce state was:
+    ///   - pdmNonce: incremented twice (pod decrypted SPS2.1 + SPS2) = same as controller's current
+    ///   - podNonce: incremented once (pod encrypted SPS2.1 only) = controller's current − 1
     ///
-    /// **keysNonceFirst == true** (nonces-first, Frida capture layout):
+    /// So we use `pdmNonce` as-is and decrement `podNonce` by 1 (little-endian first 8 bytes).
+    ///
+    /// Verified by ECDSA signature match against Config#10 pairing data (2026-02-16).
+    ///
+    /// Layout (keys-grouped, confirmed):
     /// ```
-    /// [0x02][bytes7_10(4)][FIRMWARE_ID(6)][podNonce(16)][podPublic(64)][pdmNonce(16)][pdmPublic(64)]
+    /// [0x02][bytes7_10(4)][FIRMWARE_ID(6)][podPublic(64)][pdmPublic(64)][podNonce_adj(16)][pdmNonce(16)]
     /// ```
     ///
     /// `bytes7_10` is `controllerID` when `bytesAsControllerId == true`, or 4 zero bytes when false.
@@ -292,9 +300,19 @@ class O5KeyExchange {
         // Field B: FIRMWARE_ID (6 bytes) — swapped position from controller transcript
         transcript.append(O5LTKExchanger.FIRMWARE_ID)
 
+        // Adjust podNonce: decrement by 1 to match the pod's nonce state at signing time.
+        // At verification time, podNonce has been incremented twice (SPS2.1 recv + SPS2 recv),
+        // but the pod signed with podNonce incremented only once (SPS2.1 send only).
+        var podNonceAdjusted = podNonce
+        var counter = podNonceAdjusted.withUnsafeBytes { $0.load(as: UInt64.self) }
+        counter &-= 1
+        Swift.withUnsafeBytes(of: counter) { src in
+            podNonceAdjusted.replaceSubrange(0..<8, with: src)
+        }
+
         if keysNonceFirst {
             // Nonces-first layout: nonce-key interleaved per side (Frida capture)
-            transcript.append(podNonce)
+            transcript.append(podNonceAdjusted)
             transcript.append(podPublic)
             transcript.append(pdmNonce)
             transcript.append(pdmPublic)
@@ -302,7 +320,7 @@ class O5KeyExchange {
             // Keys-grouped layout: keys together then nonces together (native RE)
             transcript.append(podPublic)
             transcript.append(pdmPublic)
-            transcript.append(podNonce)
+            transcript.append(podNonceAdjusted)
             transcript.append(pdmNonce)
         }
 

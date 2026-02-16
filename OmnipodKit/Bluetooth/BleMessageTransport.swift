@@ -89,6 +89,11 @@ class BlePodMessageTransport: MessageTransport {
 
     private let manager: PeripheralManager
 
+    /// O5 pods never use RTS/CTS; DASH pods always do
+    private var useRTS: Bool {
+        return manager.podType != omnipod5Type
+    }
+
     private var nonce: Nonce?
     private var enDecrypt: EnDecrypt?
 
@@ -201,7 +206,7 @@ class BlePodMessageTransport: MessageTransport {
 
         let sendMessage = try getCmdMessage(cmd: message)
 
-        let writeResult = manager.sendMessagePacket(sendMessage)
+        let writeResult = manager.sendMessagePacket(sendMessage, doRTS: useRTS)
         switch writeResult {
         case .sentWithAcknowledgment:
             break;
@@ -250,7 +255,7 @@ class BlePodMessageTransport: MessageTransport {
     private func readAndAckResponse() throws -> Message {
         guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
 
-        let readResponse = try manager.readMessagePacket()
+        let readResponse = try manager.readMessagePacket(doRTS: useRTS)
         guard let readMessage = readResponse else {
             throw PodProtocolError.messageIOException("Could not read response")
         }
@@ -263,7 +268,7 @@ class BlePodMessageTransport: MessageTransport {
         incrementMsgSeq()
         incrementNonceSeq()
         let ack = try getAck(response: decrypted)
-        let ackResult = manager.sendMessagePacket(ack)
+        let ackResult = manager.sendMessagePacket(ack, doRTS: useRTS)
         guard case .sentWithAcknowledgment = ackResult else {
             throw PodProtocolError.messageIOException("Could not write $msgType: \(ackResult)")
         }

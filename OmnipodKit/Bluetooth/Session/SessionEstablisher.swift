@@ -29,14 +29,15 @@ class SessionEstablisher {
     private let myId: UInt32
     private let podId: UInt32
     private var msgSeq: Int
-    
+    private let podType: PodType
+
     private var controllerIV: Data
     private var nodeIV: Data = Data()
     private var identifier: UInt8 = 0
     private let milenage: Milenage
     private let log = OSLog(category: "SessionEstablisher")
-    
-    init(manager: PeripheralManager, ltk: Data, eapSqn: Int, myId: UInt32, podId: UInt32, msgSeq: Int) throws {
+
+    init(manager: PeripheralManager, ltk: Data, eapSqn: Int, myId: UInt32, podId: UInt32, msgSeq: Int, podType: PodType = dashType) throws {
 //        guard eapSqn.count == 6 else { throw SessionEstablishmentException.InvalidParameter("EAP-SQN has to be 6 bytes long") }
         guard ltk.count == 16 else { throw SessionEstablishmentException.InvalidParameter("LTK has to be 16 bytes long") }
 
@@ -49,17 +50,22 @@ class SessionEstablisher {
         self.myId = myId
         self.podId = podId
         self.msgSeq = msgSeq
+        self.podType = podType
         self.milenage = try Milenage(k: ltk, sqn: self.eapSqn)
     }
     
     func negotiateSessionKeys() throws -> SessionResult {
+        // O5 pods never use RTS/CTS; DASH pods always do
+        let useRTS = (podType != omnipod5Type)
+        log.default("negotiateSessionKeys: podType=%{public}@, useRTS=%{public}@", podType.briefName, String(describing: useRTS))
+
         msgSeq += 1
         let challenge = try eapAkaChallenge()
-        let sendResult = manager.sendMessagePacket(challenge)
+        let sendResult = manager.sendMessagePacket(challenge, doRTS: useRTS)
         guard case .sentWithAcknowledgment = sendResult else {
             throw SessionEstablishmentException.CommunicationError("Could not send the EAP AKA challenge: $sendResult")
         }
-        guard let challengeResponse = try manager.readMessagePacket() else {
+        guard let challengeResponse = try manager.readMessagePacket(doRTS: useRTS) else {
             throw SessionEstablishmentException.CommunicationError("Could not establish session")
         }
 
@@ -73,7 +79,7 @@ class SessionEstablisher {
 
         msgSeq += 1
         let success = eapSuccess()
-        let _ = manager.sendMessagePacket(success)
+        let _ = manager.sendMessagePacket(success, doRTS: useRTS)
 
         return .SessionKeys(SessionKeys(
             ck: milenage.ck,

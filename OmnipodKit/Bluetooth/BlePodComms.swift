@@ -206,7 +206,7 @@ class BlePodComms: PodComms {
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         guard let manager = manager else { throw PodCommsError.noPodPaired }
-        let eapAkaExchanger = try SessionEstablisher(manager: manager, ltk: ltk, eapSqn: eapSeq, myId: self.myId, podId: self.podId, msgSeq: msgSeq)
+        let eapAkaExchanger = try SessionEstablisher(manager: manager, ltk: ltk, eapSqn: eapSeq, myId: self.myId, podId: self.podId, msgSeq: msgSeq, podType: self.podType)
 
         let result = try eapAkaExchanger.negotiateSessionKeys()
 
