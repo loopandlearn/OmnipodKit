@@ -558,12 +558,21 @@ class BlePodComms: PodComms {
                     self.podStateLock.unlock()
                 }
 
-                try manager.sendHello(myId: myId)
-                try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
-
                 if (!self.isPaired) {
+                    // Fresh pod: full pairing sequence (HELLO + LTK + EAP-AKA)
+                    try manager.sendHello(myId: myId)
+                    try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
                     try self.pairPod(insulinType: insulinType)
+                } else if !self.needsSessionEstablishment,
+                          let ck = self.podState?.bleMessageTransportState.ck,
+                          !ck.isEmpty {
+                    // Already paired with active session (completeConfiguration already ran).
+                    // Skip HELLO + EAP-AKA to avoid double-session disconnect.
+                    self.log.info("Session already established by completeConfiguration, skipping HELLO + EAP-AKA")
                 } else {
+                    // Paired but no active session: re-establish
+                    try manager.sendHello(myId: myId)
+                    try manager.enableNotifications()
                     try self.establishNewSession()
                 }
 
@@ -708,6 +717,7 @@ extension BlePodComms: PeripheralManagerDelegate {
                 try manager.sendHello(myId: myId)
                 try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
                 try self.establishNewSession()
+                self.needsSessionEstablishment = false
                 self.delegate?.podCommsDidEstablishSession(self)
             } catch {
                 self.log.error("Pod session sync error: %{public}@", String(describing: error))
