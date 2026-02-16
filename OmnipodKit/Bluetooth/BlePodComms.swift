@@ -312,17 +312,19 @@ class BlePodComms: PodComms {
     ///
     /// From Frida capture of real O5 app activation (Pod2, pdmid 2587928):
     ///   Real O5 activation sequence (after pairing + EAP-AKA):
-    ///     [1] getPodVersion (AssignAddress with 0xffffffff) -> VersionResponse (FILLED)
-    ///     [2] GetStatus -> StatusResponse (verify pod state)
-    ///     [3] UtcCommand: SE255.2=[timestamp]         (set pod UTC time)
-    ///     [4] TdiCommand: S3.2=0003000E00,G3.2        (therapy delivery info)
-    ///     [5] TargetBgProfile: S3.1=00c0[...],G3.1    (48 half-hour BG targets)
-    ///     [6] DiaCommand: S3.9=8,G3.9                 (duration of insulin action)
-    ///     [7] EgvCommand: S3.7=3670015,G3.7           (CGM/EGV config)
-    ///     [8-10] AlgorithmInsulinHistory x3: SE2.1=   (insulin history, 24 records each)
-    ///     [11] UnifiedAidPodStatus: G3.12              (AID status query)
-    ///     [12] GetStatus before SetupPod
-    ///     [13] SetupPod -> VersionResponse (UID_SET)
+    ///     [0] getPodVersion (AssignAddress with 0xffffffff) -> VersionResponse (FILLED)
+    ///     [1] UtcCommand: SE255.2=[timestamp]         (set pod UTC time)
+    ///     [2] TdiCommand: S3.2=0003000E00,G3.2        (therapy delivery info)
+    ///     [3] TargetBgProfile: S3.1=00c0[...],G3.1    (48 half-hour BG targets)
+    ///     [4] DiaCommand: S3.9=8,G3.9                 (duration of insulin action)
+    ///     [5] EgvCommand: S3.7=3670015,G3.7           (CGM/EGV config)
+    ///     [6-8] AlgorithmInsulinHistory x3: SE2.1=    (insulin history, 24 records each)
+    ///     [9] UnifiedAidPodStatus: G3.12               (AID status query)
+    ///     [10] SetupPod -> VersionResponse (UID_SET)
+    ///
+    /// NOTE: The real O5 app does NOT send GetStatus between getPodVersion and the AID commands,
+    /// nor between the AID commands and SetupPod. The pod rejects GetStatus at progress state 2
+    /// with ERR_ILLEGAL_CMD_STATE (error code 19).
     private func o5PreSetupSteps(blePodMessageTransport: BlePodMessageTransport) throws {
         // We should already be holding podStateLock during calls to this function
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
@@ -338,35 +340,10 @@ class BlePodComms: PodComms {
             }
         }
 
-        // Step 1: Send GetStatus to check pod state after AssignAddress
-        log.info("O5: Step 1 — Sending GetStatus after AssignAddress")
-        do {
-            let statusResponse = try o5SendGetStatus(transport: blePodMessageTransport)
-            log.info("O5: GetStatus response — podProgress=%{public}@, deliveryStatus=%{public}@",
-                     String(describing: statusResponse.podProgressStatus),
-                     String(describing: statusResponse.deliveryStatus))
-            saveState()
-        } catch {
-            log.error("O5: GetStatus after AssignAddress failed: %{public}@", String(describing: error))
-            log.info("O5: Continuing despite GetStatus failure")
-        }
-
-        // Steps 2-10: O5 AID setup commands (UTC, TDI, TargetBG, DIA, EGV, InsulinHistory x3, AidStatus)
-        log.info("O5: Steps 2-10 — Sending AID setup commands")
+        // O5 AID setup commands (UTC, TDI, TargetBG, DIA, EGV, InsulinHistory x3, AidStatus)
+        log.info("O5: Sending AID setup commands")
         try o5SendAidSetupCommands(transport: blePodMessageTransport)
         saveState()
-
-        // Step 11: Send GetStatus before SetupPod
-        log.info("O5: Step 11 — Sending GetStatus before SetupPod")
-        do {
-            let statusResponse = try o5SendGetStatus(transport: blePodMessageTransport)
-            log.info("O5: Pre-SetupPod GetStatus response — podProgress=%{public}@",
-                     String(describing: statusResponse.podProgressStatus))
-            saveState()
-        } catch {
-            log.error("O5: Pre-SetupPod GetStatus failed: %{public}@", String(describing: error))
-            log.info("O5: Continuing to SetupPod despite GetStatus failure")
-        }
 
         log.info("O5: Pre-SetupPod steps complete, proceeding to SetupPod")
     }
@@ -480,36 +457,6 @@ class BlePodComms: PodComms {
     /// Sends a GetStatus command via the encrypted transport and returns the StatusResponse.
     /// Falls back to returning a minimal synthetic StatusResponse if the pod returns a
     /// VersionResponse instead (observed in btsnoop for the pre-SetupPod GetStatus).
-    private func o5SendGetStatus(transport: BlePodMessageTransport) throws -> StatusResponse {
-        let getStatus = GetStatusCommand(podInfoType: .normal)
-        let message = Message(address: 0xffffffff, messageBlocks: [getStatus], sequenceNum: transport.messageNumber)
-
-        log.debug("O5 GetStatus: sending message %@", String(describing: message))
-
-        let response = try transport.sendMessage(message)
-
-        // The pod may respond with a StatusResponse or a VersionResponse
-        if let statusResponse = response.messageBlocks[0] as? StatusResponse {
-            return statusResponse
-        } else if let versionResponse = response.messageBlocks[0] as? VersionResponse {
-            // Pre-SetupPod GetStatus returns VersionResponse in the btsnoop
-            log.info("O5 GetStatus got VersionResponse instead: %{public}@", String(describing: versionResponse))
-            // Return a synthetic StatusResponse
-            return StatusResponse(
-                deliveryStatus: .suspended,
-                podProgressStatus: versionResponse.podProgressStatus,
-                timeActive: 0,
-                reservoirLevel: Pod.reservoirLevelAboveThresholdMagicNumber,
-                insulinDelivered: 0,
-                bolusNotDelivered: 0,
-                lastProgrammingMessageSeqNum: 0,
-                alerts: AlertSet(rawValue: 0)
-            )
-        } else {
-            log.error("O5 GetStatus unexpected response type: %{public}@", String(describing: response))
-            throw PodCommsError.unexpectedResponse(response: response.messageBlocks[0].blockType)
-        }
-    }
 
     // MARK: - Registration payload (currently unused)
     //
