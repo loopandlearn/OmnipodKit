@@ -174,7 +174,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **O5 KDF controllerID (Config#10, 2026-02-16)**: Pod uses ZEROS (`00000000`) for controllerID in both the KDF input and the channel-binding transcript (bytes 7-10), not the real controllerID. Config#10 (bitmask `00001010`: `kdfZeroControllerID=true`, `bytesAsControllerId=false`) produced P0=0xa5 on a fresh pod (UUID `74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F`). Defaults locked in `O5KeyExchange.swift`; bitmask cycling disabled in `O5PairingConfiguration.swift`.
 - **O5 AID setup commands implemented (2026-02-16)**: 8 AID commands now sent between getPodVersion and setPodUid during activation. Implemented in `O5AidCommands.swift` and called from `BlePodComms.swift`. Uses ASCII key-value SLPE format (SET+GET, GET-only, Extended SET).
 - **Activation order corrected (Pod2 Frida, 2026-02-16)**: Removed basal schedule programming from Phase 1 (before priming). Pod2 Frida capture confirms NO basal is sent before prime 1 -- basal is deferred to Phase 2. Previously assumed from historical btsnoop that 3x ProgramBasal preceded prime.
-- **Alert parameters corrected (Pod2 Frida, 2026-02-16)**: Low reservoir threshold is 5U (not 10U), beepRepeat=1 (not 2). Prime bolus beep parameter is 0x7C (completion beep ON + 60min reminder), not no beeps. User expiry triggers at 3968 min (~66h, ~5h52m before 72h), not 68h.
+- **Alert parameters corrected (Pod2 Frida, 2026-02-16)**: Low reservoir threshold is 10U (100 ticks, corrected from initial 5U misinterpretation), beepRepeat=1 (not 2). Prime bolus beep parameter is 0x7C (completion beep ON + 60min reminder), not no beeps. User expiry triggers at 3968 min (~66h8m, ~5h52m before 72h), not 68h.
 - **Registration payload removed from activation (Pod2 Frida, 2026-02-16)**: The 163-byte registration payload is NOT sent between AssignAddress and SetupPod. Pod2 Frida log shows no registration payload delivery during the entire Phase 1 activation.
 - **Message type signing rules clarified (Pod2 Frida, 2026-02-16)**: Only `programBolus` (prime/delivery) uses TWi Type 4 (encrypted + ECDSA signed). All other commands -- including setPodUid, programAlert, AID commands -- use TWi Type 1 (encrypted only, no signature). Previously assumed all post-pairing commands used Type 4.
 - **SLPE suffix fix — `,G3.12` → `,G0.0` for standard commands (Pod3, 2026-02-16)**: `getCmdMessage()` was sending `,G3.12` as the SLPE GET suffix for ALL O5 commands. This tells the pod "respond with AID status format" — the pod complied, returning `3.12=` prefixed AID data instead of the expected `0.0=` VersionResponse. Caused `unknownBlockType(rawVal: 0)` on the first post-pairing getPodVersion command. The real O5 app uses `S0.0=...,G0.0` for ALL standard Omnipod commands; only AID-specific commands use AID suffixes. Fixed all 4 locations in `BleMessageTransport.swift` to use `COMMAND_SUFFIX` (`,G0.0`). AID commands already use their own suffixes via `sendO5AidCommand()` / `O5AidCommands.swift`.
@@ -185,6 +185,12 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **AID command SLPE length prefix (test #21, 2026-02-16)**: `O5AidCommands` used `StringLengthPrefixEncoding.formatKeys()` to construct AID command payloads. This function inserts 2-byte big-endian length prefixes between the key and data (e.g., `"SE255.2=" + 0x000A + "1771276453"`). But AID commands use plain ASCII key-value format with NO length prefix (Frida confirms: `"SE255.2=1771222561"`). The pod received the encrypted command (ACKed transport with SUCCESS) but couldn't parse the inner payload due to the extra bytes, so it silently dropped it — no data response, timeout after 5s. Fix: replaced all three `O5AidCommands` payload methods (`setGetPayload`, `getPayload`, `extendedSetPayload`) with simple string concatenation. Also fixed `sendO5AidCommand()` response parsing to strip ASCII prefix instead of using `StringLengthPrefixEncoding.parseKeys()` (which also expects length-prefixed format). Changed hex format to uppercase (`%08X`) to match real O5 app.
 - **Double getPodVersion on initial pairing path (test #21, 2026-02-16)**: `pairPod()` sends `getPodVersion` (AssignAddress with 0xffffffff) as part of normal pairing. Then `blePairAndSetupPod()` at line 586 sends it AGAIN because `setupProgress.isPaired == false`. The second `getPodVersion` exchange shifts nonce state by 3 (encrypt, decrypt, ACK), so subsequent AID commands would use wrong nonce and fail AES-CCM integrity check. Fix: added `pairPodRanGetPodVersion` boolean flag set when `pairPod()` runs; the later `getPodVersion` is only sent when `pairPod()` was skipped (resume path). Note: this was initially suspected as the root cause but the AID SLPE format was the actual blocker — the double-getPodVersion would have been a secondary issue.
 - **SetupPodCommand 24-hour vs 12-hour hour format (test #22, 2026-02-16)**: `SetupPodCommand` sends hour from `DateComponents.hour` which is 24-hour format (0-23). O5 pods expect 12-hour format (0-11) matching Java `Calendar.HOUR` (field 10). At 4:41 PM, OmnipodKit sent hour=0x10 (16), pod expected 0x04 (4). Pod returned error code 33 (0x21). Fix: in `BlePodComms.setupPod()`, apply `% 12` conversion when `podType == omnipod5Type`. DASH/Eros pods keep 24-hour format (confirmed by existing test with hour=13).
+- **Phase 1 alert ordering: user expiry moved after prime (O5 Java validation, 2026-02-16)**: User expiry alert (slot #3) was programmed before prime bolus. O5 Java state machine shows ACTIVATION_PRIMED_PUMP (state 7) must occur before ACTIVATION_PROGRAMMED_USER_SET_EXPIRATION_ALERT (state 8). Moved user expiry programming to after prime completion and status polling, matching the Java activation state sequence.
+- **Low reservoir threshold corrected from 5U to 10U (Frida re-analysis, 2026-02-16)**: Previous analysis decoded Frida threshold `0x0064` (100 decimal) as 100 uL = 5U. Correct decoding: OmnipodKit encodes volume as `ticks = volume / 0.05 / 2`, so 100 ticks = 100 * 0.05 * 2 = 10U. Low reservoir alert threshold is 10U (200 uL), not 5U.
+- **User expiry absolute time corrected to ~66h8m (Frida re-analysis, 2026-02-16)**: Frida shows 3968 minutes = 66 hours 8 minutes (~5h52m before 72h nominal life), not 4080 minutes (68h) as previously documented. The `~66h` shorthand in earlier entries was correct; the `66.13h` was a rounding artifact.
+- **Phase 2: ProgramBasal is first command (O5 Java validation, 2026-02-16)**: O5 Java activation state ACTIVATION_PROGRAMMED_BASAL (state 9) is the first Phase 2 command, immediately after Phase 1 completes (ACTIVATION_COMPLETED_PHASE_1, state 8). Basal schedule programming precedes all Phase 2 alerts and prime 2.
+- **Phase 2: shutdown imminent beepRepeat corrected to every5Minutes (O5 Java validation, 2026-02-16)**: Shutdown imminent alert (slot #0) beepRepeat was every15Minutes (6). O5 Java source confirms it should be every5Minutes (8). Fixed to match decompiled O5 alert configuration.
+- **Phase 2: slot #0 auto-off alert added (O5 Java validation, 2026-02-16)**: New auto-off alert on slot #0 with duration=15min, autoOff=true, beepRepeat=2. This alert was missing from the Phase 2 implementation. Added to match O5 Java activation state machine.
 
 ### Resolved: SPS2.1/SPS2 Structure — SUCCESSFUL PAIRING ACHIEVED
 Native library decompile revealed the payloads are raw DER certificates. Btsnoop capture of a successful
@@ -511,11 +517,11 @@ O5 AID Setup (8 commands, all Type 1):
     v
 Phase 1: Pod Setup ("activation 1/2"):
     10. setPodUid (0x03)                          [Type 1, 41B] state->UID_SET
-    11. programAlert slot #4: low reservoir       [Type 1, 32B] 5U threshold
+    11. programAlert slot #4: low reservoir       [Type 1, 32B] 10U threshold
     12. programAlert slot #7: LOC/setup reminder  [Type 1, 32B] 5min/55min
     13. programBolus: prime 1 (2.6U, 52 pulses)  [Type 4 SIGNED, 56B + 64B sig]
         ... poll getPodStatus page 7 until done (~52 sec) ...
-    14. programAlert slot #3: user expiry         [Type 1, 32B] 3968 min
+    14. programAlert slot #3: user expiry         [Type 1, 32B] 3968 min (~66h8m)
     --- ACTIVATION_COMPLETED_PHASE_1 ---
 ```
 
@@ -532,9 +538,9 @@ Three wrapping formats for AID commands (distinct from legacy `S0.0=`/`,G0.0` wr
 
 | Alert | Slot | BeepReps | BeepType | Duration | AlertType | Threshold |
 |-------|------|----------|----------|----------|-----------|-----------|
-| Low Reservoir | 4 | 1 | 2 | 0 | volume | 100 uL (5U) |
+| Low Reservoir | 4 | 1 | 2 | 0 | volume | 100 ticks (10U) |
 | LOC/Setup Reminder | 7 | 8 | 2 | 55 min | time | 5 min |
-| User Expiry | 3 | 3 | 2 | 0 | time | 3968 min (66.13h) |
+| User Expiry | 3 | 3 | 2 | 0 | time | 3968 min (~66h8m) |
 
 ### Prime Bolus Parameters (Pod2 Frida-validated)
 
@@ -559,8 +565,8 @@ ENGAGING_CLUTCH_DRIVE (4) -> [after prime completes] -> CLUTCH_DRIVE_ENGAGED (5)
 - **Registration payload NOT sent during activation.** Previously assumed to be sent 3 times between AssignAddress and SetupPod based on btsnoop -- this was incorrect.
 - **Only programBolus uses Type 4 (signed).** All other Phase 1 commands use Type 1 (encrypted only). See "TWi Message Type Signing Rules" above.
 - **Status polling uses page 7** (`0x0e 01 07`), not page 0.
-- **Low reservoir threshold is 5U**, not 10U.
-- **User expiry at 3968 min (66.13h)**, approximately 5h52m before 72h pod life.
+- **Low reservoir threshold is 10U** (100 ticks, where ticks = volume / 0.05 / 2). Previously miscalculated as 5U.
+- **User expiry at 3968 min (~66h8m)**, approximately 5h52m before 72h pod life.
 - **Prime beep parameter is 0x7C**, not 0 (no beeps). Completion beep ON + 60min reminder.
 
 ## Next Steps / Implementation Checklist
@@ -571,7 +577,7 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
 1. ~~**Type 4 signed message construction**~~ -- **DONE.** Implemented in `PodCommsSession.o5Send()`. Only used for `programBolus` (prime/delivery). AAD(16) + ciphertext + tag(8) signed with secondary key, 64-byte raw r||s appended.
 2. ~~**O5 AID setup commands**~~ -- **DONE.** 8 AID commands implemented in `O5AidCommands.swift`, called from `BlePodComms.swift` between getPodVersion and setPodUid.
 3. ~~**Phase 1 activation order**~~ -- **DONE.** Corrected to match Pod2 Frida: getPodVersion, AID setup, setPodUid, alerts, prime 1, poll, expiry alert. No basal before priming.
-4. ~~**Alert parameters**~~ -- **DONE.** Low reservoir=5U (slot #4), LOC=5min/55min (slot #7), user expiry=3968min (slot #3). Prime beep=0x7C.
+4. ~~**Alert parameters**~~ -- **DONE.** Low reservoir=10U (slot #4), LOC=5min/55min (slot #7), user expiry=3968min (slot #3, after prime). Prime beep=0x7C.
 5. ~~**Registration payload removed**~~ -- **DONE.** Not sent during activation (Pod2 Frida confirmed).
 
 ### TODO: Remaining Implementation
@@ -591,8 +597,8 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
    - Pattern: `0000XXXXXXXXXXXX` where first 2 bytes are `0000`, remaining 5 vary per message
 
 9. **Implement Phase 2 activation** (after prime 1 completes)
-   - ProgramBasal: full 24-hour basal schedule (deferred from Phase 1)
-   - ProgramAlert: clear LOC (#7), program system expiry (#2) and imminent expiry (#0)
+   - ProgramBasal: full 24-hour basal schedule (first Phase 2 command, state ACTIVATION_PROGRAMMED_BASAL)
+   - ProgramAlert: clear LOC (#7), program system expiry (#2), shutdown imminent (#0, beepRepeat=every5Minutes(8)), auto-off (#0, duration=15min, autoOff=true, beepRepeat=2)
    - ProgramBolus: prime 2 / cannula fill (Type 4 signed)
    - CGM activation
    - Final status verification

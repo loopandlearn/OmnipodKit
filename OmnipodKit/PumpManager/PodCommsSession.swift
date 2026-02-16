@@ -639,10 +639,15 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    func insertCannula(optionalAlerts: [PodAlert] = [], silent: Bool) throws -> TimeInterval {
-        // O5 pods use a different activation sequence for cannula insertion
+    func insertCannula(basalSchedule: BasalSchedule? = nil, scheduleOffset: TimeInterval = 0, optionalAlerts: [PodAlert] = [], silent: Bool) throws -> TimeInterval {
+        // O5 pods use a different activation sequence for cannula insertion.
+        // O5 Phase 2 programs the basal schedule as its first command (before alerts and prime 2),
+        // so basalSchedule and scheduleOffset must be provided for O5.
         if podState.podType == omnipod5Type {
-            return try o5InsertCannula(optionalAlerts: optionalAlerts, silent: silent)
+            guard let basalSchedule = basalSchedule else {
+                throw PodCommsError.diagnosticMessage(str: "O5 Phase 2 requires basalSchedule parameter")
+            }
+            return try o5InsertCannula(basalSchedule: basalSchedule, scheduleOffset: scheduleOffset, optionalAlerts: optionalAlerts, silent: silent)
         }
 
         let cannulaInsertionUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra

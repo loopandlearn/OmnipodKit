@@ -89,6 +89,11 @@ struct Pod {
     
     // Default low reservoir alert limit in Units
     static let defaultLowReservoirReminder: Double = 10
+
+    // O5 user expiry alert offset: 352 minutes (5h52m) before nominal pod life.
+    // This produces an alert at 3968 minutes (~66h8m) from activation,
+    // matching the O5 app's Frida-captured value.
+    static let o5UserExpiryOffset = TimeInterval(minutes: 352)
     
     // Allowed Low Reservoir reminder values
     static let allowedLowReservoirReminderValues = Array(stride(from: 1, through: 50, by: 1))

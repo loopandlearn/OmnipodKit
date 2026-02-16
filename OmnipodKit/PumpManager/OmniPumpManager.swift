@@ -1327,8 +1327,12 @@ extension OmniPumpManager {
                     self.resumingPodSetup()
                 }
                 do {
-                    if self.state.podState?.setupProgress.needsInitialBasalSchedule == true {
-                        let scheduleOffset = timeZone.scheduleOffset(forDate: Date())
+                    let isO5 = self.state.podType == omnipod5Type
+                    let scheduleOffset = timeZone.scheduleOffset(forDate: Date())
+
+                    // For DASH/Eros, program basal schedule separately before insertCannula.
+                    // For O5, basal is programmed inside o5InsertCannula as the first Phase 2 command.
+                    if !isO5, self.state.podState?.setupProgress.needsInitialBasalSchedule == true {
                         try session.programInitialBasalSchedule(self.state.basalSchedule, scheduleOffset: scheduleOffset)
 
                         session.dosesForStorage() { (doses) -> Bool in
@@ -1342,7 +1346,14 @@ extension OmniPumpManager {
                         .lowReservoir(units: self.lowReservoirReminderValue, silent: self.silencePod)
                     ]
 
-                    let finishWait = try session.insertCannula(optionalAlerts: alerts, silent: self.silencePod)
+                    // For O5, pass basalSchedule so Phase 2 can program it as the first command.
+                    // For DASH/Eros, basalSchedule is nil (already programmed above).
+                    let finishWait = try session.insertCannula(
+                        basalSchedule: isO5 ? self.state.basalSchedule : nil,
+                        scheduleOffset: scheduleOffset,
+                        optionalAlerts: alerts,
+                        silent: self.silencePod
+                    )
                     completion(.success(finishWait))
                 } catch let error {
                     completion(.failure(.communication(error)))
