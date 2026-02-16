@@ -14,6 +14,13 @@ import os.log
 
 class BlePodComms: PodComms {
 
+    // MARK: - O5 Debug: Skip LTK exchange and use hardcoded pairing result
+    // Set to true to skip the O5 LTK exchange and use the LTK from a previous
+    // successful pairing (O5PairLogSuccess1.txt, 2026-02-16). This allows testing
+    // EAP-AKA session establishment and post-pairing commands without re-pairing.
+    // The pod must be the same one that was paired (UUID 74CF60D7-..., podId 0x277d19).
+    static let useHardcodedO5PairingResult = true
+
     var manager: PeripheralManager? {
         didSet {
             manager?.delegate = self
@@ -48,6 +55,37 @@ class BlePodComms: PodComms {
     }
 
     func connectToNewPod(_ completion: @escaping (Result<Omni, Error>) -> Void) {
+        // O5 Debug: skip scanning and connect directly to known pod UUID
+        if BlePodComms.useHardcodedO5PairingResult {
+            let knownUUID = "74CF60D7-6A27-EED6-9C1D-BDA1ACA5546F"
+            log.info("O5 DEBUG: Skipping pod discovery, connecting directly to %{public}@", knownUUID)
+
+            setServicePodType(podType: self.podType)
+            guard let device = bluetoothManager.retrieveAndConnectKnownPod(uuidString: knownUUID) else {
+                log.error("O5 DEBUG: Failed to retrieve peripheral for UUID %{public}@", knownUUID)
+                completion(.failure(PodCommsError.noPodsFound))
+                return
+            }
+
+            self.manager = device.manager
+            device.manager.delegate = self
+
+            let connectStartTime = Date()
+            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                let elapsed = Date().timeIntervalSince(connectStartTime)
+                if device.manager.peripheral.state == .connected {
+                    self.log.default("O5 DEBUG: Connected to known pod in %.1f sec", elapsed)
+                    completion(.success(device))
+                    timer.invalidate()
+                } else if elapsed > TimeInterval(seconds: 15) {
+                    self.log.error("O5 DEBUG: Timeout connecting to known pod")
+                    completion(.failure(PodCommsError.noPodsFound))
+                    timer.invalidate()
+                }
+            }
+            return
+        }
+
         let discoveryStartTime = Date()
 
         setServicePodType(podType: self.podType)
@@ -140,10 +178,17 @@ class BlePodComms: PodComms {
             response = try ltkExchanger.negotiateLTK()
             ltk = response.ltk
         case omnipod5Type:
-            ids = Ids(myId: self.myId, podId: self.podId)
-            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
-            response = try o5LTKExchanger.o5negotiateLTK()
-            ltk = response.ltk
+            if BlePodComms.useHardcodedO5PairingResult {
+                // Skip LTK exchange — use result from O5PairLogSuccess1.txt
+                log.info("O5 DEBUG: Using hardcoded LTK from previous successful pairing")
+                ltk = Data(hexadecimalString: "f43fde8e37f453bca32a5c448b2abe52")!
+                response = PairResult(ltk: ltk, address: 0x277d19, msgSeq: 6)
+            } else {
+                ids = Ids(myId: self.myId, podId: self.podId)
+                let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
+                response = try o5LTKExchanger.o5negotiateLTK()
+                ltk = response.ltk
+            }
         default:
             throw OmniPumpManagerError.podTypeNotConfigured
         }

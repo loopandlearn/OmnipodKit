@@ -185,6 +185,26 @@ class BluetoothManager: NSObject {
             self.autoConnectIDs.insert(uuidString)
         }
     }
+
+    /// Retrieve a known peripheral by UUID (without scanning), add it to devices, and initiate connection.
+    /// Returns the Omni device synchronously; the actual BLE connection completes asynchronously.
+    func retrieveAndConnectKnownPod(uuidString: String) -> Omni? {
+        var result: Omni?
+        managerQueue.sync {
+            guard manager.state == .poweredOn, let uuid = UUID(uuidString: uuidString) else { return }
+            let peripherals = manager.retrievePeripherals(withIdentifiers: [uuid])
+            guard let peripheral = peripherals.first else {
+                log.error("retrieveAndConnectKnownPod: no peripheral found for UUID %{public}@", uuidString)
+                return
+            }
+            let device = addPeripheral(peripheral, podAdvertisement: nil)
+            autoConnectIDs.insert(uuidString)
+            manager.connect(peripheral, options: nil)
+            log.default("retrieveAndConnectKnownPod: initiating connection to %{public}@", peripheral)
+            result = device
+        }
+        return result
+    }
     
     func disconnectFromDevice(uuidString: String) {
         managerQueue.async {
