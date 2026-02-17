@@ -87,6 +87,14 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
     var controllerId: UInt32 = 0
     var podId: UInt32 = 0
 
+    /// O5 pairing counter — cycles through 1, 2, 3, 1, 2, 3, ...
+    /// The Android app stores a `peripheral_node_counter` in SharedPreferences and
+    /// computes `(counter % 3) + 1` to derive the bottom 2 bits of the podId.
+    /// After each pairing, the computed value is saved back, so the stored value
+    /// itself cycles: 0 -> 1 -> 2 -> 3 -> 1 -> 2 -> 3 -> ...
+    /// The podId is then: `(certPdmId & 0xFFFFFFFC) | o5PairingCounter`.
+    var o5PairingCounter: Int = 0
+
 
     // Temporal state not persisted
 
@@ -148,7 +156,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             // Never use a persisted value — the certificate is the source of truth.
             let myId = O5CertificateStore.pdmid
             self.controllerId = myId
-            self.podId = myId + 1
+            // Advance the pairing counter: cycle 0->1, 1->2, 2->3, 3->1
+            self.o5PairingCounter = OmniPumpManagerState.nextO5PairingCounter(self.o5PairingCounter)
+            // Pod address = base (bottom 2 bits cleared) | counter (1, 2, or 3)
+            self.podId = OmniPumpManagerState.o5PodId(pdmid: myId, counter: self.o5PairingCounter)
         } else if let controllerId = controllerId, let podId = podId {
             self.controllerId = controllerId
             self.podId = podId
@@ -241,6 +252,18 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             podId: podId // non-Eros only
         )
 
+        // Restore the O5 pairing counter from persisted state.
+        // The designated init already advanced it from 0->1, so we need to override
+        // with the persisted value and re-derive the podId for O5.
+        if podType == omnipod5Type {
+            let persistedCounter = rawValue["o5PairingCounter"] as? Int ?? 0
+            self.o5PairingCounter = persistedCounter
+            // Re-derive podId from persisted counter (controllerId was set correctly by init)
+            if persistedCounter > 0 {
+                self.podId = OmniPumpManagerState.o5PodId(pdmid: self.controllerId, counter: persistedCounter)
+            }
+        }
+
         if let rawUnstoredDoses = rawValue["unstoredDoses"] as? [UnfinalizedDose.RawValue] {
             self.unstoredDoses = rawUnstoredDoses.compactMap( { UnfinalizedDose(rawValue: $0) } )
         } else {
@@ -328,6 +351,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             "maxBolusUnits": maxBolusUnits,
             "controllerId": controllerId,
             "podId": podId,
+            "o5PairingCounter": o5PairingCounter,
         ]
 
         value["podType"] = podType.rawValue
@@ -342,6 +366,21 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         value["previousPodState"] = previousPodState?.rawValue
 
         return value
+    }
+
+    // MARK: - O5 Pairing Counter
+
+    /// Advance the O5 pairing counter: 0->1, 1->2, 2->3, 3->1.
+    /// Matches the Android app's `(counter % 3) + 1` logic where the result
+    /// is saved back as the new counter value.
+    static func nextO5PairingCounter(_ current: Int) -> Int {
+        return (current % 3) + 1
+    }
+
+    /// Compute the O5 podId from a certPdmId and pairing counter.
+    /// Clears the bottom 2 bits of pdmid and ORs in the counter value (1, 2, or 3).
+    static func o5PodId(pdmid: UInt32, counter: Int) -> UInt32 {
+        return (pdmid & 0xFFFFFFFC) | UInt32(counter)
     }
 }
 
@@ -402,6 +441,7 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             retVal += [
                 "* controllerId: \(String(format: "%08X", controllerId))",
                 "* podId: \(String(format: "%08X", podId))",
+                "* o5PairingCounter: \(o5PairingCounter)",
             ].joined(separator: "\n")
         }
         retVal += [

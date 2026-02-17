@@ -668,9 +668,10 @@ class O5RealSessionTests: XCTestCase {
         let derived = Data(bytes: &pdmid, count: 4)
         XCTAssertEqual(derived, controllerID, "controllerID must equal pdmid in big-endian")
 
-        // Pod ID is controller ID + 1
-        let podIdValue = UInt32(bigEndian: controllerID.withUnsafeBytes { $0.load(as: UInt32.self) }) + 1
-        XCTAssertEqual(podIdValue, 0x277095, "podId must be controllerId + 1")
+        // Pod ID for first pairing: (pdmid & ~3) | 1 = pdmid + 1 when bottom 2 bits are 0
+        let pdmidValue = UInt32(bigEndian: controllerID.withUnsafeBytes { $0.load(as: UInt32.self) })
+        let podIdValue = (pdmidValue & 0xFFFFFFFC) | 1
+        XCTAssertEqual(podIdValue, 0x277095, "podId for first pairing must be (pdmid & ~3) | 1")
     }
 
     // MARK: - Component Sizes
@@ -708,14 +709,24 @@ class O5BtsnoopGoldenDataTests: XCTestCase {
         XCTAssertEqual(reg.controllerID.hexadecimalString, "00277d18")
     }
 
-    /// Pod ID is always controller ID + 1 (verified in btsnoop: 0x00277d19)
+    /// Pod ID for first pairing = (pdmid & ~3) | 1 (verified in btsnoop: 0x00277d19)
+    /// The bottom 2 bits cycle 1, 2, 3, 1, 2, 3 for each successive pod.
     func testPodIDFromBtsnoop() {
-        let controllerID: UInt32 = 2587928
-        XCTAssertEqual(controllerID + 1, 2587929)
+        let pdmid: UInt32 = 2587928
+        let firstPodId = (pdmid & 0xFFFFFFFC) | 1
+        XCTAssertEqual(firstPodId, 2587929) // 0x00277d19
 
-        var podId = UInt32(2587929).bigEndian
+        var podId = UInt32(firstPodId).bigEndian
         let podIdData = Data(bytes: &podId, count: 4)
         XCTAssertEqual(podIdData.hexadecimalString, "00277d19")
+
+        // Verify cycling: pod 2 = |2, pod 3 = |3, pod 4 wraps to |1
+        XCTAssertEqual((pdmid & 0xFFFFFFFC) | 2, 2587930) // 0x00277d1a
+        XCTAssertEqual((pdmid & 0xFFFFFFFC) | 3, 2587931) // 0x00277d1b
+        XCTAssertEqual(OmniPumpManagerState.nextO5PairingCounter(0), 1)
+        XCTAssertEqual(OmniPumpManagerState.nextO5PairingCounter(1), 2)
+        XCTAssertEqual(OmniPumpManagerState.nextO5PairingCounter(2), 3)
+        XCTAssertEqual(OmniPumpManagerState.nextO5PairingCounter(3), 1) // wraps
     }
 
     /// SP2 encoding for the btsnoop pod ID
