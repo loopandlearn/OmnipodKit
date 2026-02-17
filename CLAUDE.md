@@ -13,13 +13,16 @@ The pairing sequence is orchestrated by `O5LTKExchanger.o5negotiateLTK()`:
 
 ```
 SP1+SP2  → Pod ID assignment (4+11 bytes)
-SPS0     → Algorithm negotiation (5 bytes, CRC-16/XMODEM)
+SPS0     → Algorithm negotiation (5 bytes: 00 01 09 a2 18, algo=0x09, CRC-16/XMODEM)
 SPS1     → ECDH key exchange (80 bytes: 64-byte EC pubkey + 16-byte nonce)
-SPS2.1   → PKI authentication: INS02PG1 cert only (642 encrypted = 634 cert + 8 tag)
-SPS2     → Certificate + signature exchange: TLS cert + ECDSA sig (variable size)
+SPS2.1   → PKI authentication (642 encrypted, native index=1, extended path with sig)
+SPS2     → Certificate exchange (1089 encrypted, native index=0, short path)
 SP0/GP0  → Handshake complete
 P0       → Pod ack (0xa5 = success)
 ```
+Algorithm byte `0x09` = `CURVE256R1_NO_PASSWORD_CERTIFICATE`. SPS3 exists in the code but is
+only triggered for PASSWORD algorithm variants (0x05, 0x0D) — O5 pods use 0x09 which bypasses
+SPS3 entirely. Confirmed by 3 btsnoop captures: zero SPS3 occurrences.
 
 Messages are wrapped in TWi framing (16-byte header) with `StringLengthPrefixEncoding`:
 ```
@@ -326,11 +329,52 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 | V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **DONE (test #15)** | Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior). O5 pods never use RTS/CTS. Fixed: `doRTS=false` for O5 in `SessionEstablisher` and `useRTS` derived from `podType` in `BleMessageTransport`. |
 
 ### Not Yet Implemented
-- **Resolve Error 33 / EAP-AKA role for post-pairing session**: The Error 33 investigation (see `Omnipod5APK/ERROR_33_ANALYSIS.md` sections 16-18) has **eliminated 10 hypotheses**: SPS2 format/size, SP2 counter, certPdmId increment, hidden BLE messages, Type 4 signing for SetUniqueId, EAP-AKA Milenage params, registration payload as BLE command, registration payload in SPS2, encryption mode flag, and Pod2 pre-registration. **Remaining hypotheses** (ranked by confidence):
-  1. **EAP-AKA role reversal (40%)**: Android uses `TwiEapAkaSlave` (pod initiates challenge) for post-pairing sessions. OmnipodKit uses authenticator/master role. Test #24 tried SECONDARY mode but pod disconnected (CBError 7) immediately without sending a challenge -- may need a disconnect/reconnect cycle after pairing, or PRIMARY may actually be correct for the initial post-pairing session.
-  2. **TwiSecurityIdentifier `0xCCCCCCCC` (25%)**: Android passes `{0xCC,0xCC,0xCC,0xCC}` to all native crypto constructors (`TwiEapAkaSlave`, `TwiCcmAes`). OmnipodKit has no equivalent. If this identifier affects key derivation or nonce construction, it would cause different session keys.
-  3. **Unknown firmware validation (10%)**: Error 33 not found in app code -- may be a pod firmware-level check.
-  4. **12-hour hour format for SetUniqueId**: CONFIRMED CORRECT (test #22). O5 pods require 12-hour format (0-11). The `% 12` conversion IS required and is implemented.
+- **Resolve Error 33 at SetUniqueId**: All 12 testable protocol-level hypotheses have been eliminated. Deep investigation of the native TWI SDK (`libb7fe0d.so`) JNI interface (2026-02-17) and verification against 3 btsnoop captures narrowed the field. Error 33 (0x21) is NOT in the standard `PodErrorCode` enum (max 29/0x1D) — it is a pod firmware-specific error code. **Remaining hypotheses** (ranked by confidence):
+  1. **SPS2.1 ECDSA channel-binding signature placement — TOP SUSPECT**: Java code definitively maps native index 1 → SLPE key `"SPS2.1="` (sent first) and native index 0 → `"SPS2="` (sent second). Native formula: index 1 = cert + 72 (cert + 64 sig + 8 tag, "extended path"), index 0 = cert + 8 (cert-only + 8 tag, "short path"). **So SPS2.1 carries the ECDSA signature per the native code.** However, btsnoop sizes (SPS2.1=642, SPS2=1089) only factor correctly with known cert DER sizes if SPS2.1 is cert-only: 634+8=642 and 1017+64+8=1089. This implies either: (a) the cert loaded at native index 1 is NOT the 634-byte INS02PG1 but a smaller ~570-byte variant (642-72=570), and the cert at index 0 is ~1081 bytes (1089-8=1081) rather than the 1017-byte TLS cert — meaning the native engine processes/transforms the DER before encrypting, OR (b) the btsnoop size analysis has an off-by-one or framing error. **We have a valid secondary TEE key** (scalar `0bf11c04...`). OmnipodKit currently places the ECDSA signature in SPS2 (matching btsnoop interpretation). **Next step**: Frida-hook `calcConfValue(ctx, buf, 1)` and `calcConfValue(ctx, buf, 0)` during a real pairing to capture actual plaintext sizes and resolve this definitively.
+  2. **12-hour hour format for SetUniqueId**: CONFIRMED CORRECT (test #22). O5 pods require 12-hour format (0-11). The `% 12` conversion IS required and is implemented.
+  3. **Unknown pod firmware validation**: Error 33 not in app code — may be a firmware-level check related to certificate chain validation, registration state, or session binding that is invisible at the protocol level.
+  4. ~~**`setPreparePassword()` / SPS3 — ELIMINATED (2026-02-17)**~~: SPS3 is only triggered for PASSWORD algorithm variants (bytes 0x05 and 0x0D). O5 pods use algorithm byte `0x09` (`CURVE256R1_NO_PASSWORD_CERTIFICATE`), which bypasses SPS3 entirely via `PairingStateMachine.C3426e` branching logic (lines 2352-2403). Verified against 3 btsnoop captures: zero SPS3 occurrences. The `setPreparePassword` Frida hook was installed but never fired. Irrelevant for O5.
+  5. ~~**TwiSecurityIdentifier `0xCCCCCCCC`**~~: **ELIMINATED**. Internal dispatch/lookup value within the native library, NOT transmitted over-the-air. Commands before SetUniqueId succeed regardless.
+  6. ~~**EAP-AKA role reversal**~~: **ELIMINATED**. Test #24 showed pod disconnects immediately in SECONDARY mode. PRIMARY mode works.
+
+#### Native Pairing Call Sequence for O5 (algo=0x09, from JNI + state machine investigation 2026-02-17)
+State machine: C3426e (AppPairing) → C3427f (SPS0) → C3423b (SPS1) → C3422a (SPS2.x) → C3425d (SP0).
+Note: C3424c (SPS3/setPreparePassword) is SKIPPED for algo 0x09 — only used for PASSWORD algorithms.
+```
+ 1. TwiSecPair(context, identifier)        — Constructor (identifier = 4 bytes from pdmId)
+ 2. hasLtk(ctx, identifier)                — Check for existing LTK
+ 3. init(ctx, false, certCount)            — Initialize with certificate count
+ 4. setPhoneCertificates(ctx, certs, sizes) — Load ALL certificates into native engine
+--- SPS0 (C3427f SettingAlgorithmCMD) ---
+ 5. Send SPS0 (algo byte 0x09), receive pod's SPS0
+--- SPS1 (C3423b InitialStateControllerNode) ---
+ 6. startPairing(ctx)                      — Reset state machine
+ 7. prepareLocalData(ctx)                  — Generate ECDH keypair + nonce
+ 8. getKeyPairSize(ctx) → 64, getPairNonceSize(ctx) → 16
+ 9. getPairingData(ctx, key, nonce)        — Get pubkey + nonce for SPS1
+10. Send SPS1, receive pod's SPS1
+11. setPeerData(ctx, peerKey, peerNonce)   — Compute shared secret + LTK via KDF
+--- SPS2.1 (C3422a ConfirmationValueControllerNode, index=1) ---
+12. getMyConfValSize(ctx, 1)               — Returns cert[1]+72 (extended: cert+sig+tag)
+13. calcConfValue(ctx, buf, 1)             — Generate SPS2.1 payload (cert + ECDSA sig + CCM tag)
+14. verConfValue(ctx, peerBuf, 1)          — Verify pod's SPS2.1 payload
+--- SPS2 (C3422a, index=0) ---
+15. getMyConfValSize(ctx, 0)               — Returns cert[0]+8 (short: cert+tag)
+16. calcConfValue(ctx, buf, 0)             — Generate SPS2 payload (cert + CCM tag)
+17. verConfValue(ctx, peerBuf, 0)          — Verify pod's SPS2 payload
+--- SP0/GP0 (C3425d PairingFinalizingState) ---
+18. Send "SP0,GP0", receive P0 (0xa5 = success)
+19. saveLtk(ctx, identifier)               — Persist LTK
+20. saveAsCurrentActiveNode(identifier)    — Register active node in TwiCaching
+21. deinit(ctx)                            — Clean up native context
+```
+Index=1 → SLPE "SPS2.1=" (extended path with sig), index=0 → SLPE "SPS2=" (short path, cert-only). See hypothesis #1 above for the btsnoop size discrepancy analysis.
+
+#### `saveLtk()` — LOW RISK
+Persists LTK + pairing state to encrypted SharedPreferences (TwiCaching). Called AFTER pairing succeeds. OmnipodKit stores LTK in Swift — the native storage is irrelevant for the current session.
+
+#### `verifyCloudPublicKey()` — LOW RISK
+Verification-only: validates Insulet's cloud certificate signature. Does not set pod-side state. Pod performs its own independent verification.
 - **Command sequence counter**: Counter tracked in `TwiCaching` value (bytes 40-42), increments per command exchange. Must be persisted across reconnections. **Implementation needed.**
 - **Session persistence**: `.twi_session` (4140 bytes, AES/GCM encrypted with `com.twi.enclave.session` key) stores session state. Must save/restore on reconnect. **Implementation needed.**
 - ~~**Heartbeat keep-alive**~~: **NOT NEEDED.** Frida session (2026-02-15) confirmed the heartbeat service UUID `7DED7A6C` is NOT discovered on connected pods. Only three BLE services exist: GAP (0x1800), GATT (0x1801), and Omnipod custom (1a7e4024). The app polls via normal encrypted commands every ~20-30 seconds instead.
@@ -502,6 +546,75 @@ AES-CCM parameters: tag length parameter = 1 (meaning 8-byte tags), consistent w
 | `hmac-secret` | Secret | HMAC operations |
 | `secured-sharedpreferences-secret` | Secret | SharedPreferences encryption |
 
+## EAP-AKA Role Reversal (Confirmed by Omnipod5APK Reverse Engineering, 2026-02-17)
+
+The Omnipod 5 app implements an **EAP-AKA role reversal** between initial pairing and post-pairing sessions. The TWI SDK exposes two distinct classes — `TwiEapAka` (master/authenticator) and `TwiEapAkaSlave` (slave/supplicant) — and the phone app uses **both**, switching role based on the connection phase.
+
+### During Initial Pairing: Phone = Master, Pod = Slave
+
+The phone drives the EAP-AKA exchange as the authenticator:
+
+| Component | Class (obfuscated) | Class (renamed) | SDK class |
+|-----------|-------------------|-----------------|-----------|
+| EncryptionContext | `aNW` | `PairingContext` | — |
+| EAP handler | `aNU` | `EapAkaHandler` | `TwiEapAka` (master) |
+
+- `PairingContext` creates `EapAkaHandler` at `PairingContext.java:1816`
+- `EapAkaHandler` creates `new TwiEapAka(context, identifier)` at `EapAkaHandler.java:169`
+- The phone **initiates** the session by calling `startSession()` at `EapAkaHandler.java:180`
+- Identifier: dynamic, from `PairingContext.f24548a` (pairing-specific identity bytes)
+- The pod responds to the phone's EAP-AKA challenge as the supplicant
+
+### During Reconnection (post-pairing): Phone = Slave, Pod = Master
+
+The pod drives the EAP-AKA exchange as the authenticator:
+
+| Component | Class (obfuscated) | Class (renamed) | SDK class |
+|-----------|-------------------|-----------------|-----------|
+| EncryptionContext | `aNX` | `EapAkaAuthenticator` | — |
+| EAP handler | `aOb` / `C7139aOb` | `EapAkaSlaveManager` | `TwiEapAkaSlave` (slave) |
+
+- `EapAkaAuthenticator` creates `EapAkaSlaveManager` at `EapAkaAuthenticator.java:670`
+- `EapAkaSlaveManager` creates `new TwiEapAkaSlave(context, identifier)` at `EapAkaSlaveManager.java:197`
+- The phone does **NOT** call `startSession()` — it calls `init(0)` and waits passively
+- Identifier: **hardcoded** `{-52, -52, -52, -52}` (`0xCCCCCCCC`) at `EapAkaAuthenticator.java:1024`
+- The pod initiates the EAP-AKA challenge; the phone responds as supplicant
+- Log tags: `"EapAkaSlaveModule"`, `"SecuritySlaveManager"`
+
+### Role Selection Logic
+
+The role is determined by the `EnumC3403a` enum in `C7095aMj.java`:
+
+| Enum value | String | Ordinal | Phone role |
+|-----------|--------|---------|------------|
+| `f24314b` | `"Master"` | 0 | EAP-AKA Master (pairing) |
+| `f24316d` | `"Slave"` | 1 | EAP-AKA Slave (reconnection) |
+| `f24313a` | `"None"` | 2 | No role |
+
+The branch in `RunnableC7090aMe.java` (the connection manager):
+- Line 2362: `if (mode == "Slave")` → creates `EapAkaAuthenticator` (slave path, `TwiEapAkaSlave`)
+- Line 2262: else → creates `PairingContext` (master path, `TwiEapAka`)
+
+### Key Behavioral Differences
+
+| Aspect | Pairing (Phone=Master) | Reconnection (Phone=Slave) |
+|--------|----------------------|---------------------------|
+| SDK class | `TwiEapAka` | `TwiEapAkaSlave` |
+| Session initiation | Phone calls `startSession()` | Phone waits; pod initiates |
+| Identifier | Dynamic (from pairing context) | Hardcoded `0xCCCCCCCC` |
+| On success | Creates `MessageEncryptor`, signals pairing complete | Creates `MessageEncryptor`, signals session ready |
+| 5-second timeout | Yes (handler-based) | Yes (handler-based) |
+| State enum values | `START`, `SESSION_FAILED`, `RESYNC` | `START`, `SESSION_FAILED`, `RESYNC_COUNT_REACH_MAX`, `INVALID` |
+
+### Implications for OmnipodKit
+
+OmnipodKit currently uses `SessionEstablisher` in PRIMARY mode (controller initiates) for all sessions. To match the Android app:
+
+1. **Initial pairing**: Keep PRIMARY mode (phone = master, phone initiates). This is already correct.
+2. **Post-pairing sessions**: Switch to SECONDARY mode (phone = slave, pod initiates). The phone must wait for the pod to send its EAP-AKA challenge instead of initiating.
+3. **TwiSecurityIdentifier `0xCCCCCCCC`**: Must be passed to the crypto engine for post-pairing sessions. This hardcoded identifier replaces the dynamic pairing identifier.
+4. **Test #24 failure analysis**: The pod disconnected immediately in SECONDARY mode — this may be because a disconnect/reconnect cycle is needed between pairing completion (P0=0xa5) and the first post-pairing EAP-AKA session, giving the pod time to transition to its master role.
+
 ## O5 Phase 1 Activation Flow (Pod2 Frida-Validated, 2026-02-16)
 
 The complete Phase 1 activation sequence, validated against a live Pod2 activation (pdmid 2587928, podId 0x277d1a). See `POST_PAIR_COMMANDS.md` for full byte-level encoding details.
@@ -594,8 +707,9 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
 
 ### TODO: Remaining Implementation
 6. **Resolve Error 33 at setPodUid (BLOCKING — must fix before Phase 1 can complete)**
-   - SECONDARY EAP-AKA mode tested (test #24): pod disconnected immediately without sending a challenge. May need disconnect/reconnect cycle after pairing, or PRIMARY may be correct for initial session.
-   - Investigate TwiSecurityIdentifier `0xCCCCCCCC` — may affect Milenage key derivation, AES-CCM nonce, or session binding.
+   - **EAP-AKA role reversal CONFIRMED by RE** (see "EAP-AKA Role Reversal" section): Android switches phone to Slave role (`TwiEapAkaSlave`) for post-pairing sessions. Pod becomes Master and initiates the EAP-AKA challenge. OmnipodKit must implement this role switch.
+   - SECONDARY EAP-AKA mode tested (test #24): pod disconnected immediately without sending a challenge. May need disconnect/reconnect cycle after pairing before pod will initiate as master.
+   - Implement TwiSecurityIdentifier `0xCCCCCCCC` (`{-52,-52,-52,-52}` signed bytes) — Android passes this to `TwiEapAkaSlave` constructor as the phone's identifier for post-pairing sessions. May affect Milenage key derivation or session binding.
    - Fix pdmidExtension bug: `43008040` -> `4300804` in `O5RegistrationData.swift` line 351.
    - Byte-level comparison of SetUniqueId command against btsnoop TSV (seq 0x1d).
    - Eliminated: SPS2 format, SP2 counter, certPdmId, hidden BLE messages, Type 4 signing, EAP-AKA params, registration payload, encryption mode flag.
