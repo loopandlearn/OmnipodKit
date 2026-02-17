@@ -12,7 +12,7 @@ Create integration tests that verify the O5 (Omnipod 5) activation command seque
 
 ## Prerequisites: Production Code Changes
 
-Before the test file can be written, several small refactors are needed to make the activation flow testable. The core problem is that `BlePodComms` and `PodCommsSession` use concrete `BlePodMessageTransport` references for O5-specific methods (`sendO5AidCommand` and `sendO5SignedMessage`), which cannot be mocked without a protocol extraction.
+Before the test file can be written, several small refactors are needed to make the activation flow testable. The core problem is that `BlePodComms` and `PodCommsSession` use concrete `BlePodMessageTransport` references for O5-specific methods (`sendO5AidCommand`, `sendO5SignedMessage`, and `sendRawO5DataExpectingAck`), which cannot be mocked without a protocol extraction.
 
 ### Change 1: Define `O5Transport` Protocol
 
@@ -22,10 +22,11 @@ Add the following protocol after the existing `MessageTransport` protocol (line 
 
 ```swift
 /// Protocol for O5-specific transport operations.
-/// Extends MessageTransport with O5 AID command and signed message methods.
+/// Extends MessageTransport with O5 AID command, signed message, and raw data methods.
 protocol O5Transport: MessageTransport {
     func sendO5AidCommand(_ wrappedPayload: Data, responsePrefix: String) throws -> Data
     func sendO5SignedMessage(_ message: Message, certStore: O5CertificateStore) throws -> Message
+    func sendRawO5DataExpectingAck(_ rawData: Data) throws
 }
 ```
 
@@ -45,7 +46,7 @@ to:
 class BlePodMessageTransport: O5Transport {
 ```
 
-No other changes needed -- `BlePodMessageTransport` already implements both `sendO5AidCommand(_:responsePrefix:)` (line 528) and `sendO5SignedMessage(_:certStore:)` (line 607).
+No other changes needed -- `BlePodMessageTransport` already implements `sendO5AidCommand(_:responsePrefix:)` (line 528), `sendO5SignedMessage(_:certStore:)` (line 607), and `sendRawO5DataExpectingAck(_:)` (used by `o5SendRegistrationPayload` for sending the 163-byte registration payload).
 
 ### Change 3: Update `PodCommsSession.o5Send()` to use `O5Transport`
 
@@ -81,9 +82,11 @@ to:
 let response = try o5Transport.sendO5SignedMessage(message, certStore: certStore)
 ```
 
-### Change 4: Update `BlePodComms.o5SendAidSetupCommands()` Accessibility and Parameter Type
+### Change 4: Update `BlePodComms` Method Accessibility and Parameter Types
 
 **File**: `/Users/james/repos/OmnipodKit/OmnipodKit/Bluetooth/BlePodComms.swift`
+
+#### 4a: `o5SendAidSetupCommands`
 
 At line 365, change from `private` to `internal` (remove `private` keyword) and widen the parameter type:
 
@@ -95,26 +98,41 @@ private func o5SendAidSetupCommands(transport: BlePodMessageTransport) throws {
 func o5SendAidSetupCommands(transport: O5Transport) throws {
 ```
 
-This allows `@testable import OmnipodKit` to access the method for testing, and allows passing a mock `O5Transport`.
+#### 4b: `o5SendRegistrationPayload`
 
-**Important**: The call site at line 345 passes a `BlePodMessageTransport`, which already conforms to `O5Transport` after Change 2, so no call-site changes are needed.
+Similarly, change `o5SendRegistrationPayload` from `private` to `internal` and widen the parameter type:
+
+```swift
+// Before:
+private func o5SendRegistrationPayload(blePodMessageTransport: BlePodMessageTransport) throws {
+
+// After:
+func o5SendRegistrationPayload(transport: O5Transport) throws {
+```
+
+The method body calls `sendRawO5DataExpectingAck(_:)` on the transport, which is now part of the `O5Transport` protocol (Change 1). The method sends the 163-byte `O5RegistrationData.active.registrationPayload` exactly 3 times. Update the internal call site to use `transport` instead of `blePodMessageTransport`.
+
+Both changes allow `@testable import OmnipodKit` to access the methods for testing, and allow passing a mock `O5Transport`.
+
+**Important**: The call sites in `blePairAndSetupPod()` pass a `BlePodMessageTransport`, which already conforms to `O5Transport` after Change 2, so no call-site changes are needed beyond renaming the parameter label if applicable.
 
 ### Summary of Production Code Changes
 
 | File | Line(s) | Change |
 |------|---------|--------|
-| `MessageTransport.swift` | After line 40 | Add `O5Transport` protocol definition |
+| `MessageTransport.swift` | After line 40 | Add `O5Transport` protocol (with `sendRawO5DataExpectingAck`) |
 | `BleMessageTransport.swift` | Line 90 | Change class declaration to `: O5Transport` |
 | `PodCommsSession.swift` | Lines 441, 458 | Cast to `O5Transport` instead of `BlePodMessageTransport` |
-| `BlePodComms.swift` | Line 365 | Remove `private`, change param type to `O5Transport` |
+| `BlePodComms.swift` | Line 365 | Remove `private` from `o5SendAidSetupCommands`, change param type to `O5Transport` |
+| `BlePodComms.swift` | `o5SendRegistrationPayload` | Remove `private`, change param type to `O5Transport` |
 
-Total: approximately 10 lines changed across 4 files.
+Total: approximately 12 lines changed across 4 files.
 
 ## Mock Implementation
 
 ### `MockO5Transport`
 
-This mock captures all commands in order, distinguishing between standard `sendMessage()`, O5 AID `sendO5AidCommand()`, and signed `sendO5SignedMessage()` calls.
+This mock captures all commands in order, distinguishing between standard `sendMessage()`, O5 AID `sendO5AidCommand()`, signed `sendO5SignedMessage()`, and raw `sendRawO5DataExpectingAck()` calls.
 
 ```swift
 import Foundation
@@ -133,6 +151,8 @@ class MockO5Transport: O5Transport {
         case aidCommand(prefix: String)
         /// O5 signed command via sendO5SignedMessage(). Records the MessageBlockType(s).
         case signedMessage(blockTypes: [MessageBlockType])
+        /// Raw O5 data via sendRawO5DataExpectingAck(). Records the payload size in bytes.
+        case registrationPayload(size: Int)
 
         var description: String {
             switch self {
@@ -142,6 +162,8 @@ class MockO5Transport: O5Transport {
                 return "aidCommand(\(prefix))"
             case .signedMessage(let types):
                 return "signedMessage(\(types))"
+            case .registrationPayload(let size):
+                return "registrationPayload(\(size))"
             }
         }
     }
@@ -162,6 +184,9 @@ class MockO5Transport: O5Transport {
     /// Responses for sendO5SignedMessage() calls, consumed in order.
     var signedResponses: [MessageBlock] = []
     private var signedResponseIndex = 0
+
+    /// Number of times sendRawO5DataExpectingAck was called.
+    var registrationPayloadCallCount = 0
 
     // MARK: - MessageTransport Conformance
 
@@ -247,6 +272,11 @@ class MockO5Transport: O5Transport {
             sequenceNum: message.sequenceNum
         )
     }
+
+    func sendRawO5DataExpectingAck(_ rawData: Data) throws {
+        registrationPayloadCallCount += 1
+        recordedCommands.append(.registrationPayload(size: rawData.count))
+    }
 }
 ```
 
@@ -257,6 +287,8 @@ class MockO5Transport: O5Transport {
 2. **Response address**: Defaults to `0xffffffff` (the address used before setPodUid). Tests that verify post-setPodUid behavior should set this to the assigned pod address.
 
 3. **No `O5CertificateStore` needed for mock**: The mock's `sendO5SignedMessage` accepts the cert store parameter but does not use it, avoiding the need to construct real crypto objects in tests.
+
+4. **Registration payload recording**: The mock's `sendRawO5DataExpectingAck` records the payload size via `.registrationPayload(size:)` and increments `registrationPayloadCallCount`. Unlike AID commands, there is no response to return -- the real method just expects a BLE-level ACK, so the mock simply records and returns.
 
 ## Test Cases
 
@@ -388,6 +420,8 @@ func testUnifiedAidPodStatusPayload() {
 
 These tests verify that `o5SendAidSetupCommands()` sends the 9 AID commands in the exact order specified by the Frida capture.
 
+**Note**: `o5SendAidSetupCommands` does **not** include registration payload delivery. Registration is a separate step (`o5SendRegistrationPayload`) that occurs after AID commands and is tested independently in Test Group 2.5 below.
+
 **Source file to read**: `/Users/james/repos/OmnipodKit/OmnipodKit/Bluetooth/BlePodComms.swift`, lines 365-455
 
 #### Test 2.1: `testAidSetupCommandOrdering`
@@ -498,6 +532,132 @@ func testAidSetupThreeInsulinHistoryBatches() throws {
         "Expected exactly 3 AlgorithmInsulinHistory batches")
 }
 ```
+
+### Test Group 2.5: Registration Payload Delivery (Requires O5Transport Protocol)
+
+These tests verify that `o5SendRegistrationPayload(transport:)` correctly sends the 163-byte registration payload from `O5RegistrationData.active.registrationPayload` exactly 3 times via `sendRawO5DataExpectingAck()`. In the activation sequence, this step occurs after AID commands and before SetupPod:
+
+```
+getPodVersion -> 9 AID commands -> sendRegistrationPayload(x3) -> SetupPod -> alerts -> prime
+```
+
+**Source file to read**: `/Users/james/repos/OmnipodKit/OmnipodKit/Bluetooth/BlePodComms.swift` (the `o5SendRegistrationPayload` method)
+
+#### Test 2.5.1: `testRegistrationPayloadSent3Times`
+
+Verify the method sends the registration payload exactly 3 times:
+
+```swift
+func testRegistrationPayloadSent3Times() throws {
+    let mock = MockO5Transport()
+
+    let comms = BlePodComms(podState: nil, podType: omnipod5Type)
+    try comms.o5SendRegistrationPayload(transport: mock)
+
+    // Verify exactly 3 raw data sends
+    XCTAssertEqual(mock.registrationPayloadCallCount, 3,
+        "Expected registration payload to be sent exactly 3 times, " +
+        "got \(mock.registrationPayloadCallCount)")
+
+    // Verify all recorded commands are registrationPayload type
+    let regCommands = mock.recordedCommands.filter {
+        if case .registrationPayload = $0 { return true }
+        return false
+    }
+    XCTAssertEqual(regCommands.count, 3)
+
+    // Verify each payload is 163 bytes
+    for (i, cmd) in mock.recordedCommands.enumerated() {
+        guard case .registrationPayload(let size) = cmd else {
+            XCTFail("Command \(i) should be .registrationPayload, got \(cmd)")
+            continue
+        }
+        XCTAssertEqual(size, 163,
+            "Registration payload \(i) should be 163 bytes, got \(size)")
+    }
+}
+```
+
+#### Test 2.5.2: `testRegistrationPayloadSentBeforeSetupPod`
+
+Verify ordering -- registration comes after AID commands but before SetupPod. This test calls both `o5SendAidSetupCommands` and `o5SendRegistrationPayload` against the same mock to verify sequencing:
+
+```swift
+func testRegistrationPayloadSentBeforeSetupPod() throws {
+    let mock = MockO5Transport()
+
+    // Pre-load 9 AID responses
+    mock.aidResponses = Array(repeating: Data("0".utf8), count: 9)
+
+    let comms = BlePodComms(podState: nil, podType: omnipod5Type)
+
+    // Simulate the activation sequence order
+    try comms.o5SendAidSetupCommands(transport: mock)
+    try comms.o5SendRegistrationPayload(transport: mock)
+
+    // Verify: 9 AID commands followed by 3 registration payloads
+    XCTAssertEqual(mock.recordedCommands.count, 12,
+        "Expected 9 AID + 3 registration = 12 commands")
+
+    // First 9 should be AID commands
+    for i in 0..<9 {
+        guard case .aidCommand = mock.recordedCommands[i] else {
+            XCTFail("Command \(i) should be .aidCommand, got \(mock.recordedCommands[i])")
+            continue
+        }
+    }
+
+    // Last 3 should be registration payloads
+    for i in 9..<12 {
+        guard case .registrationPayload(let size) = mock.recordedCommands[i] else {
+            XCTFail("Command \(i) should be .registrationPayload, got \(mock.recordedCommands[i])")
+            continue
+        }
+        XCTAssertEqual(size, 163)
+    }
+}
+```
+
+#### Test 2.5.3: `testRegistrationPayloadThrowsWhenMissing`
+
+Verify the method throws `PodCommsError.invalidData` if `O5RegistrationData.active.registrationPayload` is nil:
+
+```swift
+func testRegistrationPayloadThrowsWhenMissing() throws {
+    let mock = MockO5Transport()
+
+    // Temporarily clear the registration payload to simulate a missing payload.
+    // NOTE: This test depends on the ability to set registrationPayload to nil.
+    // If O5RegistrationData.active.registrationPayload is not settable in
+    // tests, this test may need to be adjusted (e.g., by using a separate
+    // O5RegistrationData instance or a test-only reset method).
+    let savedPayload = O5RegistrationData.active.registrationPayload
+    O5RegistrationData.active.registrationPayload = nil
+    defer { O5RegistrationData.active.registrationPayload = savedPayload }
+
+    let comms = BlePodComms(podState: nil, podType: omnipod5Type)
+
+    XCTAssertThrowsError(try comms.o5SendRegistrationPayload(transport: mock)) { error in
+        guard let podError = error as? PodCommsError else {
+            XCTFail("Expected PodCommsError, got \(type(of: error))")
+            return
+        }
+        if case .invalidData = podError {
+            // Expected
+        } else {
+            XCTFail("Expected PodCommsError.invalidData, got \(podError)")
+        }
+    }
+
+    // Verify no payloads were sent
+    XCTAssertEqual(mock.registrationPayloadCallCount, 0,
+        "No payloads should be sent when registrationPayload is nil")
+}
+```
+
+**Important**: This test assumes `O5RegistrationData.active.registrationPayload` is settable from tests. If the property is read-only, the implementer should either:
+- Add a test-only setter or reset method to `O5RegistrationData`, OR
+- Skip this test and document it as a known gap, verifying the guard behavior by code inspection instead
 
 ### Test Group 3: Phase 1 Prime Command Ordering (Requires O5Transport Protocol)
 
@@ -752,34 +912,38 @@ func testFullPhase1SequenceOrdering() throws {
     // Simulate the sequence:
     // 1. getPodVersion (sendMessage with AssignAddress)
     // 2. AID setup (9x sendO5AidCommand)
-    // 3. setupPod (sendMessage with SetupPod)
-    // 4. o5Prime: 3x configureAlerts (sendMessage) + 1x prime (sendO5SignedMessage)
+    // 3. Registration payload (3x sendRawO5DataExpectingAck)
+    // 4. setupPod (sendMessage with SetupPod)
+    // 5. o5Prime: 3x configureAlerts (sendMessage) + 1x prime (sendO5SignedMessage)
 
-    // ... verify mock.recordedCommands has 15 entries in order:
-    // [0]  standard(.assignAddress)
-    // [1]  aidCommand("SE255.2=")
-    // [2]  aidCommand("S3.2=")
-    // [3]  aidCommand("S3.1=")
-    // [4]  aidCommand("S3.9=")
-    // [5]  aidCommand("S3.7=")
-    // [6]  aidCommand("SE2.1=")
-    // [7]  aidCommand("SE2.1=")
-    // [8]  aidCommand("SE2.1=")
-    // [9]  aidCommand("G3.12")
-    // [10] standard(.setupPod)
-    // [11] standard(.configureAlerts)
-    // [12] standard(.configureAlerts)
-    // [13] standard(.configureAlerts)
-    // [14] signedMessage([.setInsulinSchedule, .bolusExtra])
+    // ... verify mock.recordedCommands has 18 entries in order:
+    // [0]  standard(.assignAddress)        — getPodVersion
+    // [1]  aidCommand("SE255.2=")          — UtcCommand
+    // [2]  aidCommand("S3.2=")             — TdiCommand
+    // [3]  aidCommand("S3.1=")             — TargetBgProfile
+    // [4]  aidCommand("S3.9=")             — DiaCommand
+    // [5]  aidCommand("S3.7=")             — EgvCommand
+    // [6]  aidCommand("SE2.1=")            — InsulinHistory #1
+    // [7]  aidCommand("SE2.1=")            — InsulinHistory #2
+    // [8]  aidCommand("SE2.1=")            — InsulinHistory #3
+    // [9]  aidCommand("G3.12")             — UnifiedAidPodStatus
+    // [10] registrationPayload(163)        — Registration #1
+    // [11] registrationPayload(163)        — Registration #2
+    // [12] registrationPayload(163)        — Registration #3
+    // [13] standard(.setupPod)             — SetupPod/SetUniqueId
+    // [14] standard(.configureAlerts)      — Alert #1
+    // [15] standard(.configureAlerts)      — Alert #2
+    // [16] standard(.configureAlerts)      — Alert #3
+    // [17] signedMessage([.setInsulinSchedule, .bolusExtra]) — Prime bolus
 }
 ```
 
-**Implementation note**: This test is aspirational and depends on the ability to drive the sub-methods (`bleSendPairMessage`, `o5PreSetupSteps`, `setupPod`, `o5Prime`) against the mock. The implementer should determine the best approach:
+**Implementation note**: This test is aspirational and depends on the ability to drive the sub-methods (`bleSendPairMessage`, `o5PreSetupSteps`, `o5SendRegistrationPayload`, `setupPod`, `o5Prime`) against the mock. The implementer should determine the best approach:
 
-- **Option A**: Call each sub-method sequentially against the same `MockO5Transport` to build up the full command trace. This requires the sub-methods to be accessible (some are `private`).
-- **Option B**: Skip the full sequence test and rely on Test Groups 2 and 3 independently verifying sub-sequences. Document the expected overall ordering in comments.
+- **Option A**: Call each sub-method sequentially against the same `MockO5Transport` to build up the full command trace. This requires the sub-methods to be accessible (some are `private`). After Change 4, both `o5SendAidSetupCommands` and `o5SendRegistrationPayload` are `internal`.
+- **Option B**: Skip the full sequence test and rely on Test Groups 2, 2.5, and 3 independently verifying sub-sequences. Document the expected overall ordering in comments.
 
-**Recommendation**: Start with Option B (independent sub-sequence tests) and add Option A only if the accessibility refactoring is straightforward. Test Groups 2 and 3 together cover the most critical ordering constraints.
+**Recommendation**: Start with Option B (independent sub-sequence tests) and add Option A only if the accessibility refactoring is straightforward. Test Groups 2, 2.5, and 3 together cover the most critical ordering constraints including the registration payload delivery step.
 
 ### Test Group 5: Negative / Regression Tests
 
@@ -917,11 +1081,21 @@ class O5ActivationOrderingTests: XCTestCase, PodCommsSessionDelegate {
     func testAidSetupCommandsAreAllAidType() throws { ... }
     func testAidSetupThreeInsulinHistoryBatches() throws { ... }
 
+    // MARK: - Test Group 2.5: Registration Payload Delivery
+
+    func testRegistrationPayloadSent3Times() throws { ... }
+    func testRegistrationPayloadSentBeforeSetupPod() throws { ... }
+    func testRegistrationPayloadThrowsWhenMissing() throws { ... }
+
     // MARK: - Test Group 3: Phase 1 Prime Ordering
 
     func testO5PrimeCommandOrdering() throws { ... }
     func testO5PrimeAlertsAreStandardNotSigned() throws { ... }
     func testO5PrimeBolusIsSigned() throws { ... }
+
+    // MARK: - Test Group 4: Full Activation Sequence (Integration)
+
+    func testFullPhase1SequenceOrdering() throws { ... }
 
     // MARK: - Test Group 5: Negative / Regression
 
@@ -949,8 +1123,10 @@ class O5ActivationOrderingTests: XCTestCase, PodCommsSessionDelegate {
    - The `MockO5Transport` class
    - Test Group 1 (AID payload format) -- these should work immediately with no production changes
    - Test Group 2 (AID command ordering) -- requires Changes 1-4
+   - Test Group 2.5 (registration payload delivery) -- requires Changes 1-4
    - Test Group 3 (Phase 1 prime ordering) -- requires Changes 1-3 and a valid `O5CertificateStore`
-   - Test Group 5 (regression tests) -- mix of requirements from Groups 2 and 3
+   - Test Group 4 (full activation sequence) -- requires all changes; aspirational
+   - Test Group 5 (regression tests) -- mix of requirements from Groups 2, 2.5, and 3
 
 4. **Verify tests compile and run**. If the test target cannot build standalone, at minimum verify:
    - Test Group 1 tests compile and produce correct assertions
@@ -978,3 +1154,5 @@ xcodebuild test -scheme OmnipodKit -destination 'platform=iOS Simulator,name=iPh
 4. **`assertOnSessionQueue` assertions**: Several methods in `BlePodComms` have `assert(!podStateLock.try(), ...)` preconditions. These will fire in tests unless the lock is acquired beforehand. The implementer should either acquire the lock in tests or disable assertions for testing.
 
 5. **`hexadecimalString` case**: The `hexadecimalString` extension uses lowercase (`%02hhx`), but `O5AidCommands` constructs uppercase hex strings (`String(format: "%08X", target)` and `String(format: "%04X", totalBytes)`). Tests must account for this mixed casing -- the payload strings contain uppercase hex but `Data.hexadecimalString` would produce lowercase.
+
+6. **Nil registration payload**: `o5SendRegistrationPayload` reads from `O5RegistrationData.active.registrationPayload`. If a registration data set does not include a registration payload (i.e., the property is nil), the method should throw `PodCommsError.invalidData` rather than silently skip or crash. Test 2.5.3 covers this case, but the test depends on the ability to set `registrationPayload` to nil in the test environment. If `O5RegistrationData.active` is not mutable from tests, the implementer should add a test-only reset mechanism or verify the guard behavior by code inspection.
