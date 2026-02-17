@@ -739,6 +739,26 @@ extension BlePodComms: PeripheralManagerDelegate {
         if self.isPaired && needsSessionEstablishment {
             let myId = self.myId
 
+            // Ensure BLE MTU is properly negotiated before sending O5 protocol messages.
+            // iOS auto-negotiates MTU asynchronously after connect. For O5, we need
+            // maximumWriteValueLength >= BlePacket_MAX_PAYLOAD_SIZE (244) per write.
+            // With .withoutResponse, writes exceeding the MTU are silently truncated.
+            if manager.podType == omnipod5Type {
+                let requiredMTU = BlePacket_MAX_PAYLOAD_SIZE
+                var attempts = 0
+                var currentMTU = manager.peripheral.maximumWriteValueLength(for: .withoutResponse)
+                while currentMTU < requiredMTU && attempts < 10 {
+                    log.default("MTU not yet settled (%{public}d < %{public}d), waiting... (attempt %{public}d/10)", currentMTU, requiredMTU, attempts + 1)
+                    Thread.sleep(forTimeInterval: 0.2)
+                    currentMTU = manager.peripheral.maximumWriteValueLength(for: .withoutResponse)
+                    attempts += 1
+                }
+                log.default("MTU settled after %{public}d polls: maximumWriteValueLength=%{public}d (required=%{public}d)", attempts, currentMTU, requiredMTU)
+                if currentMTU < requiredMTU {
+                    log.error("WARNING: MTU (%{public}d) below required minimum (%{public}d). Large writes may be truncated!", currentMTU, requiredMTU)
+                }
+            }
+
             self.podStateLock.lock()
             defer {
                 self.podStateLock.unlock()

@@ -518,10 +518,11 @@ extension PeripheralManager {
         case .connected:
             clearCommsQueues()
 
-            // Log the negotiated MTU for diagnostics. Note: BlePacket_MAX_PAYLOAD_SIZE (244 for O5)
-            // is an application-level protocol constant for logical packet framing, NOT the physical
-            // BLE MTU. CoreBluetooth handles L2CAP fragmentation of larger writes transparently.
-            // Android requests MTU 251, pod responds with 247. iOS auto-negotiates but may stay at 23.
+            // Log the MTU at connect time. Note: this may report 20 (MTU 23) initially because
+            // iOS auto-negotiates MTU asynchronously after connect. For O5 (.withoutResponse writes),
+            // writes exceeding maximumWriteValueLength are silently truncated — NOT fragmented.
+            // Android requests MTU 251, pod responds with 247. iOS should auto-negotiate to 247.
+            // completeConfiguration() polls until MTU settles before sending protocol messages.
             let mtu = peripheral.maximumWriteValueLength(for: .withoutResponse)
             self.log.default("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d, BlePacket_MAX_PAYLOAD_SIZE: %{public}d", mtu, BlePacket_MAX_PAYLOAD_SIZE)
 
