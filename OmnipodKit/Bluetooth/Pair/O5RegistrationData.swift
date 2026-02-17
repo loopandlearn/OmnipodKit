@@ -120,7 +120,7 @@ extension O5RegistrationData {
 
     /// The currently active registration data set.
     /// Change this to use a different registration.
-    static var active: O5RegistrationData = .teeSimulator_2587928
+    static var active: O5RegistrationData = .teeSimulator_2584724
 }
 
 // MARK: - TEE Simulator Registration (pdmid 2584724, Feb 2026)
