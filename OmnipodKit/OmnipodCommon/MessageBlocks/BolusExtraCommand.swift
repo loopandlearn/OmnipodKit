@@ -19,15 +19,16 @@ struct BolusExtraCommand: MessageBlock {
     let timeBetweenPulses: TimeInterval
     let extendedUnits: Double
     let extendedDuration: TimeInterval
+    let withPdmValue: Bool // O5 requires 0x12 (WITH_PDM_VALUE) instead of 0x0d (NO_VALUE)
 
-    // 17 0d 7c 1770 00030d40 0000 00000000
-    // 0  1  2  3    5        9    13
+    // 17 0d 7c 1770 00030d40 0000 00000000           -- DASH (15 bytes, type 0x0d)
+    // 17 12 7c 0208 000186a0 0000 00000000 01 0000 0000 -- O5  (20 bytes, type 0x12)
     var data: Data {
         let beepOptions = (UInt8(programReminderInterval.minutes) & 0x3f) + (completionBeep ? (1<<6) : 0) + (acknowledgementBeep ? (1<<7) : 0)
 
         var data = Data([
             blockType.rawValue,
-            0x0d,
+            withPdmValue ? 0x12 : 0x0d,
             beepOptions
             ])
 
@@ -39,6 +40,13 @@ struct BolusExtraCommand: MessageBlock {
 
         let timeBetweenExtendedPulses = pulseCountX10 > 0 ? extendedDuration / (Double(pulseCountX10) / 10) : 0
         data.appendBigEndian(UInt32(timeBetweenExtendedPulses.hundredthsOfMilliseconds))
+
+        if withPdmValue {
+            data.append(0x01) // bolus source
+            data.appendBigEndian(UInt16(0)) // meal pulses
+            data.appendBigEndian(UInt16(0)) // correction pulses
+        }
+
         return data
     }
 
@@ -47,6 +55,7 @@ struct BolusExtraCommand: MessageBlock {
             throw MessageBlockError.notEnoughData
         }
 
+        withPdmValue = encodedData[1] == 0x12
         acknowledgementBeep = encodedData[2] & (1<<7) != 0
         completionBeep = encodedData[2] & (1<<6) != 0
         programReminderInterval = TimeInterval(minutes: Double(encodedData[2] & 0x3f))
@@ -64,7 +73,7 @@ struct BolusExtraCommand: MessageBlock {
         extendedDuration = timeBetweenExtendedPulses * (Double(pulseCountX10) / 10)
     }
 
-    init(units: Double = 0, timeBetweenPulses: TimeInterval = Pod.secondsPerBolusPulse, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0) {
+    init(units: Double = 0, timeBetweenPulses: TimeInterval = Pod.secondsPerBolusPulse, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, withPdmValue: Bool = false) {
         self.acknowledgementBeep = acknowledgementBeep
         self.completionBeep = completionBeep
         self.programReminderInterval = programReminderInterval
@@ -72,6 +81,7 @@ struct BolusExtraCommand: MessageBlock {
         self.timeBetweenPulses = timeBetweenPulses != 0 ? timeBetweenPulses : Pod.secondsPerBolusPulse
         self.extendedUnits = extendedUnits
         self.extendedDuration = extendedDuration
+        self.withPdmValue = withPdmValue
     }
 }
 

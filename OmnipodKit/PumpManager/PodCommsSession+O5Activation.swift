@@ -81,7 +81,8 @@ extension PodCommsSession {
             units: Pod.primeUnits,
             timeBetweenPulses: timeBetweenPulses,
             completionBeep: true,
-            programReminderInterval: TimeInterval(minutes: 60)
+            programReminderInterval: TimeInterval(minutes: 60),
+            withPdmValue: true // O5 requires 0x12 (WITH_PDM_VALUE) with bolus source fields
         )
         let primeStatus: StatusResponse = try o5Send([scheduleCommand, bolusExtraCommand])
         podState.updateFromStatusResponse(primeStatus, at: currentDate)
@@ -218,7 +219,8 @@ extension PodCommsSession {
         podState.setupProgress = .startingInsertCannula
         let bolusExtraCommand = BolusExtraCommand(
             units: cannulaInsertionUnits,
-            timeBetweenPulses: timeBetweenPulses
+            timeBetweenPulses: timeBetweenPulses,
+            withPdmValue: true // O5 requires 0x12 (WITH_PDM_VALUE) with bolus source fields
         )
         let status: StatusResponse = try o5Send([bolusScheduleCommand, bolusExtraCommand])
         podState.updateFromStatusResponse(status, at: currentDate)
