@@ -366,7 +366,12 @@ class PodCommsSession: MessageTransportDelegate {
             // Clear the lastDeliveryStatusReceived variable which is used to guard against possible 0x31 pod faults
             podState.lastDeliveryStatusReceived = nil
 
-            let response = try transport.sendMessage(message)
+            // For O5 pods, automatically route whitelisted commands through the
+            // Type 4 (ECDSA signed) transport path instead of unsigned Type 1.
+            let useO5Signing = shouldUseO5Signing(for: blocksToSend)
+            let response = try useO5Signing
+                ? sendO5SignedMessage(message)
+                : transport.sendMessage(message)
 
             // Simulate fault
             //let podInfoResponse = try PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000000000ab6a038403ff03860000285708030d0000")!)
@@ -418,75 +423,48 @@ class PodCommsSession: MessageTransportDelegate {
         throw PodCommsError.nonceResyncFailed
     }
 
-    // MARK: - O5 Type 4 Signed Message Sending
+    // MARK: - O5 Type 4 Signed Message Support
 
-    /// Sends message blocks as a Type 4 (encrypted + ECDSA signed) message for O5 pods.
-    /// This is required for all O5 programming commands (ConfigureAlerts, ProgramBolus, ProgramBasal, etc.).
-    ///
-    /// The Frida log confirms ALL O5 programming commands must be sent as Type 4 signed messages.
-    /// The ECDSA signature covers AAD(16) + ciphertext + tag(8) and is appended as 64 bytes raw r||s.
-    ///
-    /// - Parameters:
-    ///   - messageBlocks: The message blocks to send
-    ///   - expectFollowOnMessage: If true, the pod will expect another message within 4 minutes
-    /// - Returns: The received message response
-    /// - Throws: PodCommsError if cert store not available, transport not BLE, or communication fails
-    func o5Send<T: MessageBlock>(_ messageBlocks: [MessageBlock], expectFollowOnMessage: Bool = false) throws -> T {
+    /// O5 command types that MUST be sent as Type 4 (ECDSA signed) messages.
+    /// These are the specific_commands from the O5 APK's TWi signing whitelist.
+    /// Any message containing one of these block types will be automatically
+    /// routed through sendO5SignedMessage() by send() when on an O5 pod.
+    private static let o5SignedCommandTypes: Set<MessageBlockType> = [
+        .basalScheduleExtra,  // 0x13 — ProgramBasal (SetInsulinScheduleCommand + BasalScheduleExtraCommand)
+        .tempBasalExtra,      // 0x16 — ProgramTempBasal (SetInsulinScheduleCommand + TempBasalExtraCommand)
+        .bolusExtra,          // 0x17 — ProgramBolus (SetInsulinScheduleCommand + BolusExtraCommand)
+        .deactivatePod,       // 0x1c — DeactivatePod (DeactivatePodCommand)
+        .cancelDelivery,      // 0x1f — StopProgram / ProgramBeep (CancelDeliveryCommand)
+    ]
 
+    /// Returns true if the message blocks contain a command type that requires
+    /// Type 4 (ECDSA signed) sending on O5 pods, and the O5 cert store and
+    /// BLE transport are available.
+    private func shouldUseO5Signing(for blocks: [MessageBlock]) -> Bool {
+        guard podState.podType == omnipod5Type,
+              o5CertStore != nil,
+              transport is BlePodMessageTransport else {
+            return false
+        }
+        return blocks.contains { Self.o5SignedCommandTypes.contains($0.blockType) }
+    }
+
+    /// Sends a Message via the O5 Type 4 (encrypted + ECDSA signed) transport path.
+    /// Called internally by send() when a whitelisted command is detected on an O5 pod.
+    private func sendO5SignedMessage(_ message: Message) throws -> Message {
         guard let certStore = o5CertStore else {
-            log.error("o5Send: O5CertificateStore not available, cannot send signed message")
             throw PodCommsError.diagnosticMessage(str: "O5 certificate store not available for signed message sending")
         }
-
         guard let bleTransport = transport as? BlePodMessageTransport else {
-            log.error("o5Send: Transport is not BlePodMessageTransport, cannot send signed message")
             throw PodCommsError.diagnosticMessage(str: "O5 signed messages require BLE transport")
         }
-
-        // Handle nonce advancement for nonce-resyncable blocks (same as send())
-        if messageBlocks.contains(where: { $0 as? NonceResyncableMessageBlock != nil }) {
-            podState.advanceToNextNonce()
-        }
-
-        let messageNumber = transport.messageNumber
-        let message = Message(address: podState.address, messageBlocks: messageBlocks, sequenceNum: messageNumber, expectFollowOnMessage: expectFollowOnMessage)
-
-        // Clear the lastDeliveryStatusReceived variable (same as send())
-        podState.lastDeliveryStatusReceived = nil
-
-        log.info("O5 Signed Send: %{public}@", String(describing: messageBlocks.map { $0.blockType }))
-        let response = try bleTransport.sendO5SignedMessage(message, certStore: certStore)
-
-        if let responseMessageBlock = response.messageBlocks[0] as? T {
-            log.info("O5 Signed Response: %{public}@", String(describing: responseMessageBlock))
-            return responseMessageBlock
-        }
-
-        if let fault = response.fault {
-            try throwPodFault(fault: fault)
-        }
-
-        let responseType = response.messageBlocks[0].blockType
-        guard let errorResponse = response.messageBlocks[0] as? ErrorResponse else {
-            log.error("O5 Signed: Unexpected response: %{public}@", String(describing: response.messageBlocks[0]))
-            throw PodCommsError.unexpectedResponse(response: responseType)
-        }
-
-        switch errorResponse.errorResponseType {
-        case .badNonce(let nonceResyncKey):
-            // For O5 signed messages, nonce resync is not expected but handle gracefully
-            log.error("O5 Signed: Unexpected bad nonce response (nonceResyncKey=%{public}04x)", nonceResyncKey)
-            throw PodCommsError.nonceResyncFailed
-        case .nonretryableError(let errorCode, let faultEventCode, let podProgress):
-            log.error("O5 Signed: Command error: code %u, %{public}@, pod progress %{public}@",
-                      errorCode, String(describing: faultEventCode), String(describing: podProgress))
-            throw PodCommsError.rejectedMessage(errorCode: errorCode)
-        }
+        log.info("O5 Type 4 Signed Send: %{public}@", String(describing: message.messageBlocks.map { $0.blockType }))
+        return try bleTransport.sendO5SignedMessage(message, certStore: certStore)
     }
 
     /// O5-aware configureAlerts: uses standard Type 1 (encrypted, unsigned) sending.
-    /// Frida evidence (Pod2, 2026-02-16) shows ProgramAlert commands use Type 1,
-    /// NOT Type 4 (signed). Only ProgramBolus uses Type 4 signing.
+    /// ConfigureAlerts (0x19) is NOT on the O5 signed command whitelist.
+    /// Frida evidence (Pod2, 2026-02-16) confirms ProgramAlert commands use Type 1.
     @discardableResult
     func o5ConfigureAlerts(_ alerts: [PodAlert], acknowledgeAll: Bool = false, beepBlock: MessageBlock? = nil) throws -> StatusResponse {
         // O5 alerts use the same Type 1 encrypted transport as DASH

@@ -9,8 +9,10 @@
 //    Phase 1: Alerts (slots #4, #7) -> Prime 1 (tubing fill) -> [wait] -> Alert (slot #3)
 //    Phase 2: Basal -> Alerts (clear/reprogram) -> Prime 2 (cannula insertion) -> Final status
 //
-//  Only ProgramBolus (prime/delivery) uses Type 4 (encrypted + ECDSA signed) via o5Send().
-//  All other commands (ConfigureAlerts, ProgramBasal, etc.) use Type 1 (encrypted only).
+//  All O5 whitelisted commands (ProgramBolus, ProgramBasal, ProgramTempBasal, DeactivatePod,
+//  StopProgram/CancelDelivery) are automatically sent as Type 4 (encrypted + ECDSA signed)
+//  by send() when on an O5 pod with a cert store. ConfigureAlerts (0x19) is NOT on the
+//  whitelist and uses Type 1 (encrypted only).
 //
 //  Copyright © 2025 LoopKit Authors. All rights reserved.
 //
@@ -35,7 +37,8 @@ extension PodCommsSession {
     /// during Phase 2 (cannula insertion), matching the real O5 app behavior.
     /// The user expiry alert (slot #3) is sent AFTER prime completes, not before.
     ///
-    /// All commands are sent as Type 4 signed messages via o5Send() / o5ConfigureAlerts().
+    /// Whitelisted commands (ProgramBolus) are automatically sent as Type 4 signed messages
+    /// by send(). ConfigureAlerts uses Type 1 (unsigned) via o5ConfigureAlerts().
     ///
     /// - Returns: Time interval until prime is expected to complete
     func o5Prime() throws -> TimeInterval {
@@ -84,7 +87,7 @@ extension PodCommsSession {
             programReminderInterval: TimeInterval(minutes: 60),
             withPdmValue: true // O5 requires 0x12 (WITH_PDM_VALUE) with bolus source fields
         )
-        let primeStatus: StatusResponse = try o5Send([scheduleCommand, bolusExtraCommand])
+        let primeStatus: StatusResponse = try send([scheduleCommand, bolusExtraCommand])
         podState.updateFromStatusResponse(primeStatus, at: currentDate)
         podState.setupProgress = .priming
         log.info("O5 Phase 1: Prime 1 started, expected completion in %.0f seconds",
@@ -129,8 +132,8 @@ extension PodCommsSession {
     ///   4. CGM activation (skipped -- not implemented yet)
     ///   5. Final status verification
     ///
-    /// All alerts use Type 1 (encrypted, unsigned) via o5ConfigureAlerts().
-    /// ProgramBolus (prime 2) uses Type 4 (encrypted + ECDSA signed) via o5Send().
+    /// Alerts use Type 1 (encrypted, unsigned) via o5ConfigureAlerts().
+    /// ProgramBolus and ProgramBasal are automatically sent as Type 4 (ECDSA signed) by send().
     ///
     /// - Parameter basalSchedule: The basal schedule to program (from OmniPumpManagerState)
     /// - Parameter scheduleOffset: Current time offset into the basal schedule
@@ -222,7 +225,7 @@ extension PodCommsSession {
             timeBetweenPulses: timeBetweenPulses,
             withPdmValue: true // O5 requires 0x12 (WITH_PDM_VALUE) with bolus source fields
         )
-        let status: StatusResponse = try o5Send([bolusScheduleCommand, bolusExtraCommand])
+        let status: StatusResponse = try send([bolusScheduleCommand, bolusExtraCommand])
         podState.updateFromStatusResponse(status, at: currentDate)
 
         podState.setupProgress = .cannulaInserting
