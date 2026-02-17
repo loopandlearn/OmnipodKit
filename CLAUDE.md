@@ -193,6 +193,9 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **Phase 2: slot #0 auto-off alert added (O5 Java validation, 2026-02-16)**: New auto-off alert on slot #0 with duration=15min, autoOff=true, beepRepeat=2. This alert was missing from the Phase 2 implementation. Added to match O5 Java activation state machine.
 - **Registration payload removed (misidentified btsnoop frames, 2026-02-16)**: The three 184-byte btsnoop messages (frames 1925, 1939, 1952) previously identified as "registration payload delivery" were actually AlgorithmInsulinHistory (`SE2.1=`) AID commands. Size coincidence (184 bytes encrypted ~ 163 payload + overhead) led to the incorrect identification in O5_ACTIVATION_SEQUENCE.md. Both btsnoop and Pod2 Frida confirm no registration payload is sent during activation. Removed `o5SendRegistrationPayload()` and `sendRawO5DataExpectingAck()` from the codebase — sending the 163-byte binary blob wrapped in `S0.0=...G0.0` SLPE format caused CBError 7 pod disconnect.
 - **O5 messageNumber reset after EAP-AKA (reconnect fix, 2026-02-16)**: `establishSession()` carried forward the old `messageNumber` from podState on reconnect, causing setPodUid to use stale Omnipod Message sequence numbers. Frida shows: getPodVersion(seq=0) → setPodUid(seq=2) — sequence restarts from 0 after each new EAP-AKA session. Fix: in `establishSession()`, O5 pods always reset `omnipodMessageNumber = 0` instead of preserving the old value. On the fresh pairing path this happened naturally (podState was nil → default 0), but on reconnect the stale value caused wrong seq numbers. DASH behavior unchanged.
+- **certPdmId cycling fix (2026-02-16)**: OmnipodKit now cycles the bottom 2 bits of certPdmId through 1->2->3->1... matching the Android app's `peripheral_node_counter` behavior. Formula: `(certPdmId & 0xFFFFFFFC) | ((counter % 3) + 1)`. Files: `OmniPumpManagerState.swift` (added `o5PairingCounter`, `nextO5PairingCounter()`, `o5PodId()`), `OmniPumpManager.swift` (`prepForNewPod()` uses cycling counter instead of hardcoded +1). While correct for protocol compliance, this was already eliminated as the cause of Error 33 — pairing and commands succeed regardless of address offset.
+- **SessionKeyMode enum added (2026-02-16)**: `SessionEstablisher.swift` now supports PRIMARY (controller initiates EAP-AKA challenge, DASH default) and SECONDARY (pod initiates, hypothesized for O5 post-pairing) modes. Test #24 used SECONDARY mode but pod disconnected immediately without sending a challenge.
+- **BUG FOUND: pdmidExtension value wrong in O5RegistrationData.swift (2026-02-16)**: `pdmidExtension: 43008040` (line 351 of active registration `teeSimulator_2587928`) should be `4300804`. TLS certificate SAN and HAR capture both show `4300804`. This is a factor-of-10 error (hex `0x02904028` wrong vs `0x0041A004` correct). **Fix pending.**
 
 ### Resolved: SPS2.1/SPS2 Structure — SUCCESSFUL PAIRING ACHIEVED
 Native library decompile revealed the payloads are raw DER certificates. Btsnoop capture of a successful
@@ -226,8 +229,9 @@ attestation, which the pod accepted.
 | 19 | **Pod3 reconnect: double EAP-AKA session — `blePairAndSetupPod()` re-establishes session** | **Pod3 failed (reconnect)** | Same pod, eapSeq=10→14. Fix #18 correctly routes to `blePairAndSetupPod()`, but it sends HELLO + establishes a NEW EAP-AKA session even though `completeConfiguration()` already established one. Pod disconnects (CBError 7) because it already has an active session. Infinite loop: `completeConfiguration` establishes session → `blePairAndSetupPod` sends HELLO → pod disconnects → reconnect → repeat. Fix: (1) Set `needsSessionEstablishment = false` after successful establishment in `completeConfiguration()`. (2) In `blePairAndSetupPod()`, skip HELLO + EAP-AKA when `!needsSessionEstablishment` and `ck` is valid. |
 | 20 | **Pod3 reconnect: UtcCommand sent but pod gives no response (`emptyValue`)** | **Pod3 failed (reconnect)** | Same pod, eapSeq=18→22. Double-EAP fix works ("Session already established by completeConfiguration, skipping HELLO + EAP-AKA"). AID command UtcCommand is sent, pod ACKs at transport level (SUCCESS) but never responds on DATA char. Root cause: `getPodVersion` (AssignAddress with 0xffffffff) is missing from the resume path — `pairPod()` normally sends it but is skipped on resume. Pod needs this as the first encrypted command after each new EAP-AKA session before it will accept AID commands. Fix: added `getPodVersion` send in `blePairAndSetupPod()` resume path, before `o5PreSetupSteps()`. |
 | 21 | **Fixed: AID commands used SLPE length prefix, should be plain ASCII** | **AID commands succeed, setPodUid fails** | New pod (5A751FA5). Pairing P0=0xa5, EAP-AKA success, getPodVersion success (FW 9.0.4). Double-getPodVersion fix confirmed working (`pairPodRanGetPodVersion` flag). UtcCommand fails with `emptyValue` — pod ACKs transport but never responds. Root cause: `O5AidCommands` used `StringLengthPrefixEncoding.formatKeys()` which adds 2-byte big-endian length prefixes, but AID commands use plain ASCII key-value format with NO length prefix. Frida: `"SE255.2=1771222561"` (18 bytes). OmnipodKit sent: `"SE255.2=" + 0x000A + "1771276453"` (20 bytes). Fix: replaced `formatKeys()` with simple string concatenation, fixed response parsing in `sendO5AidCommand()` to strip prefix instead of using `parseKeys()`. Also fixed double-getPodVersion with `pairPodRanGetPodVersion` flag. |
-| 22 | **AID SLPE fix confirmed: all 9 AID commands succeed. setPodUid fails error 33** | **Pod4 failed at setPodUid** | Same pod as #21 (5A751FA5), retry with SLPE fix. ALL 9 AID COMMANDS SUCCEED for first time ever: UtcCommand, TdiCommand, TargetBgProfile, DiaCommand, EgvCommand, 3x AlgorithmInsulinHistory, UnifiedAidPodStatus. setPodUid then fails with error code 33 (0x21). Originally hypothesized as 12-hour vs 24-hour hour format mismatch (`Calendar.HOUR` field 10) and added `% 12` conversion. **This hypothesis was incorrect** -- O5 pods use 24-hour format like DASH/Eros. The `% 12` fix was reverted. The actual root cause of error 33 was not the hour format. |
+| 22 | **AID SLPE fix confirmed: all 9 AID commands succeed. setPodUid fails error 33** | **Pod4 failed at setPodUid** | Same pod as #21 (5A751FA5), retry with SLPE fix. ALL 9 AID COMMANDS SUCCEED for first time ever: UtcCommand, TdiCommand, TargetBgProfile, DiaCommand, EgvCommand, 3x AlgorithmInsulinHistory, UnifiedAidPodStatus. setPodUid then fails with error code 33 (0x21). Hypothesized as 12-hour vs 24-hour hour format mismatch (`Calendar.HOUR` field 10) and added `% 12` conversion. Initially reverted as "incorrect", but a fresh pod test (feb16-840pm-1.txt) **RE-CONFIRMED that 12-hour format IS correct**: sending hour=20 (24-hour) at 8:40 PM caused error 33. The `% 12` conversion is required and has been re-implemented. Error 33 on THIS pod was caused by 24-hour hour format. |
 | 23 | **Removed registration payload, reset O5 messageNumber after EAP-AKA** | **Pending test** | Registration payload (163B x 3) was misidentified btsnoop frames — actually AlgorithmInsulinHistory (`SE2.1=`). Sending it caused CBError 7. Also: `establishSession()` preserved stale `messageNumber` from old podState on reconnect. O5 Frida shows message seq restarts from 0 after each EAP-AKA. Fix: removed registration payload sending (`o5SendRegistrationPayload()` and `sendRawO5DataExpectingAck()`), O5 pods now reset `messageNumber=0` in `establishSession()`. **Test with fresh pod.** |
+| 24 | **SECONDARY EAP-AKA mode: pod initiates challenge instead of controller** | **Pairing P0=0xa5 SUCCESS, pod disconnected on SECONDARY EAP-AKA** | Fresh pod (BLE `3FE369C7-22A0-2344-5393-EB967FB49AE3`), pdmid 2584724, myId=`0x277094`, podId=`0x277095`. Pairing succeeded (P0=0xa5, LTK=`4f1da4ab399c275afdb8be816adb2089`, seq=6). SessionEstablisher entered SECONDARY mode (waits for pod's EAP-AKA challenge). Pod immediately disconnected (CBError code=7) — never sent any EAP-AKA challenge data. Log: "Skipping notifications for undiscovered service: 7DED7A6C". Second attempt on same pod failed during SPS0 read (pod in tainted state from first attempt, disconnected at SPS0). **Key finding**: Pod does NOT initiate EAP-AKA challenge after pairing — SECONDARY mode may not be the correct post-pairing approach for the initial session, OR a disconnect/reconnect cycle may be needed between pairing and session establishment. PRIMARY (controller initiates) may actually be correct for the first post-pairing session. |
 
 **Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
 (uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
@@ -322,6 +326,11 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 | V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **DONE (test #15)** | Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior). O5 pods never use RTS/CTS. Fixed: `doRTS=false` for O5 in `SessionEstablisher` and `useRTS` derived from `podType` in `BleMessageTransport`. |
 
 ### Not Yet Implemented
+- **Resolve Error 33 / EAP-AKA role for post-pairing session**: The Error 33 investigation (see `Omnipod5APK/ERROR_33_ANALYSIS.md` sections 16-18) has **eliminated 10 hypotheses**: SPS2 format/size, SP2 counter, certPdmId increment, hidden BLE messages, Type 4 signing for SetUniqueId, EAP-AKA Milenage params, registration payload as BLE command, registration payload in SPS2, encryption mode flag, and Pod2 pre-registration. **Remaining hypotheses** (ranked by confidence):
+  1. **EAP-AKA role reversal (40%)**: Android uses `TwiEapAkaSlave` (pod initiates challenge) for post-pairing sessions. OmnipodKit uses authenticator/master role. Test #24 tried SECONDARY mode but pod disconnected (CBError 7) immediately without sending a challenge -- may need a disconnect/reconnect cycle after pairing, or PRIMARY may actually be correct for the initial post-pairing session.
+  2. **TwiSecurityIdentifier `0xCCCCCCCC` (25%)**: Android passes `{0xCC,0xCC,0xCC,0xCC}` to all native crypto constructors (`TwiEapAkaSlave`, `TwiCcmAes`). OmnipodKit has no equivalent. If this identifier affects key derivation or nonce construction, it would cause different session keys.
+  3. **Unknown firmware validation (10%)**: Error 33 not found in app code -- may be a pod firmware-level check.
+  4. **12-hour hour format for SetUniqueId**: CONFIRMED CORRECT (test #22). O5 pods require 12-hour format (0-11). The `% 12` conversion IS required and is implemented.
 - **Command sequence counter**: Counter tracked in `TwiCaching` value (bytes 40-42), increments per command exchange. Must be persisted across reconnections. **Implementation needed.**
 - **Session persistence**: `.twi_session` (4140 bytes, AES/GCM encrypted with `com.twi.enclave.session` key) stores session state. Must save/restore on reconnect. **Implementation needed.**
 - ~~**Heartbeat keep-alive**~~: **NOT NEEDED.** Frida session (2026-02-15) confirmed the heartbeat service UUID `7DED7A6C` is NOT discovered on connected pods. Only three BLE services exist: GAP (0x1800), GATT (0x1801), and Omnipod custom (1a7e4024). The app polls via normal encrypted commands every ~20-30 seconds instead.
@@ -584,46 +593,54 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
 5. ~~**Registration payload delivery**~~ -- **REMOVED (misidentified).** The btsnoop messages originally identified as registration payloads were actually AlgorithmInsulinHistory (`SE2.1=`) AID commands. Sending the 163-byte binary blob in `S0.0=...G0.0` SLPE format caused CBError 7 pod disconnect. Removed `o5SendRegistrationPayload()` and `sendRawO5DataExpectingAck()`. Registration payload is NOT needed for activation.
 
 ### TODO: Remaining Implementation
-6. **Implement command sequence counter management**
+6. **Resolve Error 33 at setPodUid (BLOCKING — must fix before Phase 1 can complete)**
+   - SECONDARY EAP-AKA mode tested (test #24): pod disconnected immediately without sending a challenge. May need disconnect/reconnect cycle after pairing, or PRIMARY may be correct for initial session.
+   - Investigate TwiSecurityIdentifier `0xCCCCCCCC` — may affect Milenage key derivation, AES-CCM nonce, or session binding.
+   - Fix pdmidExtension bug: `43008040` -> `4300804` in `O5RegistrationData.swift` line 351.
+   - Byte-level comparison of SetUniqueId command against btsnoop TSV (seq 0x1d).
+   - Eliminated: SPS2 format, SP2 counter, certPdmId, hidden BLE messages, Type 4 signing, EAP-AKA params, registration payload, encryption mode flag.
+   - 12-hour hour format confirmed correct (test #22 proved 24-hour causes error 33).
+
+7. **Implement command sequence counter management**
    - Track counter per session (observed: `9f492c` → `9f4935`, incrementing per command exchange)
    - Persist counter in session state for reconnection
    - Counter appears in TWi header and TwiCaching value (bytes 43-45)
 
-7. **Implement ACK message construction**
+8. **Implement ACK message construction**
    - ACK = AES-CCM encrypt with empty plaintext, producing 8-byte tag only
    - ACK is written to control characteristic (`2441`) after receiving pod response on data characteristic (`2443`)
    - ACK AAD uses type byte `81` (acknowledgment frame)
 
-8. **Implement BLE fragmentation header**
+9. **Implement BLE fragmentation header**
    - 7-byte fragmentation header prepended to TWi packet on BLE writes
    - Parse incoming fragments and reassemble TWi packets
    - Pattern: `0000XXXXXXXXXXXX` where first 2 bytes are `0000`, remaining 5 vary per message
 
-9. **Implement Phase 2 activation** (after prime 1 completes)
-   - ProgramBasal: full 24-hour basal schedule (first Phase 2 command, state ACTIVATION_PROGRAMMED_BASAL)
-   - ProgramAlert: clear LOC (#7), program system expiry (#2), shutdown imminent (#0, beepRepeat=every5Minutes(8)), auto-off (#0, duration=15min, autoOff=true, beepRepeat=2)
-   - ProgramBolus: prime 2 / cannula fill (Type 4 signed)
-   - CGM activation
-   - Final status verification
+10. **Implement Phase 2 activation** (after prime 1 completes)
+    - ProgramBasal: full 24-hour basal schedule (first Phase 2 command, state ACTIVATION_PROGRAMMED_BASAL)
+    - ProgramAlert: clear LOC (#7), program system expiry (#2), shutdown imminent (#0, beepRepeat=every5Minutes(8)), auto-off (#0, duration=15min, autoOff=true, beepRepeat=2)
+    - ProgramBolus: prime 2 / cannula fill (Type 4 signed)
+    - CGM activation
+    - Final status verification
 
-10. **Implement session persistence (save/restore)**
+11. **Implement session persistence (save/restore)**
     - Save: LTK derivative, nonce state, command counter, pod ID, session metadata
     - Restore: reload on app restart for reconnection without re-pairing
     - Model after TwiCaching 93-byte value structure
 
-11. **Implement reconnection using stored session**
+12. **Implement reconnection using stored session**
     - Skip pairing flow when LTK exists
     - Resume AES-CCM encryption with persisted nonce/counter state
     - Re-establish BLE subscriptions (NOTIFY on 2443, INDICATE on 2441)
 
-12. **End-to-end test: complete Phase 1 activation on a real pod**
+13. **End-to-end test: complete Phase 1 activation on a real pod**
     - Verify full sequence: getPodVersion through expiry alert
     - Compare BLE traffic against Pod2 Frida captures
     - Confirm pod state transitions: FILLED -> UID_SET -> ENGAGING_CLUTCH_DRIVE -> CLUTCH_DRIVE_ENGAGED
 
 ## Debugging Reference (Quick Guide for New Agents)
 
-This section consolidates the most critical debugging knowledge from 21+ test iterations. Read this FIRST when investigating O5 activation failures.
+This section consolidates the most critical debugging knowledge from 24+ test iterations. Read this FIRST when investigating O5 activation failures.
 
 ### Pod Failure Modes and What They Mean
 
