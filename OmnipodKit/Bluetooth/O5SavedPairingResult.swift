@@ -58,4 +58,17 @@ struct O5SavedPairingResult {
         msgSeq: 6,
         eapSeq: 1
     )
+
+    /// Pod5 — successful pairing + full activation through SetupPod + alerts (2026-02-17 1:45am, pdmid 2584724 = 0x277094)
+    /// One EAP session established. Pod reached "Pairing completed" state.
+    /// AID commands, SetupPod, low reservoir alert (#4), setup reminder (#7) all succeeded.
+    /// Prime bolus (Type 4 signed) sent but got rejectedMessage(errorCode: 42).
+    static let pod5 = O5SavedPairingResult(
+        name: "Pod5 (2026-02-17 1:45am)",
+        bleUUID: "F1EFC829-6782-86D9-8548-F7FF2752E6D0",
+        ltk: "9277e3987d3b8cbb7a1fceee9f87d8c6",
+        podAddress: 0x277097,
+        msgSeq: 6,
+        eapSeq: 2
+    )
 }
