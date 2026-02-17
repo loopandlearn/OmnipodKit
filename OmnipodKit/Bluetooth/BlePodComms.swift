@@ -254,13 +254,15 @@ class BlePodComms: PodComms {
         log.debug("pairPod: self.PodState bleMessageTransportState now: %@", String(reflecting: self.podState?.bleMessageTransportState))
     }
 
-    private func establishSession(ltk: Data, eapSeq: Int, msgSeq: Int = 1) throws -> BleMessageTransportState? {
+    private func establishSession(ltk: Data, eapSeq: Int, msgSeq: Int = 1, isPairing: Bool = true) throws -> BleMessageTransportState? {
         // We should already be holding podStateLock during calls to this function, so try() should fail
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         guard let manager = manager else { throw PodCommsError.noPodPaired }
-        // PRIMARY mode (controller initiates challenge).
-        let sessionMode: SessionKeyMode = .PRIMARY
+        // Use SECONDARY mode for O5 pods when reconnecting (post-pairing),
+        // where the pod initiates the EAP-AKA challenge and controller responds.
+        // Use PRIMARY mode for initial pairing and all DASH sessions.
+        let sessionMode: SessionKeyMode = (!isPairing && self.podType == omnipod5Type) ? .SECONDARY : .PRIMARY
         let eapAkaExchanger = try SessionEstablisher(manager: manager, ltk: ltk, eapSqn: eapSeq, myId: self.myId, podId: self.podId, msgSeq: msgSeq, podType: self.podType, mode: sessionMode)
 
         let result = try eapAkaExchanger.negotiateSessionKeys()
@@ -310,9 +312,9 @@ class BlePodComms: PodComms {
             throw PodCommsError.noPodPaired
         }
 
-        let mts = try establishSession(ltk: ltk, eapSeq: self.podState!.incrementEapSeq())
+        let mts = try establishSession(ltk: ltk, eapSeq: self.podState!.incrementEapSeq(), isPairing: false)
         if mts == nil {
-            let mts = try establishSession(ltk: ltk, eapSeq: self.podState!.incrementEapSeq())
+            let mts = try establishSession(ltk: ltk, eapSeq: self.podState!.incrementEapSeq(), isPairing: false)
             if mts == nil {
                 throw PodCommsError.diagnosticMessage(str: "Received resynchronization SQN for the second time")
             }

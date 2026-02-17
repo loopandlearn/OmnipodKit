@@ -705,7 +705,7 @@ class O5BtsnoopGoldenDataTests: XCTestCase {
     func testActiveRegistrationIsBtsnoop() {
         let reg = O5RegistrationData.active
         XCTAssertEqual(reg.pdmid, 2587928)
-        XCTAssertEqual(reg.pdmidExtension, 43008040)
+        XCTAssertEqual(reg.pdmidExtension, 4300804)
         XCTAssertEqual(reg.controllerID.hexadecimalString, "00277d18")
     }
 
