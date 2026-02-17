@@ -18,7 +18,9 @@ class BlePodComms: PodComms {
     // Set to a saved pairing result to skip LTK exchange and pod discovery,
     // connecting directly to the pod by BLE UUID and re-establishing the EAP-AKA
     // session with the stored LTK. Set to nil for normal pairing.
-    static let savedO5PairingResult: O5SavedPairingResult? = nil
+    // HARDCODED: Using pod4 pairing result to skip LTK exchange and reconnect.
+    // Set back to nil when done debugging or after successful session establishment.
+    static let savedO5PairingResult: O5SavedPairingResult? = .pod4
 
     var manager: PeripheralManager? {
         didSet {
@@ -182,6 +184,12 @@ class BlePodComms: PodComms {
                 log.info("O5 DEBUG: Using saved LTK from %{public}@", saved.name)
                 ltk = Data(hexadecimalString: saved.ltk)!
                 response = PairResult(ltk: ltk, address: saved.podAddress, msgSeq: saved.msgSeq)
+                // Override podId to match the saved pairing (prepForNewPod may have
+                // advanced the counter, making self.podId differ from saved.podAddress)
+                if self.podId != saved.podAddress {
+                    log.info("O5 DEBUG: Overriding podId from 0x%{public}x to saved 0x%{public}x", self.podId, saved.podAddress)
+                    self.podId = saved.podAddress
+                }
             } else {
                 ids = Ids(myId: self.myId, podId: self.podId)
                 let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
@@ -588,8 +596,10 @@ class BlePodComms: PodComms {
                 // O5 pods require getPodVersion (AssignAddress) as the first encrypted command
                 // after each new EAP-AKA session, followed by AID setup commands, then SetupPod.
                 if self.podState!.setupProgress.isPaired == false && self.podType == omnipod5Type {
+                    // Use self.myId/self.podId (not the captured locals) because pairPod()
+                    // may have overridden self.podId when using a saved pairing result.
                     let preSetupTransport = BlePodMessageTransport(
-                        manager: manager, myId: myId, podId: podId,
+                        manager: manager, myId: self.myId, podId: self.podId,
                         state: self.podState!.bleMessageTransportState
                     )
                     preSetupTransport.messageLogger = self.messageLogger
@@ -628,7 +638,8 @@ class BlePodComms: PodComms {
                 }
 
                 // Run a session now for any post-pairing commands
-                let blePodMessageTransport = BlePodMessageTransport(manager: manager, myId: myId, podId: podId, state: self.podState!.bleMessageTransportState)
+                // Use self.myId/self.podId (not captured locals) — pairPod() may have overridden them.
+                let blePodMessageTransport = BlePodMessageTransport(manager: manager, myId: self.myId, podId: self.podId, state: self.podState!.bleMessageTransportState)
                 blePodMessageTransport.messageLogger = self.messageLogger
 
                 // For O5 pods, create the certificate store for Type 4 signed message sending

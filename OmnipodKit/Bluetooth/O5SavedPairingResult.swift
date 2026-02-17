@@ -43,4 +43,19 @@ struct O5SavedPairingResult {
         msgSeq: 8,
         eapSeq: 2
     )
+
+    /// Pod4 — successful pairing (2026-02-16 ~11:30pm, pdmid 2584724 = 0x277094)
+    /// Pairing completed (P0=0xa5) but post-pairing EAP-AKA session establishment
+    /// failed due to BLE disconnect (CBErrorDomain code=7). No EAP session was ever
+    /// established, so eapSeq=1. The pod is paired but needs session establishment.
+    /// Pod cert serial: 6f590e4f97e114c400ecc689e7b9056839810210
+    /// Config#10 [00001010] — kdfZeroControllerID=true
+    static let pod4 = O5SavedPairingResult(
+        name: "Pod4 (2026-02-16 11:30pm)",
+        bleUUID: "3FE369C7-22A0-2344-5393-EB967FB49AE3",
+        ltk: "4f1da4ab399c275afdb8be816adb2089",
+        podAddress: 0x277095,
+        msgSeq: 6,
+        eapSeq: 1
+    )
 }
