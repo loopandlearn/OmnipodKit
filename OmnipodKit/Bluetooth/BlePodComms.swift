@@ -470,7 +470,13 @@ class BlePodComms: PodComms {
         let blePodMessageTransport = BlePodMessageTransport(manager: manager, myId: self.myId, podId: self.podId, state: podState!.bleMessageTransportState)
         blePodMessageTransport.messageLogger = messageLogger
 
-        let dateComponents = SetupPodCommand.dateComponents(date: Date(), timeZone: timeZone)
+        var dateComponents = SetupPodCommand.dateComponents(date: Date(), timeZone: timeZone)
+
+        // O5 pods expect 12-hour format (0-11) matching Java Calendar.HOUR (field 10).
+        // Fresh pod test confirmed: hour=20 (24h) causes error 33, hour must be % 12.
+        if self.podType == omnipod5Type {
+            dateComponents.hour = (dateComponents.hour ?? 0) % 12
+        }
 
         let setupPod = SetupPodCommand(address: podState!.address, dateComponents: dateComponents, lot: UInt32(podState!.lotNo), tid: podState!.lotSeq)
 
