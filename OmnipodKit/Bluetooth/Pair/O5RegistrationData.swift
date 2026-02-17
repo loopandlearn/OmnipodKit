@@ -348,7 +348,7 @@ extension O5RegistrationData {
 
         // PDM Identity (from TLS certificate SAN)
         pdmid: 2587928,
-        pdmidExtension: 43008040,
+        pdmidExtension: 4300804,
         commandsBase64: "AAYTBhYGFwYcBh8=",
 
         // Secondary Key (com.twi.enclave.device.secondary, uid=10260)
