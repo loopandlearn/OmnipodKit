@@ -18,9 +18,7 @@ class BlePodComms: PodComms {
     // Set to a saved pairing result to skip LTK exchange and pod discovery,
     // connecting directly to the pod by BLE UUID and re-establishing the EAP-AKA
     // session with the stored LTK. Set to nil for normal pairing.
-    // HARDCODED: Using pod4 pairing result to skip LTK exchange and reconnect.
-    // Set back to nil when done debugging or after successful session establishment.
-    static let savedO5PairingResult: O5SavedPairingResult? = .pod4
+    static let savedO5PairingResult: O5SavedPairingResult? = nil
 
     var manager: PeripheralManager? {
         didSet {
