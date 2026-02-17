@@ -251,9 +251,8 @@ class BlePodComms: PodComms {
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         guard let manager = manager else { throw PodCommsError.noPodPaired }
-        // O5 pods use SECONDARY mode (pod initiates EAP-AKA challenge);
-        // DASH pods use PRIMARY mode (controller initiates challenge).
-        let sessionMode: SessionKeyMode = (self.podType == omnipod5Type) ? .SECONDARY : .PRIMARY
+        // PRIMARY mode (controller initiates challenge).
+        let sessionMode: SessionKeyMode = .PRIMARY
         let eapAkaExchanger = try SessionEstablisher(manager: manager, ltk: ltk, eapSqn: eapSeq, myId: self.myId, podId: self.podId, msgSeq: msgSeq, podType: self.podType, mode: sessionMode)
 
         let result = try eapAkaExchanger.negotiateSessionKeys()
