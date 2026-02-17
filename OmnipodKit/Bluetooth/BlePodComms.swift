@@ -458,22 +458,37 @@ class BlePodComms: PodComms {
     /// Falls back to returning a minimal synthetic StatusResponse if the pod returns a
     /// VersionResponse instead (observed in btsnoop for the pre-SetupPod GetStatus).
 
-    // MARK: - Registration payload (currently unused)
-    //
-    // The o5SendRegistrationPayload method was removed because Frida capture of a real
-    // O5 app activation (Pod2, 2026-02-16) confirmed the 163-byte registration payload
-    // from register/complete is NOT sent during pod activation. The "setPodUid" command
-    // in the Frida log is just the standard SetUniqueId command (41 bytes plaintext
-    // assigning the pod address), not the 163-byte registration payload.
-    //
-    // The previous implementation incorrectly sent the registration payload 3 times
-    // between AssignAddress and SetupPod based on a misidentification of btsnoop messages.
-    // The registration payload may be delivered via a different mechanism or at a different
-    // time (e.g., embedded in the TLS certificate SAN during BLE pairing, or not needed
-    // at all for pod activation).
-    //
-    // The registration payload data is still available in O5RegistrationData.active.registrationPayload
-    // if needed in the future.
+    // MARK: - O5 Registration Payload Delivery
+
+    /// Sends the 163-byte registration/provisioning payload to the pod 3 times.
+    ///
+    /// The O5 firmware requires this payload (from TWI `register/complete`) before it will
+    /// accept SetUniqueId (0x03). Without it, the pod rejects SetUniqueId with error 33
+    /// (0x21), an O5-specific "controller not provisioned" error.
+    ///
+    /// The payload contains the controller's secondary P-256 public key and an ECDSA
+    /// signature from Insulet's CA, cryptographically binding the controller to the pod.
+    ///
+    /// Btsnoop captures show 3 identical 184-byte encrypted messages (163B inner payload)
+    /// delivered before SetupPod, each ACKed with 15 bytes.
+    ///
+    /// - Parameter blePodMessageTransport: The encrypted transport to use for sending.
+    private func o5SendRegistrationPayload(blePodMessageTransport: BlePodMessageTransport) throws {
+        guard let registrationPayload = O5RegistrationData.active.registrationPayload else {
+            log.error("O5 Registration: No registration payload available in O5RegistrationData.active")
+            throw PodCommsError.invalidData
+        }
+
+        log.info("O5 Registration: Sending %{public}d-byte registration payload (3 copies)", registrationPayload.count)
+
+        for i in 1...3 {
+            log.info("O5 Registration [%d/3]: Sending registration payload (%{public}d bytes)", i, registrationPayload.count)
+            try blePodMessageTransport.sendRawO5DataExpectingAck(registrationPayload)
+            log.info("O5 Registration [%d/3]: ACK received", i)
+        }
+
+        log.info("O5 Registration: All 3 registration payload deliveries complete")
+    }
 
     private func setupPod(timeZone: TimeZone) throws {
         guard let manager = manager else { throw PodCommsError.podNotConnected }
@@ -618,6 +633,12 @@ class BlePodComms: PodComms {
 
                     self.log.info("O5: Running pre-SetupPod intermediate steps (AID commands)")
                     try self.o5PreSetupSteps(blePodMessageTransport: preSetupTransport)
+
+                    // Send the 163-byte registration payload 3 times before SetupPod.
+                    // The O5 firmware requires this to accept SetUniqueId (error 33 without it).
+                    self.log.info("O5: Sending registration payload before SetupPod")
+                    try self.o5SendRegistrationPayload(blePodMessageTransport: preSetupTransport)
+
                     // Save transport state back to podState after the intermediate steps
                     self.podState!.bleMessageTransportState = preSetupTransport.state
                     self.log.info("O5: Pre-SetupPod steps complete, transport state saved")

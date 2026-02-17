@@ -96,7 +96,7 @@ From native `sub_36690` (fully resolved, controller `ctx[4]==0` path):
 ### Native signature constraint
 - `"wrong u16_signature_sz size! Need to be 64 bytes!"` — signature is exactly 64 bytes, no recovery byte.
 
-**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1/SPS2. It was previously assumed to be written to the pod during `setPodUid` activation, but the Pod2 Frida capture (2026-02-16) shows it is NOT sent during activation at all. It may be delivered via a separate mechanism or during an earlier session.
+**Important**: The registration payload (from `register/complete`) does NOT go in SPS2.1/SPS2. It IS sent 3 times before SetUniqueId during activation — error 33 proved it is required by the O5 firmware.
 
 ## Active Registration: TEE Simulator pdmid 2587928 (SUCCESSFUL PAIRING)
 
@@ -138,7 +138,7 @@ The **registration payload** (163 bytes from `register/complete`) structure:
 [89-97] 061306160617061c061f  Commands (matches SAN)
 [98-162] 1ec56a79...0a0e  Signature (65 bytes)
 ```
-This payload is NOT included in SPS2.1/SPS2. Pod2 Frida capture (2026-02-16) shows it is also NOT sent during the activation sequence. Delivery mechanism TBD.
+This payload is NOT included in SPS2.1/SPS2. It IS sent 3 times before SetUniqueId during activation — error 33 proved it is required by the O5 firmware.
 
 ### Previous Registration: pdmid 2584724 (FAILED — all tests disconnected at SPS2.1)
 
@@ -175,7 +175,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **O5 AID setup commands implemented (2026-02-16)**: 8 AID commands now sent between getPodVersion and setPodUid during activation. Implemented in `O5AidCommands.swift` and called from `BlePodComms.swift`. Uses ASCII key-value SLPE format (SET+GET, GET-only, Extended SET).
 - **Activation order corrected (Pod2 Frida, 2026-02-16)**: Removed basal schedule programming from Phase 1 (before priming). Pod2 Frida capture confirms NO basal is sent before prime 1 -- basal is deferred to Phase 2. Previously assumed from historical btsnoop that 3x ProgramBasal preceded prime.
 - **Alert parameters corrected (Pod2 Frida, 2026-02-16)**: Low reservoir threshold is 10U (100 ticks, corrected from initial 5U misinterpretation), beepRepeat=1 (not 2). Prime bolus beep parameter is 0x7C (completion beep ON + 60min reminder), not no beeps. User expiry triggers at 3968 min (~66h8m, ~5h52m before 72h), not 68h.
-- **Registration payload removed from activation (Pod2 Frida, 2026-02-16)**: The 163-byte registration payload is NOT sent between AssignAddress and SetupPod. Pod2 Frida log shows no registration payload delivery during the entire Phase 1 activation.
+- **Registration payload re-added to activation (error 33 fix, 2026-02-16)**: The 163-byte registration payload IS sent 3 times before SetUniqueId during activation. Error 33 proved it is required by the O5 firmware.
 - **Message type signing rules clarified (Pod2 Frida, 2026-02-16)**: Only `programBolus` (prime/delivery) uses TWi Type 4 (encrypted + ECDSA signed). All other commands -- including setPodUid, programAlert, AID commands -- use TWi Type 1 (encrypted only, no signature). Previously assumed all post-pairing commands used Type 4.
 - **SLPE suffix fix — `,G3.12` → `,G0.0` for standard commands (Pod3, 2026-02-16)**: `getCmdMessage()` was sending `,G3.12` as the SLPE GET suffix for ALL O5 commands. This tells the pod "respond with AID status format" — the pod complied, returning `3.12=` prefixed AID data instead of the expected `0.0=` VersionResponse. Caused `unknownBlockType(rawVal: 0)` on the first post-pairing getPodVersion command. The real O5 app uses `S0.0=...,G0.0` for ALL standard Omnipod commands; only AID-specific commands use AID suffixes. Fixed all 4 locations in `BleMessageTransport.swift` to use `COMMAND_SUFFIX` (`,G0.0`). AID commands already use their own suffixes via `sendO5AidCommand()` / `O5AidCommands.swift`.
 - **GetStatus removed from `o5PreSetupSteps()` (Pod3 reconnect, 2026-02-16)**: `o5PreSetupSteps()` sent two GetStatus commands (after AssignAddress, and before SetupPod) that the real O5 app never sends. Pod at progress state 2 (FILLED) rejects GetStatus with `ERR_ILLEGAL_CMD_STATE` (error code 19). The rejected exchange desynchronized nonce state, causing subsequent AID commands to fail. Fix: removed both GetStatus calls and the `o5SendGetStatus()` function from `BlePodComms.swift`. The method now goes directly to AID setup commands, matching the Pod2 Frida-validated activation flow.
@@ -323,7 +323,7 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 - **Session persistence**: `.twi_session` (4140 bytes, AES/GCM encrypted with `com.twi.enclave.session` key) stores session state. Must save/restore on reconnect. **Implementation needed.**
 - ~~**Heartbeat keep-alive**~~: **NOT NEEDED.** Frida session (2026-02-15) confirmed the heartbeat service UUID `7DED7A6C` is NOT discovered on connected pods. Only three BLE services exist: GAP (0x1800), GATT (0x1801), and Omnipod custom (1a7e4024). The app polls via normal encrypted commands every ~20-30 seconds instead.
 - ~~**Post-pairing command signing**~~: **IMPLEMENTED** for programBolus (Type 4). See "TWi Message Type Signing Rules" section. Only programBolus requires Type 4 signing; other commands use Type 1 (encrypted only).
-- ~~**Registration payload delivery**~~: **NOT NEEDED during activation.** Pod2 Frida capture (2026-02-16) shows the 163-byte registration payload is NOT sent between AssignAddress and SetupPod. May be delivered via a separate mechanism or earlier session.
+- ~~**Registration payload delivery**~~: **REQUIRED during activation.** The 163-byte registration payload IS sent 3 times before SetUniqueId. Error 33 proved it is required by the O5 firmware.
 
 ## Post-Pairing Command Protocol (from Frida 2026-02-15 and Pod2 2026-02-16)
 
@@ -562,7 +562,7 @@ ENGAGING_CLUTCH_DRIVE (4) -> [after prime completes] -> CLUTCH_DRIVE_ENGAGED (5)
 ### Key Corrections from Pod2 Frida
 
 - **NO basal schedule before priming.** Basal is deferred to Phase 2. Historical btsnoop showed 3x ProgramBasal before prime -- that was a different app/firmware version.
-- **Registration payload NOT sent during activation.** Previously assumed to be sent 3 times between AssignAddress and SetupPod based on btsnoop -- this was incorrect.
+- **Registration payload IS sent during activation.** Sent 3 times before SetUniqueId. Error 33 proved it is required by the O5 firmware.
 - **Only programBolus uses Type 4 (signed).** All other Phase 1 commands use Type 1 (encrypted only). See "TWi Message Type Signing Rules" above.
 - **Status polling uses page 7** (`0x0e 01 07`), not page 0.
 - **Low reservoir threshold is 10U** (100 ticks, where ticks = volume / 0.05 / 2). Previously miscalculated as 5U.
@@ -578,7 +578,7 @@ Ordered steps to implement post-pairing pod communication in OmnipodKit.
 2. ~~**O5 AID setup commands**~~ -- **DONE.** 8 AID commands implemented in `O5AidCommands.swift`, called from `BlePodComms.swift` between getPodVersion and setPodUid.
 3. ~~**Phase 1 activation order**~~ -- **DONE.** Corrected to match Pod2 Frida: getPodVersion, AID setup, setPodUid, alerts, prime 1, poll, expiry alert. No basal before priming.
 4. ~~**Alert parameters**~~ -- **DONE.** Low reservoir=10U (slot #4), LOC=5min/55min (slot #7), user expiry=3968min (slot #3, after prime). Prime beep=0x7C.
-5. ~~**Registration payload removed**~~ -- **DONE.** Not sent during activation (Pod2 Frida confirmed).
+5. ~~**Registration payload delivery**~~ -- **DONE.** Sent 3 times before SetUniqueId during activation. Error 33 proved it is required by the O5 firmware.
 
 ### TODO: Remaining Implementation
 6. **Implement command sequence counter management**
