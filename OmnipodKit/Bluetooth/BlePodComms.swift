@@ -479,6 +479,13 @@ class BlePodComms: PodComms {
         log.debug("setupPod: calling bleSendPairMessage %@ for message %@", String(reflecting: blePodMessageTransport), String(describing: message))
         let versionResponse = try bleSendPairMessage(blePodMessageTransport: blePodMessageTransport, message: message)
 
+        // Check for activation timeout condition
+        guard versionResponse.podProgressStatus != .activationTimeExceeded else {
+            // The 2 hour window for the initial pairing has expired
+            self.podState?.setupProgress = .activationTimeout
+            throw PodCommsError.activationTimeExceeded
+        }
+
         // Verify that the fundemental pod constants returned match the expected constant values in the Pod struct.
         // To actually be able to handle different fundemental values in Loop things would need to be reworked to save
         // these values in some persistent PodState and then make sure that everything properly works using these values.
