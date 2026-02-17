@@ -10,6 +10,18 @@
 import Foundation
 import OSLog
 
+/// Determines the EAP-AKA role during session key negotiation.
+///
+/// - `PRIMARY`: Controller initiates the EAP-AKA challenge (sends RAND+AUTN first,
+///   pod responds with RES). This is the standard DASH behavior.
+/// - `SECONDARY`: Pod initiates the EAP-AKA challenge (pod sends RAND+AUTN first,
+///   controller responds with RES). This is what O5 pods expect for post-pairing sessions,
+///   matching the Android app's use of `TwiEapAkaSlave`.
+enum SessionKeyMode {
+    case PRIMARY    // Controller initiates challenge (DASH default)
+    case SECONDARY  // Pod initiates challenge, controller responds (O5 post-pairing)
+}
+
 enum SessionResult {
     case SessionKeys(SessionKeys)
     case SessionNegotiationResynchronization(SessionNegotiationResynchronization)
@@ -30,6 +42,7 @@ class SessionEstablisher {
     private let podId: UInt32
     private var msgSeq: Int
     private let podType: PodType
+    private let mode: SessionKeyMode
 
     private var controllerIV: Data
     private var nodeIV: Data = Data()
@@ -37,7 +50,7 @@ class SessionEstablisher {
     private let milenage: Milenage
     private let log = OSLog(category: "SessionEstablisher")
 
-    init(manager: PeripheralManager, ltk: Data, eapSqn: Int, myId: UInt32, podId: UInt32, msgSeq: Int, podType: PodType = dashType) throws {
+    init(manager: PeripheralManager, ltk: Data, eapSqn: Int, myId: UInt32, podId: UInt32, msgSeq: Int, podType: PodType = dashType, mode: SessionKeyMode = .PRIMARY) throws {
 //        guard eapSqn.count == 6 else { throw SessionEstablishmentException.InvalidParameter("EAP-SQN has to be 6 bytes long") }
         guard ltk.count == 16 else { throw SessionEstablishmentException.InvalidParameter("LTK has to be 16 bytes long") }
 
@@ -51,14 +64,26 @@ class SessionEstablisher {
         self.podId = podId
         self.msgSeq = msgSeq
         self.podType = podType
+        self.mode = mode
         self.milenage = try Milenage(k: ltk, sqn: self.eapSqn)
     }
     
     func negotiateSessionKeys() throws -> SessionResult {
         // O5 pods never use RTS/CTS; DASH pods always do
         let useRTS = (podType != omnipod5Type)
-        log.default("negotiateSessionKeys: podType=%{public}@, useRTS=%{public}@", podType.briefName, String(describing: useRTS))
+        log.default("negotiateSessionKeys: podType=%{public}@, useRTS=%{public}@, mode=%{public}@", podType.briefName, String(describing: useRTS), String(describing: mode))
 
+        switch mode {
+        case .PRIMARY:
+            return try negotiateSessionKeysPrimary(useRTS: useRTS)
+        case .SECONDARY:
+            return try negotiateSessionKeysSecondary(useRTS: useRTS)
+        }
+    }
+
+    // MARK: - PRIMARY Mode (Controller initiates challenge -- current DASH behavior)
+
+    private func negotiateSessionKeysPrimary(useRTS: Bool) throws -> SessionResult {
         msgSeq += 1
         let challenge = try eapAkaChallenge()
         let sendResult = manager.sendMessagePacket(challenge, doRTS: useRTS)
@@ -86,6 +111,174 @@ class SessionEstablisher {
             nonce:  Nonce(prefix: controllerIV + nodeIV),
             msgSequenceNumber: msgSeq
         ))
+    }
+
+    // MARK: - SECONDARY Mode (Pod initiates challenge -- O5 post-pairing behavior)
+
+    private func negotiateSessionKeysSecondary(useRTS: Bool) throws -> SessionResult {
+        // Step 1: Wait for pod's EAP-Request/AKA-Challenge
+        log.default("SECONDARY: Waiting for pod's EAP-AKA challenge...")
+        guard let challengePacket = try manager.readMessagePacket(doRTS: useRTS) else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Did not receive EAP-AKA challenge from pod"
+            )
+        }
+
+        let challengeMsg = try EapMessage.parse(payload: challengePacket.payload)
+
+        // Validate it's an EAP-Request (code=0x01) with AKA-Challenge subtype
+        guard challengeMsg.code == .REQUEST else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Expected EAP-Request from pod, got code: \(challengeMsg.code)"
+            )
+        }
+
+        // Store the identifier from the pod's message (we must echo it back)
+        identifier = challengeMsg.identifier
+        log.default("SECONDARY: Received pod challenge with identifier=%{public}d, %{public}d attributes",
+                     identifier, challengeMsg.attributes.count)
+
+        // Step 2: Extract RAND, AUTN, and pod's IV from the challenge
+        var podRand: Data?
+        var podAutn: Data?
+        var podIV: Data?
+
+        for attr in challengeMsg.attributes {
+            switch attr {
+            case is EapAkaAttributeRand:
+                podRand = attr.payload
+            case is EapAkaAttributeAutn:
+                podAutn = attr.payload
+            case is EapAkaAttributeCustomIV:
+                podIV = attr.payload.subdata(in: 0..<SessionEstablisher.IV_SIZE)
+            default:
+                throw SessionEstablishmentException.CommunicationError(
+                    "SECONDARY: Unexpected attribute in pod challenge: \(type(of: attr))"
+                )
+            }
+        }
+
+        guard let rand = podRand, let autn = podAutn, let nodeIVData = podIV else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Pod challenge missing required attributes " +
+                "(RAND=\(podRand != nil), AUTN=\(podAutn != nil), IV=\(podIV != nil))"
+            )
+        }
+
+        self.nodeIV = nodeIVData
+        log.default("SECONDARY: Pod RAND=%{public}@, AUTN=%{public}@, IV=%{public}@",
+                     rand.hexadecimalString, autn.hexadecimalString, nodeIVData.hexadecimalString)
+
+        // Step 3: Compute Milenage using pod's RAND and shared K
+        let secondaryMilenage = try Milenage(k: ltk, sqn: eapSqn, randParam: rand)
+
+        // Step 4: Validate pod's AUTN
+        // AUTN = (AK ^ SQN) || AMF || MAC-A  (16 bytes total)
+        // If our SQN matches the pod's SQN, our computed AUTN will match exactly.
+        // If SQN is out of sync, the AUTN will differ (both AK^SQN and MAC-A portions).
+        log.default("SECONDARY: Computed AUTN=%{public}@, received AUTN=%{public}@",
+                     secondaryMilenage.autn.hexadecimalString, autn.hexadecimalString)
+
+        if autn != secondaryMilenage.autn {
+            // AUTN mismatch. Extract the pod's SQN and try recomputing with it.
+            // Pod's SQN can be recovered from: SQN_pod = AUTN[0:6] ^ AK
+            // (AK depends only on K and RAND, which we both know)
+            let podSqn = autn.subdata(in: 0..<6) ^ secondaryMilenage.ak
+            log.default("SECONDARY: AUTN mismatch. Extracted pod SQN=%{public}@, our SQN=%{public}@",
+                         podSqn.hexadecimalString, eapSqn.hexadecimalString)
+
+            // Recompute Milenage with the pod's SQN to verify MAC-A
+            let recomputedMilenage = try Milenage(k: ltk, sqn: podSqn, randParam: rand)
+            if autn != recomputedMilenage.autn {
+                // Even with the pod's SQN, AUTN doesn't match -- K mismatch or corruption
+                throw SessionEstablishmentException.CommunicationError(
+                    "SECONDARY: AUTN validation failed even with pod's extracted SQN. " +
+                    "Received: \(autn.hexadecimalString), " +
+                    "Recomputed: \(recomputedMilenage.autn.hexadecimalString). " +
+                    "Possible LTK mismatch."
+                )
+            }
+
+            // AUTN is valid with the pod's SQN -- our SQN is stale.
+            // Return resynchronization so the caller can update the stored EAP SQN.
+            log.default("SECONDARY: AUTN valid with pod SQN. Returning resynchronization.")
+            let newSqn = try EapSqn(data: podSqn)
+            return .SessionNegotiationResynchronization(SessionNegotiationResynchronization(
+                synchronizedEapSqn: newSqn,
+                msgSequenceNumber: UInt8(msgSeq)
+            ))
+        }
+
+        log.default("SECONDARY: AUTN validated successfully. Computing RES.")
+
+        // Step 5: Build and send EAP-Response with RES and controller IV
+        msgSeq += 1
+        let responsePacket = try buildSecondaryResponse(
+            res: secondaryMilenage.res,
+            identifier: identifier
+        )
+
+        let sendResult = manager.sendMessagePacket(responsePacket, doRTS: useRTS)
+        guard case .sentWithAcknowledgment = sendResult else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Could not send EAP-AKA response: \(sendResult)"
+            )
+        }
+        log.default("SECONDARY: Sent EAP-Response with RES=%{public}@, controllerIV=%{public}@",
+                     secondaryMilenage.res.hexadecimalString, controllerIV.hexadecimalString)
+
+        // Step 6: Wait for EAP-Success from pod
+        guard let successPacket = try manager.readMessagePacket(doRTS: useRTS) else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Did not receive EAP-Success from pod"
+            )
+        }
+
+        let successMsg = try EapMessage.parse(payload: successPacket.payload)
+        if successMsg.code == .FAILURE {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Pod rejected EAP-AKA response (EAP-Failure received)"
+            )
+        }
+        guard successMsg.code == .SUCCESS else {
+            throw SessionEstablishmentException.CommunicationError(
+                "SECONDARY: Expected EAP-Success from pod, got code: \(successMsg.code)"
+            )
+        }
+        log.default("SECONDARY: Received EAP-Success from pod")
+
+        msgSeq += 1
+
+        // Step 7: Return session keys
+        // In SECONDARY mode, the pod sends first (with its IV), so the nonce prefix
+        // uses nodeIV + controllerIV (reversed from PRIMARY mode's controllerIV + nodeIV).
+        return .SessionKeys(SessionKeys(
+            ck: secondaryMilenage.ck,
+            nonce: Nonce(prefix: nodeIV + controllerIV),
+            msgSequenceNumber: msgSeq
+        ))
+    }
+
+    /// Builds an EAP-Response message containing RES and controller IV for SECONDARY mode.
+    private func buildSecondaryResponse(res: Data, identifier: UInt8) throws -> MessagePacket {
+        let attributes = [
+            try EapAkaAttributeRes(payload: res),
+            try EapAkaAttributeCustomIV(payload: controllerIV)
+        ]
+
+        let eapMsg = EapMessage(
+            code: EapCode.RESPONSE,  // 0x02 -- we are responding to the pod's challenge
+            identifier: identifier,
+            attributes: attributes
+        )
+
+        return MessagePacket(
+            type: MessageType.SESSION_ESTABLISHMENT,
+            source: myId,
+            destination: podId,
+            payload: eapMsg.toData(),
+            sequenceNumber: UInt8(msgSeq)
+        )
     }
 
     private func eapAkaChallenge() throws -> MessagePacket {
