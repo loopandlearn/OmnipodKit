@@ -48,7 +48,7 @@ So `651 bytes TWi payload = 7 + 2 + 642 encrypted`. The 651/650 byte sizes in bt
 - `OmnipodKit/Bluetooth/StringLengthPrefixEncoding.swift` — Key-value encoding for pairing messages: `[key_string][2-byte big-endian length][payload]`
 
 ### Post-Pairing / Activation
-- `OmnipodKit/Bluetooth/O5AidCommands.swift` — O5 AID command constructors for pre-SetupPod sequence (UtcCommand, TdiCommand, TargetBgProfile, DiaCommand, EgvCommand, AlgorithmInsulinHistory, UnifiedAidPodStatus). Uses ASCII key-value SLPE format.
+- `OmnipodKit/Bluetooth/O5AidCommands.swift` — O5 AID command constructors for pre-SetupPod sequence (UtcCommand, TdiCommand, TargetBgProfile, DiaCommand, EgvCommand, AlgorithmInsulinHistory, UnifiedAidPodStatus). Uses ASCII key-value SLPE format. **Binary AID data fix (2026-02-17)**: TdiCommand, TargetBgProfileCommand, and AlgorithmInsulinHistoryCommand now send raw binary bytes in their data portions (via `useBinaryAidData` flag) instead of ASCII hex text. See "Known Issues / Recent Fixes" for details.
 
 ### Identity
 - `OmnipodKit/Bluetooth/Id.swift` — Controller/pod ID management. O5 uses pdmid from certificate (not random).
@@ -197,6 +197,7 @@ Source: `Omnipod5APK/KEYS/com.twi.enclave.device.secondary/` (TEE simulator, uid
 - **certPdmId cycling fix (2026-02-16)**: OmnipodKit now cycles the bottom 2 bits of certPdmId through 1->2->3->1... matching the Android app's `peripheral_node_counter` behavior. Formula: `(certPdmId & 0xFFFFFFFC) | ((counter % 3) + 1)`. Files: `OmniPumpManagerState.swift` (added `o5PairingCounter`, `nextO5PairingCounter()`, `o5PodId()`), `OmniPumpManager.swift` (`prepForNewPod()` uses cycling counter instead of hardcoded +1). While correct for protocol compliance, this was already eliminated as the cause of Error 33 — pairing and commands succeed regardless of address offset.
 - **SessionKeyMode enum added (2026-02-16)**: `SessionEstablisher.swift` now supports PRIMARY (controller initiates EAP-AKA challenge, DASH default) and SECONDARY (pod initiates, hypothesized for O5 post-pairing) modes. Test #24 used SECONDARY during pairing — pod disconnected immediately. Test #25 used SECONDARY for 44 consecutive post-pairing reconnections — pod NEVER sent a challenge, complete deadlock. **SECONDARY mode fully eliminated; code reverted to `.PRIMARY` for all sessions.**
 - **BUG FOUND: pdmidExtension value wrong in O5RegistrationData.swift (2026-02-16)**: `pdmidExtension: 43008040` (line 351 of active registration `teeSimulator_2587928`) should be `4300804`. TLS certificate SAN and HAR capture both show `4300804`. This is a factor-of-10 error (hex `0x02904028` wrong vs `0x0041A004` correct). **Fix pending.**
+- **ERROR 33 RESOLVED: Binary AID data encoding fix (2026-02-17)**: Root cause of Error 33 (0x21) at SetUniqueId found and fixed. Three AID commands (TdiCommand, TargetBgProfileCommand, AlgorithmInsulinHistoryCommand) were sending ASCII hex text in their data portions where the Android app sends raw binary bytes. For example, TdiCommand sent the ASCII string `"0003000E00"` (10 bytes) instead of raw bytes `\x00\x03\x00\x0E\x00` (5 bytes). The pod's AID command parser accepted the malformed data without returning errors, but the incorrectly-encoded data left the pod's algorithm state invalid, causing it to reject SetUniqueId with Error 33. Fix: added `useBinaryAidData` flag (default `true`) and binary data variants (`setGetPayload(feature:attribute:binaryData:)`, `extendedSetPayload(feature:attribute:binaryData:)`) for the three affected commands. Correct sizes: TdiCommand=15B (was 20B), TargetBgProfileCommand=204B (was 398B), AlgorithmInsulinHistoryCommand=176B (was 346B). Test #26 (feb17-01am-1.txt) confirmed: all 9 AID commands succeed with correct binary sizes, SetUniqueId succeeds with `progressStatus=Pairing completed`.
 
 ### Resolved: SPS2.1/SPS2 Structure — SUCCESSFUL PAIRING ACHIEVED
 Native library decompile revealed the payloads are raw DER certificates. Btsnoop capture of a successful
@@ -234,6 +235,7 @@ attestation, which the pod accepted.
 | 23 | **Removed registration payload, reset O5 messageNumber after EAP-AKA** | **Pending test** | Registration payload (163B x 3) was misidentified btsnoop frames — actually AlgorithmInsulinHistory (`SE2.1=`). Sending it caused CBError 7. Also: `establishSession()` preserved stale `messageNumber` from old podState on reconnect. O5 Frida shows message seq restarts from 0 after each EAP-AKA. Fix: removed registration payload sending (`o5SendRegistrationPayload()` and `sendRawO5DataExpectingAck()`), O5 pods now reset `messageNumber=0` in `establishSession()`. **Test with fresh pod.** |
 | 24 | **SECONDARY EAP-AKA mode: pod initiates challenge instead of controller** | **Pairing P0=0xa5 SUCCESS, pod disconnected on SECONDARY EAP-AKA** | Fresh pod (BLE `3FE369C7-22A0-2344-5393-EB967FB49AE3`), pdmid 2584724, myId=`0x277094`, podId=`0x277095`. Pairing succeeded (P0=0xa5, LTK=`4f1da4ab399c275afdb8be816adb2089`, seq=6). SessionEstablisher entered SECONDARY mode (waits for pod's EAP-AKA challenge). Pod immediately disconnected (CBError code=7) — never sent any EAP-AKA challenge data. Log: "Skipping notifications for undiscovered service: 7DED7A6C". Second attempt on same pod failed during SPS0 read (pod in tainted state from first attempt, disconnected at SPS0). **Key finding**: Pod does NOT initiate EAP-AKA challenge after pairing — SECONDARY mode may not be the correct post-pairing approach for the initial session, OR a disconnect/reconnect cycle may be needed between pairing and session establishment. PRIMARY (controller initiates) may actually be correct for the first post-pairing session. |
 | 25 | **SECONDARY EAP-AKA mode for post-pairing reconnections (same pod as #24)** | **Complete failure: 44 consecutive reconnections, zero successful sessions** | Same pod from test #24 (already paired). Code changed so post-pairing reconnections (`isPairing==false`, `podType==omnipod5Type`) use SECONDARY mode. Log confirmed: `negotiateSessionKeys: podType=O5, useRTS=false, mode=SECONDARY` on every attempt. Pod NEVER sent an EAP-AKA challenge — both sides deadlocked (phone waited for pod to speak first, pod expected phone to speak first). Pod disconnected the phone (CBError code=7) after timing out on every attempt. Pod sent `0800010100` on command channel a few times (not EAP-AKA data). MTU degraded to 23 on reconnections (irrelevant — EAP-AKA never started). **Conclusion**: SECONDARY EAP-AKA is fully eliminated. Pod expects PRIMARY mode at ALL lifecycle stages — during pairing (test #24) and during post-pairing reconnection (test #25). The Android app's `TwiEapAkaSlave` class naming does not reflect wire-level behavior; the TWI SDK may handle the protocol differently internally. Code reverted back to `.PRIMARY` for all sessions. |
+| 26 | **ERROR 33 RESOLVED: Binary AID data encoding fix** | **SetUniqueId SUCCESS (progressStatus=Pairing completed). Prime bolus FAILED (new issue).** | Fresh pod (feb17-01am-1.txt). Root cause of Error 33 found: TdiCommand, TargetBgProfileCommand, and AlgorithmInsulinHistoryCommand sent ASCII hex text in data portions instead of raw binary bytes. Example: TdiCommand sent `"0003000E00"` (10B ASCII) instead of `\x00\x03\x00\x0E\x00` (5B binary). Pod accepted malformed AID data silently but left algorithm state invalid, causing SetUniqueId rejection. Fix: `useBinaryAidData` flag + binary payload variants. Correct sizes confirmed in logs: TdiCommand=15B (was 20B), TargetBgProfile=204B (was 398B), AlgorithmInsulinHistory=176B (was 346B). Full sequence: Pairing P0=0xa5, EAP-AKA PRIMARY success, all 9 AID commands succeed, **SetUniqueId SUCCESS**, ProgramAlert x2 succeed. **NEW ISSUE**: Prime bolus (2.6U, Type 4 signed) fails — pod ACKs BLE write but never sends response (`emptyValue` timeout, 4 retries all failed). ProgramAlert (unsigned Type 1) works fine. Failure is specific to ECDSA-signed message path. |
 
 **Root cause (tests 1-9)**: The pdmid 2584724 TEE simulator keys were from a different provisioning session
 (uid=10262) and did not have valid attestation for the certificates being sent. The pod validates the TEE
@@ -328,13 +330,14 @@ but rejected it at the application layer. Possible causes ranked by likelihood:
 | V5 | Fix EAP-AKA session establishment (post-pairing disconnect) | **DONE (test #15)** | Root cause: `SessionEstablisher` and `BleMessageTransport` defaulted to `doRTS: true` (DASH behavior). O5 pods never use RTS/CTS. Fixed: `doRTS=false` for O5 in `SessionEstablisher` and `useRTS` derived from `podType` in `BleMessageTransport`. |
 
 ### Not Yet Implemented
-- **Resolve Error 33 at SetUniqueId**: All protocol-level hypotheses from the native TWI SDK investigation (2026-02-17) have been **eliminated or confirmed already-correct**. Error 33 (0x21) is NOT in the standard `PodErrorCode` enum (max 29/0x1D) — it is a pod firmware-specific error code. **Status of all investigated hypotheses:**
-  1. ~~**SPS2.1 ECDSA signature placement — RESOLVED, ALREADY CORRECT (2026-02-17)**~~: Definitively resolved by cross-referencing btsnoop byte counts against actual DER cert sizes from PEM files. **Answer: SPS2 (native index=0, sent second) carries the 64-byte ECDSA signature. SPS2.1 (native index=1, sent first) is cert-only.** Proof: SPS2.1 phone→pod=642=INS02PG1(634)+tag(8), SPS2.1 pod→phone=641=INS01PG1(633)+tag(8), SPS2 phone→pod=1089=TLS(1017)+sig(64)+tag(8), SPS2 pod→phone=895=pod_cert(823)+sig(64)+tag(8) — all four sizes match to the exact byte. The native decompile's ternary `(index != 0 ? 0x40 : 0)` was **inverted during reconstruction** — index 0 actually selects the extended path (cert+sig+tag), index≠0 selects the short path (cert+tag). **OmnipodKit already implements this correctly** — signature is in SPS2, matching btsnoop.
-  2. **12-hour hour format for SetUniqueId**: CONFIRMED CORRECT and IMPLEMENTED (test #22). O5 pods require 12-hour format (0-11). The `% 12` conversion is in place.
-  3. **Unknown pod firmware validation — ONLY REMAINING HYPOTHESIS**: Error 33 not in app code. All pairing crypto (KDF, SPS2/SPS2.1 structure, signature placement, cert sizes) verified correct. All post-pairing protocol elements (EAP-AKA, AID commands, SLPE format, message sequencing) verified working. The 12-hour fix resolved Error 33 for one test pod. If Error 33 recurs on a fresh pod WITH the 12-hour fix, the cause is something invisible at the protocol level — possibly firmware-level registration state, certificate chain validation depth, or a timing/state requirement between AID commands and SetUniqueId.
-  4. ~~**`setPreparePassword()` / SPS3 — ELIMINATED (2026-02-17)**~~: O5 pods use algorithm byte `0x09` which bypasses SPS3 entirely. Verified against 3 btsnoop captures: zero SPS3 occurrences.
+- ~~**Resolve Error 33 at SetUniqueId**~~: **RESOLVED (Test #26, 2026-02-17).** Root cause: three AID commands (TdiCommand, TargetBgProfileCommand, AlgorithmInsulinHistoryCommand) sent ASCII hex text in data portions instead of raw binary bytes. The pod's AID parser accepted the malformed data silently but left algorithm state invalid, causing SetUniqueId to reject with Error 33 (0x21). Fix: `useBinaryAidData` flag + binary payload variants in `O5AidCommands.swift`. Correct sizes: TdiCommand=15B (was 20B ASCII), TargetBgProfile=204B (was 398B), AlgorithmInsulinHistory=176B (was 346B). All investigated hypotheses and their final status:
+  1. ~~**SPS2.1 ECDSA signature placement — RESOLVED, ALREADY CORRECT (2026-02-17)**~~: OmnipodKit already implements this correctly — signature is in SPS2, matching btsnoop.
+  2. ~~**12-hour hour format for SetUniqueId — CONFIRMED CORRECT (test #22)**~~: O5 pods require 12-hour format (0-11). The `% 12` conversion is in place. This was a secondary cause of Error 33 (fixed before the binary data fix).
+  3. ~~**Binary AID data encoding — THIS WAS THE ROOT CAUSE (test #26)**~~: `setGetPayload()` and `extendedSetPayload()` treated binary data as hex-encoded ASCII strings. TdiCommand sent `"0003000E00"` (10B) instead of `\x00\x03\x00\x0E\x00` (5B). Pod accepted malformed data but algorithm state was invalid.
+  4. ~~**`setPreparePassword()` / SPS3 — ELIMINATED (2026-02-17)**~~: O5 pods use algorithm byte `0x09` which bypasses SPS3 entirely.
   5. ~~**TwiSecurityIdentifier `0xCCCCCCCC`**~~: **ELIMINATED**. Internal dispatch/lookup value, not transmitted OTA.
   6. ~~**EAP-AKA role reversal (SECONDARY mode)**~~: **ELIMINATED**. Pod expects PRIMARY mode at all lifecycle stages.
+- **Resolve Type 4 signed message failure (BLOCKING — prime bolus fails silently)**: Test #26 confirmed that ProgramAlert (Type 1, unsigned) works after SetUniqueId, but ProgramBolus (Type 4, ECDSA-signed) fails. Pod ACKs the BLE write (SUCCESS on CMD char) but never sends a data response (`emptyValue` timeout, 4 retries all failed). This is the new blocking issue for Phase 1 activation. The ECDSA signature is computed over AAD(16) + ciphertext + tag(8), appended as 64-byte raw r||s. Possible causes: incorrect signing input construction, wrong key used, signature format mismatch, or AAD/header byte error specific to Type 4 messages.
 
 #### Native Pairing Call Sequence for O5 (algo=0x09, from JNI + state machine investigation 2026-02-17)
 State machine: C3426e (AppPairing) → C3427f (SPS0) → C3423b (SPS1) → C3422a (SPS2.x) → C3425d (SP0).
@@ -629,12 +632,12 @@ Phase 0: getPodVersion (0x07)                    [Type 1, 26B plaintext]
     |     Response: FW 4.23.1.21, productId=5, state=FILLED
     v
 O5 AID Setup (8 commands, all Type 1):
-    1. UtcCommand          SE255.2=[unix_timestamp]
-    2. TdiCommand          S3.2=0003000E00,G3.2         (TDI=14U)
-    3. TargetBgProfile     S3.1=00C0[48x 0000006E],G3.1 (110 mg/dL)
-    4. DiaCommand          S3.9=8,G3.9                   (DIA=8 hours)
-    5. EgvCommand          S3.7=3670015,G3.7             (Low=55)
-    6-8. AlgorithmInsulinHistory x3  SE2.1=00A8[24 x 7B records]
+    1. UtcCommand          SE255.2=[unix_timestamp]              (ASCII)
+    2. TdiCommand          S3.2=[binary 5B],G3.2                 (TDI=14U, 15B total)
+    3. TargetBgProfile     S3.1=[binary 196B],G3.1               (110 mg/dL, 204B total)
+    4. DiaCommand          S3.9=8,G3.9                           (DIA=8 hours, ASCII)
+    5. EgvCommand          S3.7=3670015,G3.7                     (Low=55, ASCII)
+    6-8. AlgorithmInsulinHistory x3  SE2.1=[binary 168B]         (176B total each)
     9. UnifiedAidPodStatus G3.12
     --- "activation (QN setup) 0/2 finished" ---
     |
@@ -656,7 +659,7 @@ Three wrapping formats for AID commands (distinct from legacy `S0.0=`/`,G0.0` wr
 - **GET only**: `G[feature].[attr]` -- reads current value
 - **Extended SET**: `SE[feature].[attr]=[data]` -- extended feature set, response prefix `ES[feature].[attr]=`
 
-**Important**: Despite the name "SLPE", AID commands do NOT use `StringLengthPrefixEncoding` length prefixes. They are plain ASCII strings: `key=data` or `key=data,suffix`. Only standard Omnipod commands (`S0.0=...,G0.0`) use the 2-byte big-endian length prefix from `StringLengthPrefixEncoding.formatKeys()`.
+**Important**: Despite the name "SLPE", AID commands do NOT use `StringLengthPrefixEncoding` length prefixes. The key portion (`S3.2=`, `SE2.1=`, etc.) is always plain ASCII. The data portion after the `=` sign is either plain ASCII (for simple numeric values like UtcCommand, DiaCommand, EgvCommand) or **raw binary bytes** (for TdiCommand, TargetBgProfileCommand, AlgorithmInsulinHistoryCommand). The binary data commands use `setGetPayload(feature:attribute:binaryData:)` and `extendedSetPayload(feature:attribute:binaryData:)` variants. Only standard Omnipod commands (`S0.0=...,G0.0`) use the 2-byte big-endian length prefix from `StringLengthPrefixEncoding.formatKeys()`.
 
 ### Alert Parameters (Pod2 Frida-validated)
 
@@ -697,21 +700,27 @@ ENGAGING_CLUTCH_DRIVE (4) -> [after prime completes] -> CLUTCH_DRIVE_ENGAGED (5)
 
 Ordered steps to implement post-pairing pod communication in OmnipodKit.
 
-### DONE (Phase 1 activation sequence implemented)
-1. ~~**Type 4 signed message construction**~~ -- **DONE.** Implemented in `PodCommsSession.o5Send()`. Only used for `programBolus` (prime/delivery). AAD(16) + ciphertext + tag(8) signed with secondary key, 64-byte raw r||s appended.
-2. ~~**O5 AID setup commands**~~ -- **DONE.** 8 AID commands implemented in `O5AidCommands.swift`, called from `BlePodComms.swift` between getPodVersion and setPodUid.
+### DONE (Phase 1 activation sequence implemented through SetUniqueId + alerts)
+1. ~~**Type 4 signed message construction**~~ -- **DONE (construction implemented, but runtime failure — see item 6b).** Implemented in `PodCommsSession.o5Send()`. Only used for `programBolus` (prime/delivery). AAD(16) + ciphertext + tag(8) signed with secondary key, 64-byte raw r||s appended.
+2. ~~**O5 AID setup commands**~~ -- **DONE.** 8 AID commands implemented in `O5AidCommands.swift`, called from `BlePodComms.swift` between getPodVersion and setPodUid. **Binary data fix (2026-02-17)**: TdiCommand, TargetBgProfileCommand, AlgorithmInsulinHistoryCommand now send raw binary bytes instead of ASCII hex text.
 3. ~~**Phase 1 activation order**~~ -- **DONE.** Corrected to match Pod2 Frida: getPodVersion, AID setup, setPodUid, alerts, prime 1, poll, expiry alert. No basal before priming.
 4. ~~**Alert parameters**~~ -- **DONE.** Low reservoir=10U (slot #4), LOC=5min/55min (slot #7), user expiry=3968min (slot #3, after prime). Prime beep=0x7C.
 5. ~~**Registration payload delivery**~~ -- **REMOVED (misidentified).** The btsnoop messages originally identified as registration payloads were actually AlgorithmInsulinHistory (`SE2.1=`) AID commands. Sending the 163-byte binary blob in `S0.0=...G0.0` SLPE format caused CBError 7 pod disconnect. Removed `o5SendRegistrationPayload()` and `sendRawO5DataExpectingAck()`. Registration payload is NOT needed for activation.
+5b. ~~**Error 33 at SetUniqueId**~~ -- **RESOLVED (Test #26, 2026-02-17).** Root cause: binary AID data encoding. Three AID commands sent ASCII hex text instead of raw binary bytes, corrupting pod algorithm state. Fix: `useBinaryAidData` flag + binary payload variants. SetUniqueId now succeeds (`progressStatus=Pairing completed`).
 
 ### TODO: Remaining Implementation
-6. **Resolve Error 33 at setPodUid (BLOCKING — must fix before Phase 1 can complete)**
-   - ~~**EAP-AKA role reversal (SECONDARY mode) — FULLY ELIMINATED**~~: Tests #24 (pairing) and #25 (44 consecutive post-pairing reconnections) both failed. Pod NEVER sends EAP-AKA challenge in SECONDARY mode — both sides deadlock. The Android `TwiEapAkaSlave` class naming does not reflect wire-level behavior; the TWI SDK may handle the protocol differently internally. PRIMARY mode confirmed correct for all lifecycle stages. Code reverted to `.PRIMARY`.
-   - ~~TwiSecurityIdentifier `0xCCCCCCCC`~~: Moot — SECONDARY mode is eliminated, so the slave identifier is irrelevant.
-   - Fix pdmidExtension bug: `43008040` -> `4300804` in `O5RegistrationData.swift` line 351.
-   - Byte-level comparison of SetUniqueId command against btsnoop TSV (seq 0x1d).
-   - Eliminated: SPS2 format, SP2 counter, certPdmId, hidden BLE messages, Type 4 signing, EAP-AKA params, registration payload, encryption mode flag.
-   - 12-hour hour format confirmed correct (test #22 proved 24-hour causes error 33).
+6. ~~**Resolve Error 33 at setPodUid — DONE (Test #26, 2026-02-17)**~~
+   - Root cause: binary AID data encoding. Three AID commands sent ASCII hex text instead of raw binary bytes, leaving pod algorithm state invalid.
+   - Fix: `useBinaryAidData` flag + binary payload variants in `O5AidCommands.swift`.
+   - 12-hour hour format also confirmed correct (test #22, secondary cause).
+   - pdmidExtension bug (`43008040` -> `4300804`) still pending fix in `O5RegistrationData.swift`.
+
+6b. **Resolve Type 4 signed message failure (BLOCKING — prime bolus fails silently, NEW)**
+   - Test #26: ProgramBolus (2.6U prime, Type 4 ECDSA-signed) fails — pod ACKs BLE write but never responds (`emptyValue` timeout, 4 retries).
+   - ProgramAlert (Type 1, unsigned) works fine after SetUniqueId. Failure is specific to the signed message path.
+   - ECDSA signature covers AAD(16) + ciphertext + tag(8), appended as 64-byte raw r||s.
+   - Investigate: signing input construction, key selection, signature format, AAD/header bytes for Type 4 messages.
+   - Compare Type 4 message byte-by-byte against Pod2 Frida reference (`/Users/james/Downloads/Pod2-o5app-beforeinsert.txt`).
 
 7. **Implement command sequence counter management**
    - Track counter per session (observed: `9f492c` → `9f4935`, incrementing per command exchange)
@@ -768,6 +777,7 @@ When the pod sends SUCCESS (0x04) on the CMD characteristic but never sends data
 - **Malformed inner payload**: Wrong SLPE format (e.g., using `formatKeys()` length prefixes for AID commands which should be plain ASCII).
 - **Missing getPodVersion**: `getPodVersion` (AssignAddress with 0xffffffff) MUST be the first encrypted command after each new EAP-AKA session. Without it, the pod ignores subsequent commands.
 - **Command not valid for pod state**: Pod at FILLED (state 2) rejects GetStatus with error 19, but the error response itself desynchronizes nonce state, causing the NEXT command to fail silently.
+- **Type 4 ECDSA signature issue (NEW, test #26)**: ProgramBolus (Type 4 signed) fails silently while ProgramAlert (Type 1 unsigned) succeeds on the same session. If you see `emptyValue` specifically on programBolus after setPodUid and programAlert succeed, the issue is in the ECDSA signing path, not in general encryption or nonce state.
 
 **3. Pod responds with wrong data format (`unknownBlockType`):**
 - Check the SLPE GET suffix. Standard Omnipod commands must use `,G0.0` (not `,G3.12`). AID-specific commands use their own suffixes.
@@ -780,8 +790,8 @@ These are two COMPLETELY DIFFERENT payload formats that share the same BLE trans
 | Aspect | Standard Omnipod Commands | O5 AID Commands |
 |--------|--------------------------|-----------------|
 | Examples | getPodVersion, setPodUid, programAlert, programBolus | UtcCommand, TdiCommand, TargetBgProfile, EgvCommand |
-| SLPE wrapping | `S0.0=` + 2-byte length + Message bytes + `,G0.0` | Plain ASCII: `SE255.2=1771222561` or `S3.2=0003000E00,G3.2` |
-| Length prefix | YES -- `StringLengthPrefixEncoding.formatKeys()` adds 2-byte big-endian length | **NO** -- plain string concatenation, no length bytes |
+| SLPE wrapping | `S0.0=` + 2-byte length + Message bytes + `,G0.0` | ASCII key + data: `SE255.2=1771222561` (ASCII data) or `S3.2=` + raw binary bytes + `,G3.2` (binary data) |
+| Length prefix | YES -- `StringLengthPrefixEncoding.formatKeys()` adds 2-byte big-endian length | **NO** -- plain string concatenation, no length bytes. Data portion is raw binary for TdiCommand, TargetBgProfile, AlgorithmInsulinHistory; ASCII for others. |
 | Inner Message struct | YES -- 4-byte address + sequence + CRC at bytes 0-3 | **NO** -- raw ASCII key-value, no address/sequence/CRC |
 | Response parsing | `StringLengthPrefixEncoding.parseKeys()` strips `0.0=` prefix + length | Strip ASCII prefix (e.g., `ES255.2=`, `3.2=`) directly from string |
 | Implementation | `PodCommsSession` / `BleMessageTransport.getCmdMessage()` | `O5AidCommands.swift` / `BlePodComms.sendO5AidCommand()` |
@@ -865,6 +875,7 @@ The primary reference for correct command encoding is the Pod2 Frida capture:
 | `O5 AID Send: <name> payload=...` | AID command being sent | Compare payload string against Frida hex reference |
 | `Session already established by completeConfiguration` | EAP-AKA session reuse | Good -- avoids double session establishment |
 | `pairPodRanGetPodVersion=true, skipping second getPodVersion` | Double-getPodVersion prevention | Good -- prevents nonce desync |
+| `emptyValue` on programBolus after programAlert succeeds | Type 4 ECDSA signing failure (test #26) | Signing path issue, not general crypto -- Type 1 commands work fine on same session |
 
 ## External Reference Files
 

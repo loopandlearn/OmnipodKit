@@ -608,14 +608,16 @@ class BlePodMessageTransport: MessageTransport {
         let signature = try certStore.signRaw(signingInput)
         assert(signature.count == 64, "ECDSA raw signature must be 64 bytes")
 
-        // Append 64-byte signature to the encrypted payload
+        // Store signature separately — it's appended after payload in asData()
+        // but NOT counted in the header size field (size = ciphertext only)
         var signedPacket = encrypted
-        signedPacket.payload.append(signature)
+        signedPacket.signatureData = signature
 
         return signedPacket
     }
 
     /// Reads and ACKs a Type 4 signed response from the pod.
+    /// Pod responses are Type 1 (ENCRYPTED), NOT Type 4. ACK is also Type 1 with no signature.
     private func readAndAckO5SignedResponse(certStore: O5CertificateStore) throws -> Message {
         guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
 
@@ -624,33 +626,18 @@ class BlePodMessageTransport: MessageTransport {
             throw PodProtocolError.messageIOException("Could not read signed response")
         }
 
-        // For Type 4 responses, the payload has: ciphertext + tag(8) + signature(64)
-        // Strip the 64-byte signature before decryption
-        var messageForDecrypt = readMessage
-        if readMessage.type == .ENCRYPTED_SIGNED && readMessage.payload.count >= 72 {
-            // Signature is the last 64 bytes
-            let signatureStart = readMessage.payload.count - 64
-            let podSignature = readMessage.payload.suffix(from: signatureStart)
-            messageForDecrypt.payload = readMessage.payload.prefix(signatureStart)
-
-            // Pod signature verification would require the pod's TLS public key
-            // (extracted during SPS2 pairing). For now, log but don't verify.
-            log.debug("O5Sign: Pod response has %{public}d-byte signature (verification not yet implemented)",
-                      podSignature.count)
-        }
-
         incrementNonceSeq()
-        let decrypted = try enDecrypt.decrypt(messageForDecrypt, nonceSeq)
+        let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
 
         let response = try parseResponse(decrypted: decrypted)
 
-        // Send signed ACK
+        // Send Type 1 (encrypted, unsigned) ACK — matches official app behavior
         incrementMsgSeq()
         incrementNonceSeq()
-        let ack = try getO5SignedAck(response: decrypted, certStore: certStore)
+        let ack = try getO5Ack(response: decrypted)
         let ackResult = manager.sendMessagePacket(ack, doRTS: false)
         guard case .sentWithAcknowledgment = ackResult else {
-            throw PodProtocolError.messageIOException("Could not send signed ACK")
+            throw PodProtocolError.messageIOException("Could not send ACK")
         }
 
         guard response.sequenceNum == messageNumber else {
@@ -660,30 +647,23 @@ class BlePodMessageTransport: MessageTransport {
         return response
     }
 
-    /// Creates a Type 4 signed ACK message (empty plaintext → 8-byte tag only + 64-byte signature).
-    private func getO5SignedAck(response: MessagePacket, certStore: O5CertificateStore) throws -> MessagePacket {
+    /// Creates a Type 1 (encrypted, unsigned) ACK message for Type 4 command responses.
+    /// Frida confirms: ACK after Type 4 command uses Type 1 (byte[3]=0x81), no ECDSA signature.
+    private func getO5Ack(response: MessagePacket) throws -> MessagePacket {
         guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
 
         let ackNumber = (UInt(response.sequenceNumber) + 1) & 0xff
         let msg = MessagePacket(
-            type: MessageType.ENCRYPTED_SIGNED,
+            type: MessageType.ENCRYPTED,
             source: response.destination.toUInt32(),
             destination: response.source.toUInt32(),
-            payload: Data(), // empty plaintext → ACK produces 8-byte tag only
+            payload: Data(),
             sequenceNumber: UInt8(msgSeq),
             ack: true,
             ackNumber: UInt8(ackNumber),
             eqos: 0
         )
-        let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
-
-        // Sign the encrypted ACK
-        let signingInput = encrypted.asData(forEncryption: false).prefix(16) + encrypted.payload
-        let signature = try certStore.signRaw(signingInput)
-
-        var signedAck = encrypted
-        signedAck.payload.append(signature)
-        return signedAck
+        return try enDecrypt.encrypt(msg, nonceSeq)
     }
 
     func assertOnSessionQueue() {

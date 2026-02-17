@@ -9,8 +9,8 @@
 //    Phase 1: Alerts (slots #4, #7) -> Prime 1 (tubing fill) -> [wait] -> Alert (slot #3)
 //    Phase 2: Basal -> Alerts (clear/reprogram) -> Prime 2 (cannula insertion) -> Final status
 //
-//  All O5 programming commands (ConfigureAlerts, ProgramBolus, ProgramBasal) are sent as
-//  Type 4 (encrypted + ECDSA signed) messages via o5Send() / o5ConfigureAlerts().
+//  Only ProgramBolus (prime/delivery) uses Type 4 (encrypted + ECDSA signed) via o5Send().
+//  All other commands (ConfigureAlerts, ProgramBasal, etc.) use Type 1 (encrypted only).
 //
 //  Copyright © 2025 LoopKit Authors. All rights reserved.
 //

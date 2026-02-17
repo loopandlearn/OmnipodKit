@@ -73,6 +73,7 @@ struct MessagePacket {
     var source: Id
     let destination: Id
     var payload: Data
+    var signatureData: Data? // ECDSA signature for Type 4; appended after payload but excluded from size field
     let sequenceNumber: UInt8
     let ack: Bool
     let ackNumber: UInt8
@@ -136,6 +137,10 @@ struct MessagePacket {
         bb.append(self.destination.address)
 
         bb.append(self.payload)
+
+        if let sig = signatureData {
+            bb.append(sig)
+        }
 
         return bb
     }
