@@ -259,10 +259,10 @@ class BlePodComms: PodComms {
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         guard let manager = manager else { throw PodCommsError.noPodPaired }
-        // Use SECONDARY mode for O5 pods when reconnecting (post-pairing),
-        // where the pod initiates the EAP-AKA challenge and controller responds.
-        // Use PRIMARY mode for initial pairing and all DASH sessions.
-        let sessionMode: SessionKeyMode = (!isPairing && self.podType == omnipod5Type) ? .SECONDARY : .PRIMARY
+        // PRIMARY mode (controller initiates challenge).
+        // SECONDARY mode was tested for O5 post-pairing reconnections (tests #24, #25)
+        // but the pod never initiates an EAP-AKA challenge — it expects PRIMARY always.
+        let sessionMode: SessionKeyMode = .PRIMARY
         let eapAkaExchanger = try SessionEstablisher(manager: manager, ltk: ltk, eapSqn: eapSeq, myId: self.myId, podId: self.podId, msgSeq: msgSeq, podType: self.podType, mode: sessionMode)
 
         let result = try eapAkaExchanger.negotiateSessionKeys()
