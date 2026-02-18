@@ -11,6 +11,30 @@ import Foundation
 
 fileprivate let errorResponseCode_badNonce: UInt8 = 0x14 // only returned on Eros
 
+// Known error response codes returned by the pod when rejecting a command.
+// These are distinct from FaultEventCode values which represent pod hardware faults.
+enum ErrorResponseCode: UInt8, CustomStringConvertible {
+    case badNonce                   = 0x14 // Eros only: nonce mismatch
+    case o5InvalidCommand           = 0x2A // Omnipod 5 invalid command (e.g., unsigned bolus on O5 pod)
+
+    var description: String {
+        switch self {
+        case .badNonce:
+            return "Bad nonce"
+        case .o5InvalidCommand:
+            return "Omnipod 5 invalid command"
+        }
+    }
+
+    // Return a description for any error code, including unknown ones
+    static func descriptionFor(code: UInt8) -> String {
+        if let known = ErrorResponseCode(rawValue: code) {
+            return known.description
+        }
+        return String(format: "Unknown error code %u (0x%02X)", code, code)
+    }
+}
+
 enum ErrorResponseType {
     case badNonce(nonceResyncKey: UInt16) // only returned on Eros
     case nonretryableError(code: UInt8, faultEventCode: FaultEventCode, podProgress: PodProgressStatus)
