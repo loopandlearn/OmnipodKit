@@ -77,7 +77,7 @@ struct Pod {
     // Checked to verify it agrees with value returned by pod during the pairing process.
     static let cannulaInsertionUnits = 0.5
 
-    static let cannulaInsertionUnitsExtra = 0.0 // edit to add a fixed additional amount of insulin during cannula insertion
+    static let cannulaInsertionUnitsExtra = 0.35 // edit to add a fixed additional amount of insulin during cannula insertion
 
     // Default and limits for expiration reminder alerts
     static let defaultExpirationReminderOffset = TimeInterval(hours: 2)
