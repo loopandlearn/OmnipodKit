@@ -180,7 +180,11 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 self?.setupCanceled()
             }
  
+            #if ENABLE_O5
+            let o5NotAvailable = false
+            #else
             let o5NotAvailable = O5CertificateStore.isEmpty
+            #endif
             let podTypeSelectionView = PodTypeSelection(initialValue: self.podType, o5NotAvailable: o5NotAvailable, didConfirm: didConfirm, didCancel: didCancel)
             let hostedView = hostingController(rootView: podTypeSelectionView)
             hostedView.navigationItem.title = LocalizedString("Pod Type", comment: "Title for Pod Type selection screen")
