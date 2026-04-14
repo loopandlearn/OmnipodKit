@@ -51,6 +51,23 @@ struct O5RegistrationData {
         return _registry.isEmpty
     }
 
+    /// Parse an O5RegistrationData from a JSON dictionary (e.g. from an .o5keypair file or API response).
+    static func fromJSON(_ json: [String: Any]) -> O5RegistrationData? {
+        guard let controllerId = (json["controllerId"] as? NSNumber)?.uint32Value,
+              let privateKeyHex = json["privateKey"] as? String,
+              let publicKeyHex = json["publicKey"] as? String,
+              let intermediateCABase64 = json["intermediateCA"] as? String,
+              let tlsCertificateBase64 = json["tlsCertificate"] as? String
+        else { return nil }
+        return O5RegistrationData(
+            controllerId: controllerId,
+            privateKeyHex: privateKeyHex,
+            publicKeyHex: publicKeyHex,
+            intermediateCABase64: intermediateCABase64,
+            tlsCertificateBase64: tlsCertificateBase64
+        )
+    }
+
     // MARK: - Identity
 
     /// Becomes the 4-byte controller ID.
