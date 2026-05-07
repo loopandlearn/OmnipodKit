@@ -26,11 +26,22 @@ Currently if you already have an active pod session using a previous pump manage
 you must select `Switch to other insulin delivery device`
 after deactivating any active pod before you can do an `Add Pump`
 to select `All Omnipod Types` for the OmnipodKit pump manager.
+
 Eventually the OmniKit and OmniBLE pump manager will be replaced by OmnipodKit.
 When this happens, OmnipodKit will handle any conversion of
 any OmniKit or OmniBLE state (including for a currently active pod)
 with minor app changes and the OmniKit and OmniBLE pump managers
 will no longer be available and eventually unsupported.
+
+### Status as of May 07, 2026
+
+Modify the status of OmnipodKit to be public.
+
+* Update the README file to be appropriate for a public version of this repository.
+
+    * Now that repository is public, get more people using the repository to evaluate this as a replacement for OmniBLE and OmniKit
+    * In parallel, continue work on a few features needed before O5 support is publicly available
+    * The O5 work will continue to be done privately, then made available to the public repository after thorough testing
 
 ### Status as of April 14, 2026
 
@@ -38,15 +49,16 @@ Support for Omnipod 5 pod type was added to `main` with certain caveats
 
 * the required information to work with O5 (*O5 data*) is not included in the repository
 * future work will add the ability to get *O5 data* with a method that is under development
-* developers who have access to this private repository also have access to *O5 data* to be able to test the O5 pod type
-* if the *O5 data* is not available, the repository provides full support for Classic (Eros) and DASH pod types
+* developers who have access to the private *O5 data* file will be able to test the O5 pod type
+* when the *O5 data* is not available, the repository provides full support for Classic (Eros) and DASH pod types
     * for this case, the `Omnipod Type` view display
 only the `Omnipod Classic` and `Omnipod DASH` pod types
 
+Known Issues with O5 support:
 
-No nudge or heartbeat services as of yet,
-so time between loop operations can vary a lot without a CGM
-providing a "heartbeat" service.
+* No nudge or heartbeat services as of yet
+    * time between loop operations can vary a lot without a CGM
+providing a "heartbeat" service
 
 ### New feature available (as of March 6, 2026)
 Pod Details now displays the printed lot information
@@ -91,8 +103,7 @@ Included in the OmnipodKit repository is the patch to add OmnipodKit to a fresh 
 
 > The Trio patch requires an update when new submodules are incorporated into Trio.
 
-* This patch only works with Trio 0.6.0.72 or newer (30 March 2026)
-* This patch does not work with Trio 0.2.x, `main` branch but will work with `main` when 0.7.0 is released
+* This patch works with Trio 0.6.0.72 or newer (30 March 2026), including main branch Trio 0.7.0.
 
 The commands below should be pasted into Terminal with the path at the top-of-a-buildable Trio directory.
 This patch handles all the Trio pump manager integration requirements to add the
