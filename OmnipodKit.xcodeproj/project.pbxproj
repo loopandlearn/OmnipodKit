@@ -62,6 +62,7 @@
 
 /* Begin PBXFileReference section */
 		B66A70BC2E6CFDB800F1641B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		D8F83FC02D155ADA0005D165 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		D850B71B2D81733D0095CDF2 /* RileyLinkBLEKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = RileyLinkBLEKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D850B71C2D81733D0095CDF2 /* RileyLinkKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = RileyLinkKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D850B71D2D81733D0095CDF2 /* RileyLinkKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = RileyLinkKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -244,6 +245,7 @@
 		D8F83F7E2D155ADA0005D165 = {
 			isa = PBXGroup;
 			children = (
+				D8F83FC02D155ADA0005D165 /* Config.xcconfig */,
 				B66A6F082E6CFD4B00F1641B /* Localization */,
 				D8DF84DD2D5D243B00798277 /* README.md */,
 				D8F83F8A2D155ADA0005D165 /* OmnipodKit */,
@@ -793,6 +795,7 @@
 		};
 		D8F83F912D155ADA0005D165 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8F83FC02D155ADA0005D165 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -868,6 +871,7 @@
 		};
 		D8F83F922D155ADA0005D165 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8F83FC02D155ADA0005D165 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
