@@ -107,7 +107,21 @@ class O5AppAttestService {
         return "\(teamId).\(bundleId)"
     }
 
+    /// Resolves the Apple Team ID across environments. Tries, in order:
+    ///   1. The signed `embedded.mobileprovision` (real-device / TestFlight / App Store builds)
+    ///   2. The Keychain access-group prefix (works in simulator and on device whenever
+    ///      the process has a code-signing identity — does not require a provisioning profile)
+    ///   3. An `OmnipodKitTeamIdentifier` key in OmnipodKit's Info.plist, populated from the
+    ///      `$(DEVELOPMENT_TEAM)` build setting (last-ditch override for environments
+    ///      where neither runtime source is available, e.g. unsigned test harnesses).
     private func getTeamId() -> String? {
+        if let id = teamIdFromMobileProvision(), !id.isEmpty { return id }
+        if let id = teamIdFromKeychainAccessGroup(), !id.isEmpty { return id }
+        if let id = teamIdFromInfoPlist(), !id.isEmpty, !id.contains("$(") { return id }
+        return nil
+    }
+
+    private func teamIdFromMobileProvision() -> String? {
         guard let path = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision"),
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
             return nil
@@ -128,6 +142,50 @@ class O5AppAttestService {
             return nil
         }
         return teamId
+    }
+
+    /// Adds (or finds) a probe Keychain item and reads its `kSecAttrAccessGroup`,
+    /// which iOS prefixes with the team ID: `<TEAMID>.<bundleId>`.
+    private func teamIdFromKeychainAccessGroup() -> String? {
+        let probeAccount = "org.nightscout.o5.teamid-probe"
+        let probeService = "org.nightscout.o5.teamid-probe"
+
+        let baseQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: probeAccount,
+            kSecAttrService as String: probeService,
+        ]
+
+        var query = baseQuery
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        var status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecItemNotFound {
+            var addQuery = baseQuery
+            addQuery[kSecValueData as String] = Data()
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            addQuery[kSecReturnAttributes as String] = true
+            status = SecItemAdd(addQuery as CFDictionary, &result)
+        }
+
+        guard status == errSecSuccess,
+              let attrs = result as? [String: Any],
+              let accessGroup = attrs[kSecAttrAccessGroup as String] as? String,
+              let prefix = accessGroup.split(separator: ".").first
+        else { return nil }
+
+        return String(prefix)
+    }
+
+    /// Reads `OmnipodKitTeamIdentifier` from OmnipodKit's Info.plist. The xcconfig
+    /// substitutes `$(DEVELOPMENT_TEAM)` at build time. We read from the framework's
+    /// bundle (not `Bundle.main`) because the substitution happens in OmnipodKit's plist.
+    private func teamIdFromInfoPlist() -> String? {
+        let frameworkBundle = Bundle(for: O5AppAttestService.self)
+        return frameworkBundle.object(forInfoDictionaryKey: "OmnipodKitTeamIdentifier") as? String
     }
 
     // MARK: - Server API
