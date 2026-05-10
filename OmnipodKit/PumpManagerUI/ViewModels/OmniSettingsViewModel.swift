@@ -444,6 +444,9 @@ class OmniSettingsViewModel: ObservableObject {
     var podError: String? {
         switch podCommState {
         case .fault(let status):
+            guard let status = status else {
+                return LocalizedString("Pod Fault", comment: "Error message for reservoir view during unspecified pod fault")
+            }
             switch status.faultEventCode.faultType {
             case .reservoirEmpty:
                 return LocalizedString("No Insulin", comment: "Error message for reservoir view when reservoir empty")
@@ -585,6 +588,9 @@ extension OmniPumpManager {
     var lifeState: PodLifeState {
         switch podCommState {
         case .fault(let status):
+            guard let status = status else {
+                return .expired
+            }
             switch status.faultEventCode.faultType {
             case .exceededMaximumPodLife80Hrs:
                 return .expired
