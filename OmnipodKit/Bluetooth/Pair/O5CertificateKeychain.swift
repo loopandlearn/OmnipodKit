@@ -32,10 +32,16 @@ enum O5CertificateKeychain {
         case unhandled(OSStatus)
     }
 
+    /// One persisted entry: registration data plus the source that originally produced it.
+    struct Entry {
+        let data: O5RegistrationData
+        let source: O5RegistrationSource
+    }
+
     // MARK: - Public API
 
-    static func save(_ data: O5RegistrationData) throws {
-        let payload = try encode(data)
+    static func save(_ data: O5RegistrationData, source: O5RegistrationSource) throws {
+        let payload = try encode(data, source: source)
         let account = String(data.controllerId)
 
         let updateQuery: [String: Any] = [
@@ -89,7 +95,7 @@ enum O5CertificateKeychain {
         }
     }
 
-    static func loadAll() -> [O5RegistrationData] {
+    static func loadAll() -> [Entry] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -102,7 +108,7 @@ enum O5CertificateKeychain {
         guard status == errSecSuccess else { return [] }
         guard let items = result as? [[String: Any]] else { return [] }
 
-        return items.compactMap { item -> O5RegistrationData? in
+        return items.compactMap { item -> Entry? in
             guard let data = item[kSecValueData as String] as? Data else { return nil }
             return decode(data)
         }
@@ -126,16 +132,17 @@ enum O5CertificateKeychain {
         defer { restoreLock.unlock() }
         if restored { return }
         restored = true
-        for data in loadAll() {
-            O5RegistrationData.install(data)
+        for entry in loadAll() {
+            O5RegistrationData.install(entry.data, source: entry.source)
         }
     }
 
     // MARK: - Codec
 
-    private static func encode(_ data: O5RegistrationData) throws -> Data {
+    private static func encode(_ data: O5RegistrationData, source: O5RegistrationSource) throws -> Data {
         var json = data.toJSON()
         json["v"] = schemaVersion
+        json["source"] = source.rawValue
         do {
             return try JSONSerialization.data(withJSONObject: json, options: [])
         } catch {
@@ -143,10 +150,17 @@ enum O5CertificateKeychain {
         }
     }
 
-    private static func decode(_ blob: Data) -> O5RegistrationData? {
+    private static func decode(_ blob: Data) -> Entry? {
         guard let obj = try? JSONSerialization.jsonObject(with: blob),
-              let json = obj as? [String: Any]
+              let json = obj as? [String: Any],
+              let data = O5RegistrationData.fromJSON(json)
         else { return nil }
-        return O5RegistrationData.fromJSON(json)
+        let source: O5RegistrationSource = {
+            if let raw = json["source"] as? String, let s = O5RegistrationSource(rawValue: raw) {
+                return s
+            }
+            return .imported
+        }()
+        return Entry(data: data, source: source)
     }
 }

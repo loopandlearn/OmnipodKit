@@ -2,9 +2,9 @@
 //  PodCertificatesView.swift
 //  OmnipodKit
 //
-//  Displays the persisted O5 certificates and lets the user remove them
-//  individually. Removal is destructive: until the user reconnects to the
-//  internet to re-fetch a certificate, pairing to an Omnipod 5 pod will fail.
+//  Displays the loaded O5 certificates and lets the user remove the saved ones
+//  individually. Built-in certificates (compiled into the binary) are listed
+//  read-only — they cannot be forgotten without rebuilding the app.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
@@ -15,7 +15,13 @@ import LoopKitUI
 
 struct PodCertificatesView: View {
 
-    @State private var certificates: [O5RegistrationData] = []
+    private struct Row: Identifiable {
+        let data: O5RegistrationData
+        let source: O5RegistrationSource
+        var id: UInt32 { data.controllerId }
+    }
+
+    @State private var rows: [Row] = []
     @State private var pendingForget: UInt32? = nil
 
     private let title = LocalizedString("Pod Certificate Details", comment: "navigation title for pod certificate details")
@@ -26,22 +32,24 @@ struct PodCertificatesView: View {
 
     var body: some View {
         List {
-            if certificates.isEmpty {
+            if rows.isEmpty {
                 Section {
-                    Text(LocalizedString("No saved certificates", comment: "Empty state for the Pod Certificates view"))
+                    Text(LocalizedString("No certificates loaded.", comment: "Empty state for the Pod Certificate Details view"))
                         .foregroundColor(.secondary)
                 }
             } else {
-                ForEach(certificates, id: \.controllerId) { data in
-                    Section(header: Text(String(format: "Controller 0x%08X", data.controllerId))) {
-                        Text(dump(for: data))
+                ForEach(rows) { row in
+                    Section(header: Text(String(format: "Controller 0x%08X", row.data.controllerId))) {
+                        Text(dump(for: row))
                             .font(Font.system(size: 12).monospaced())
                             .textSelection(.enabled)
 
-                        Button(role: .destructive) {
-                            pendingForget = data.controllerId
-                        } label: {
-                            Text(LocalizedString("Forget Saved Certificate", comment: "Destructive button to remove a saved O5 certificate"))
+                        if row.source != .builtIn {
+                            Button(role: .destructive) {
+                                pendingForget = row.data.controllerId
+                            } label: {
+                                Text(LocalizedString("Forget Saved Certificate", comment: "Destructive button to remove a saved O5 certificate"))
+                            }
                         }
                     }
                 }
@@ -72,8 +80,16 @@ struct PodCertificatesView: View {
     }
 
     private func reload() {
-        certificates = O5CertificateKeychain.loadAll()
+        // Make sure both built-in (dlsym) and Keychain-persisted certs are populated
+        // before we read the registry — opening this view in the diagnostics screen
+        // shouldn't depend on the pairing flow having run first.
+        _ = O5CertificateStore.isEmpty
+
+        rows = O5RegistrationData.allValues
             .sorted { $0.controllerId < $1.controllerId }
+            .map { data in
+                Row(data: data, source: O5RegistrationData.source(for: data.controllerId) ?? .imported)
+            }
     }
 
     private func forget(controllerId: UInt32) {
@@ -82,14 +98,23 @@ struct PodCertificatesView: View {
         reload()
     }
 
-    private func dump(for data: O5RegistrationData) -> String {
+    private func dump(for row: Row) -> String {
         var lines: [String] = []
         lines.append("## O5RegistrationData")
-        lines.append(String(format: "* controllerId: %u (0x%08X)", data.controllerId, data.controllerId))
-        lines.append("* privateKey: \(data.privateKeyHex)")
-        lines.append("* publicKey: \(data.publicKeyHex)")
-        lines.append("* intermediateCA: \(data.intermediateCABase64)")
-        lines.append("* tlsCertificate: \(data.tlsCertificateBase64)")
+        lines.append("* source: \(label(for: row.source))")
+        lines.append(String(format: "* controllerId: %u (0x%08X)", row.data.controllerId, row.data.controllerId))
+        lines.append("* privateKey: \(row.data.privateKeyHex)")
+        lines.append("* publicKey: \(row.data.publicKeyHex)")
+        lines.append("* intermediateCA: \(row.data.intermediateCABase64)")
+        lines.append("* tlsCertificate: \(row.data.tlsCertificateBase64)")
         return lines.joined(separator: "\n")
+    }
+
+    private func label(for source: O5RegistrationSource) -> String {
+        switch source {
+        case .builtIn:  return "Built-in (compiled into app)"
+        case .imported: return "Imported (.o5keypair file)"
+        case .fetched:  return "Fetched (downloaded from API)"
+        }
     }
 }

@@ -94,8 +94,8 @@ struct O5KeySetupView: View {
                     fileImportError = LocalizedString("The selected file is not a valid .o5keypair file.", comment: "Error when o5keypair file import fails")
                     return
                 }
-                O5RegistrationData.install(registrationData)
-                try? O5CertificateKeychain.save(registrationData)
+                O5RegistrationData.install(registrationData, source: .imported)
+                try? O5CertificateKeychain.save(registrationData, source: .imported)
                 o5KeypairsNotAvailable = false
             case .failure(let error):
                 fileImportError = error.localizedDescription
@@ -105,8 +105,8 @@ struct O5KeySetupView: View {
             NavigationView {
                 O5KeyFetchView(
                     onKeypairReceived: { registrationData in
-                        O5RegistrationData.install(registrationData)
-                        try? O5CertificateKeychain.save(registrationData)
+                        O5RegistrationData.install(registrationData, source: .fetched)
+                        try? O5CertificateKeychain.save(registrationData, source: .fetched)
                         o5KeypairsNotAvailable = false
                         showingFetchSheet = false
                     },

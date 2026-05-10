@@ -220,15 +220,21 @@ class O5CertificateStore {
 
 // MARK: - Runtime Installer
 
-/// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast
+/// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast.
+/// Any registry entries that appear as a result of the call are tagged with `.builtIn`.
 fileprivate func loadOptionalO5Data() {
     // Use RTLD_DEFAULT (-2) to find the symbol if it was compiled into the binary
-    if let installSym = dlsym(
+    guard let installSym = dlsym(
         UnsafeMutableRawPointer(bitPattern: -2),
         "O5RegistrationDataInstall"
-    ) {
-        typealias InstallFunc = @convention(c) () -> Void
-        let install = unsafeBitCast(installSym, to: InstallFunc.self)
-        install()
+    ) else { return }
+
+    let before = Set(O5RegistrationData.allValues.map { $0.controllerId })
+    typealias InstallFunc = @convention(c) () -> Void
+    let install = unsafeBitCast(installSym, to: InstallFunc.self)
+    install()
+    let after = Set(O5RegistrationData.allValues.map { $0.controllerId })
+    for newId in after.subtracting(before) {
+        O5RegistrationData.markSource(newId, .builtIn)
     }
 }
