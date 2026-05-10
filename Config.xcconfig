@@ -1,0 +1,3 @@
+// OmnipodKit build configuration
+// Inherits overrides from the parent project's ConfigOverride.xcconfig
+#include? "../ConfigOverride.xcconfig"
