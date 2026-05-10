@@ -218,6 +218,23 @@ class O5CertificateStore {
     }
 }
 
+// MARK: - Public availability helper
+
+/// Whether Omnipod 5 pairing should be presented as available in the UI.
+///
+/// In ENABLE_O5 builds we surface the O5 flow unconditionally — the build is
+/// expected to ship with built-in registration data, or the user is expected
+/// to import / fetch a keypair as part of setup. In other builds we only
+/// consider O5 available if at least one registration record is currently
+/// loaded (built-in, imported, fetched, or restored from Keychain).
+public func isOmnipod5Enabled() -> Bool {
+    #if ENABLE_O5
+    return true
+    #else
+    return !O5CertificateStore.isEmpty
+    #endif
+}
+
 // MARK: - Runtime Installer
 
 /// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast.

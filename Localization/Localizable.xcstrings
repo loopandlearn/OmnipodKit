@@ -2130,6 +2130,9 @@
     "Omnipod 5 Pods have a clear needle tab with a 12-character LOT number typically starting with 'PH1'. The Pod's \"SmartAdjust\" technology will not be used for closed loop control." : {
       "comment" : "Description for Omnipod 5 pods"
     },
+    "Omnipod 5 Setup" : {
+      "comment" : "Title for the Omnipod 5 key setup screen"
+    },
     "Omnipod Classic" : {
       "comment" : "Title string for Omnipod Classic"
     },
