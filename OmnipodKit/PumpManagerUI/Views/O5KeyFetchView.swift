@@ -12,6 +12,7 @@ import LoopKitUI
 struct O5KeyFetchView: View {
 
     @State private var errorMessage: String?
+    @State private var currentStep: O5KeyFetchProgress?
 
     let onKeypairReceived: (O5RegistrationData) -> Void
     let onCancel: () -> Void
@@ -25,7 +26,18 @@ struct O5KeyFetchView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundColor(.red)
-                    Text("An error occurred: \(errorMessage)")
+                    if let step = currentStep {
+                        Text(String(format: LocalizedString("Failed at step %d of %d: %@",
+                                                            comment: "Format for fetch failure with step number"),
+                                    step.index,
+                                    O5KeyFetchProgress.totalSteps,
+                                    step.localizedDescription))
+                            .foregroundColor(.secondary)
+                            .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    Text("\(errorMessage)")
                         .foregroundColor(.red)
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
@@ -39,10 +51,24 @@ struct O5KeyFetchView: View {
                 }
             } else {
                 VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text(LocalizedString("Downloading certificate...", comment: "O5 key fetch loading text"))
-                        .foregroundColor(.secondary)
+                    ProgressView(value: progressFraction)
+                        .progressViewStyle(.linear)
+                        .padding(.horizontal, 40)
+
+                    if let step = currentStep {
+                        Text(String(format: LocalizedString("Step %d of %d",
+                                                            comment: "Step counter, e.g. 'Step 2 of 6'"),
+                                    step.index,
+                                    O5KeyFetchProgress.totalSteps))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(step.localizedDescription)
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text(LocalizedString("Starting…", comment: "O5 key fetch initial loading text"))
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
 
@@ -53,16 +79,27 @@ struct O5KeyFetchView: View {
         }
     }
 
+    private var progressFraction: Double {
+        guard let step = currentStep else { return 0 }
+        return Double(step.index) / Double(O5KeyFetchProgress.totalSteps)
+    }
+
     private func performFetch() {
         errorMessage = nil
+        currentStep = nil
 
-        O5AppAttestService().fetchKeypair { result in
-            switch result {
-            case .success(let registrationData):
-                self.onKeypairReceived(registrationData)
-            case .failure(let error):
-                self.errorMessage = error.message
+        O5AppAttestService().fetchKeypair(
+            progress: { step in
+                self.currentStep = step
+            },
+            completion: { result in
+                switch result {
+                case .success(let registrationData):
+                    self.onKeypairReceived(registrationData)
+                case .failure(let error):
+                    self.errorMessage = error.message
+                }
             }
-        }
+        )
     }
 }

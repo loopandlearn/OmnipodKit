@@ -23,6 +23,37 @@ struct O5AuthError: Error {
     }
 }
 
+/// Ordered phases of the keypair fetch flow. UI consumers can use `index` /
+/// `totalSteps` to drive a determinate progress bar.
+enum O5KeyFetchProgress: Int, CaseIterable {
+    case checkingDeviceSupport
+    case resolvingAppIdentity
+    case generatingAttestKey
+    case requestingChallenge
+    case attestingWithApple
+    case downloadingCertificate
+
+    var index: Int { rawValue + 1 }
+    static var totalSteps: Int { Self.allCases.count }
+
+    var localizedDescription: String {
+        switch self {
+        case .checkingDeviceSupport:
+            return LocalizedString("Checking device support…", comment: "O5 fetch progress: device support")
+        case .resolvingAppIdentity:
+            return LocalizedString("Resolving app identity…", comment: "O5 fetch progress: team id / bundle id")
+        case .generatingAttestKey:
+            return LocalizedString("Generating App Attest key…", comment: "O5 fetch progress: generate key")
+        case .requestingChallenge:
+            return LocalizedString("Requesting server challenge…", comment: "O5 fetch progress: challenge")
+        case .attestingWithApple:
+            return LocalizedString("Attesting with Apple…", comment: "O5 fetch progress: attestation")
+        case .downloadingCertificate:
+            return LocalizedString("Downloading certificate…", comment: "O5 fetch progress: download")
+        }
+    }
+}
+
 class O5AppAttestService {
 
     private let session: URLSession = {
@@ -32,11 +63,18 @@ class O5AppAttestService {
     }()
 
     /// Runs the full App Attest + keypair fetch flow.
-    /// Calls completion on the main queue.
-    func fetchKeypair(completion: @escaping (Result<O5RegistrationData, O5AuthError>) -> Void) {
+    /// Calls `progress` on the main queue before starting each phase, then `completion`
+    /// on the main queue with the final result.
+    func fetchKeypair(
+        progress: @escaping (O5KeyFetchProgress) -> Void = { _ in },
+        completion: @escaping (Result<O5RegistrationData, O5AuthError>) -> Void
+    ) {
+        let report: (O5KeyFetchProgress) -> Void = { step in
+            DispatchQueue.main.async { progress(step) }
+        }
         Task {
             do {
-                let result = try await performFetchFlow()
+                let result = try await performFetchFlow(progress: report)
                 DispatchQueue.main.async { completion(.success(result)) }
             } catch let error as O5AuthError {
                 DispatchQueue.main.async { completion(.failure(error)) }
@@ -50,25 +88,29 @@ class O5AppAttestService {
 
     // MARK: - Async flow
 
-    private func performFetchFlow() async throws -> O5RegistrationData {
+    private func performFetchFlow(progress: (O5KeyFetchProgress) -> Void) async throws -> O5RegistrationData {
+        progress(.checkingDeviceSupport)
         let attestService = DCAppAttestService.shared
-
         guard attestService.isSupported else {
             throw O5AuthError(message: "App Attest is not supported on this device.")
         }
 
-        // Step 1: Generate a fresh App Attest key
+        // Resolve app identity early so failures (e.g. missing team ID) surface before
+        // we burn an App Attest key generation, and so the user sees which step failed.
+        progress(.resolvingAppIdentity)
+        let appId = try getAppId()
+
+        progress(.generatingAttestKey)
         let keyId = try await generateKey(attestService)
 
-        // Step 2: Get challenge from server
+        progress(.requestingChallenge)
         let challenge = try await getChallenge()
 
-        // Step 3: Attest the key with Apple
+        progress(.attestingWithApple)
         let challengeHash = Data(SHA256.hash(data: Data(challenge.utf8)))
         let attestation = try await attestKey(attestService, keyId: keyId, clientDataHash: challengeHash)
 
-        // Step 4: Exchange attestation for a keypair in a single request.
-        let appId = try getAppId()
+        progress(.downloadingCertificate)
         return try await claimKeypair(
             attestation: attestation,
             keyId: keyId,
