@@ -95,6 +95,7 @@ struct O5KeySetupView: View {
                     return
                 }
                 O5RegistrationData.install(registrationData)
+                try? O5CertificateKeychain.save(registrationData)
                 o5KeypairsNotAvailable = false
             case .failure(let error):
                 fileImportError = error.localizedDescription
@@ -105,6 +106,7 @@ struct O5KeySetupView: View {
                 O5KeyFetchView(
                     onKeypairReceived: { registrationData in
                         O5RegistrationData.install(registrationData)
+                        try? O5CertificateKeychain.save(registrationData)
                         o5KeypairsNotAvailable = false
                         showingFetchSheet = false
                     },

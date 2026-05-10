@@ -19,6 +19,12 @@ struct O5RegistrationData {
         _registry[value.controllerId] = value
     }
 
+    static func remove(controllerId: UInt32) {
+        lock.lock()
+        defer { lock.unlock() }
+        _registry.removeValue(forKey: controllerId)
+    }
+
     static func get(_ controllerId: UInt32) -> O5RegistrationData? {
         lock.lock()
         defer { lock.unlock() }
@@ -49,6 +55,18 @@ struct O5RegistrationData {
         lock.lock()
         defer { lock.unlock() }
         return _registry.isEmpty
+    }
+
+    /// Inverse of `fromJSON`. The shape matches the .o5keypair file format so that
+    /// persisted entries and imported files share a single representation.
+    func toJSON() -> [String: Any] {
+        return [
+            "controllerId": NSNumber(value: controllerId),
+            "privateKey": privateKeyHex,
+            "publicKey": publicKeyHex,
+            "intermediateCA": intermediateCABase64,
+            "tlsCertificate": tlsCertificateBase64,
+        ]
     }
 
     /// Parse an O5RegistrationData from a JSON dictionary (e.g. from an .o5keypair file or API response).

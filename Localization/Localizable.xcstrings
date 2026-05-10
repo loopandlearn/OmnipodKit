@@ -583,7 +583,7 @@
       }
     },
     "Cancel" : {
-      "comment" : "Button title for cancelling confidence reminders edit\nButton title for cancelling low reservoir edit\nButton title for cancelling scheduled reminder date edit\nButton title for cancelling silence pod edit\nCancel button for O5 key fetch\nCancel button text in navigation bar on insert cannula screen\nCancel button text in navigation bar on pair pod UI\nCancel button title\nPairing interface navigation bar button text for cancel action",
+      "comment" : "Button title for cancelling confidence reminders edit\nButton title for cancelling low reservoir edit\nButton title for cancelling scheduled reminder date edit\nButton title for cancelling silence pod edit\nCancel button\nCancel button for O5 key fetch\nCancel button text in navigation bar on insert cannula screen\nCancel button text in navigation bar on pair pod UI\nCancel button title\nPairing interface navigation bar button text for cancel action",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -1316,6 +1316,9 @@
         }
       }
     },
+    "Forget Saved Certificate" : {
+      "comment" : "Confirm destructive forget action\nDestructive button to remove a saved O5 certificate"
+    },
     "Greater than %1$@ units remaining at %2$@" : {
       "comment" : "Accessibility format string for (1: localized volume)(2: time)",
       "localizations" : {
@@ -1969,6 +1972,9 @@
         }
       }
     },
+    "No saved certificates" : {
+      "comment" : "Empty state for the Pod Certificates view"
+    },
     "No, Continue With Pod" : {
       "comment" : "Continue pairing button title of in pairing cancel modal",
       "localizations" : {
@@ -2460,6 +2466,9 @@
           }
         }
       }
+    },
+    "Pod Certificates" : {
+      "comment" : "Text for pod certificates navigation link\nnavigation title for pod certificates"
     },
     "Pod deactivated successfully. Continue." : {
       "comment" : "Deactivate pod action button accessibility label when deactivation complete",
@@ -4038,6 +4047,9 @@
           }
         }
       }
+    },
+    "You will be unable to pair to an Omnipod 5 pod until you reconnect to the internet to download a new certificate." : {
+      "comment" : "Confirmation message when forgetting a saved O5 certificate"
     },
     "You will now begin the process of configuring your reminders, selecting your insulin type, selecting the Omnipod pod type you will be using, filling your Pod with insulin, pairing to your device and placing it on your body." : {
       "comment" : "bodyText for PodSetupView"

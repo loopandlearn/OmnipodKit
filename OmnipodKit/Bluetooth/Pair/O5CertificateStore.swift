@@ -37,6 +37,7 @@ class O5CertificateStore {
     /// Randomly picks an available O5 controllerId with or 0 if none available
     static var pickControllerId: UInt32 {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         if let data = O5RegistrationData.allValues.randomElement() {
             return data.controllerId
         }
@@ -46,12 +47,14 @@ class O5CertificateStore {
     // Returns true if no O5RegistrationData is available
     static var isEmpty: Bool {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         return O5RegistrationData.isEmpty
     }
 
     // Returns true if O5RegistrationData exists for the specific controllerId
     static func contains(_ controllerId: UInt32) -> Bool {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         return O5RegistrationData.get(controllerId) != nil
     }
 
@@ -62,6 +65,7 @@ class O5CertificateStore {
     init(controllerId: UInt32) throws {
 
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         guard let data = O5RegistrationData.get(controllerId) else {
             log.debug("@@@ O5CertificateStore has no data for 0x%08X", controllerId)
             throw PodCommsError.noCertificateFound
