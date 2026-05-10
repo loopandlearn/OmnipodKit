@@ -25,7 +25,7 @@ enum PodCommState: Equatable {
     case noPod
     case activating
     case active
-    case fault(DetailedStatus)
+    case fault(DetailedStatus?)
     case deactivating
 }
 
@@ -627,8 +627,8 @@ extension OmniPumpManager {
         guard let podState = state.podState else {
             return .noPod
         }
-        guard podState.fault == nil else {
-            return .fault(podState.fault!)
+        guard !podState.isFaulted else {
+            return .fault(podState.fault)
         }
 
         if podState.isActive {
@@ -807,7 +807,13 @@ extension OmniPumpManager {
                 imageName: "exclamationmark.circle.fill",
                 state: .warning)
         case .fault(let detail):
-            var message: String
+            var message = LocalizedString("Pod Error", comment: "Status highlight message for other alarm.")
+            guard let detail = detail else {
+                return PumpStatusHighlight(
+                    localizedMessage: message,
+                    imageName: "exclamationmark.circle.fill",
+                    state: .critical)
+            }
             switch detail.faultEventCode.faultType {
             case .reservoirEmpty:
                 message = LocalizedString("No Insulin", comment: "Status highlight message for emptyReservoir alarm.")
@@ -816,7 +822,7 @@ extension OmniPumpManager {
             case .occluded:
                 message = LocalizedString("Pod Occlusion", comment: "Status highlight message for occlusion alarm.")
             default:
-                message = LocalizedString("Pod Error", comment: "Status highlight message for other alarm.")
+                break
             }
             return PumpStatusHighlight(
                 localizedMessage: message,
@@ -889,7 +895,9 @@ extension OmniPumpManager {
             }
             return nil
         case .fault(let detail):
-            if detail.faultEventCode.faultType == FaultEventCode.FaultEventType.exceededMaximumPodLife80Hrs {
+            if let detail = detail,
+               detail.faultEventCode.faultType == FaultEventCode.FaultEventType.exceededMaximumPodLife80Hrs
+            {
                 return PumpLifecycleProgress(percentComplete: 100, progressState: .critical)
             } else {
                 if shouldWarnPodEOL,
@@ -1090,7 +1098,7 @@ extension OmniPumpManager {
     // Called on the main thread
     func pairAndPrime(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
 
-        guard self.state.podType != unknownOmnipodType else {
+        guard state.podType != unknownOmnipodType else {
             completion(.failure(.configuration(OmniPumpManagerError.podTypeNotConfigured)))
             return
         }
@@ -1130,6 +1138,17 @@ extension OmniPumpManager {
         }
         #else
 
+        /// Calls the completion handler for a failure with an appropriate PumpManagerError value
+        func completionFailure(_ error: LocalizedError?) {
+            if self.state.podState?.isFaulted == true {
+                /// If the pod has faulted, return as a non-recoverable deviceState error
+                completion(.failure(.deviceState(error)))
+            } else {
+                /// Other errors are returned as a potentially recoverable communication error
+                completion(.failure(.communication(error)))
+            }
+        }
+
         // Runs the priming session on the paired pod
         let primeSession = { (result: PodComms.SessionRunResult) in
             switch result {
@@ -1151,10 +1170,10 @@ extension OmniPumpManager {
                     let primeFinishedAt = try session.prime()
                     completion(.success(primeFinishedAt))
                 } catch let error {
-                    completion(.failure(.communication(error as? LocalizedError)))
+                    completionFailure(error as? LocalizedError)
                 }
             case .failure(let error):
-                completion(.failure(.communication(error)))
+                completionFailure(error)
             }
         }
 
@@ -1180,7 +1199,7 @@ extension OmniPumpManager {
                     primeSession(result)
                 case .failure(let error):
                     self.log.error("blePairAndSetupAndPrimePod failed with %{public}@", String(describing: error))
-                    completion(.failure(.communication(error)))
+                    completionFailure(error)
                 }
             }
         }
@@ -1230,7 +1249,7 @@ extension OmniPumpManager {
                         // Calls completion
                         primeSession(result)
                     case .failure(let error):
-                        completion(.failure(.communication(error)))
+                        completionFailure(error)
                     }
                 }
             } else if let blePodComms = self.podComms as? BlePodComms {
@@ -1242,6 +1261,7 @@ extension OmniPumpManager {
                         switch result {
                         case .failure(let error):
                             completion(.failure(.communication(error as? LocalizedError)))
+                            completionFailure(error as? LocalizedError)
                         case .success:
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
