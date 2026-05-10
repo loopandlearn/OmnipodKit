@@ -412,13 +412,20 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
         return DismissibleHostingController(content: rootView, onDisappear: onDisappear, colorPalette: colorPalette)
     }
 
-    /// Resolves the virtual `.podTypeSelected` routing step into the concrete next
-    /// screen for the currently selected pod type. Other screens pass through.
+    /// Resolves the virtual `.podTypeSelected` routing step (and intercepts direct
+    /// `.pairAndPrime` jumps that need an O5 key fetch first) into the concrete
+    /// next screen for the currently selected pod type. Other screens pass through.
     private func resolveRoutingStep(_ screen: OmniUIScreen) -> OmniUIScreen {
-        guard screen == .podTypeSelected else { return screen }
+        // Hard guard: O5 always needs a cert before pair/prime can succeed.
+        // Any caller asking to start pairing — whether through the routing step
+        // or directly via `.pairAndPrime` (e.g. the Pair Pod button in settings)
+        // gets diverted to the key setup screen if no cert is loaded.
         if podType == omnipod5Type && O5CertificateStore.isEmpty {
-            return .o5KeySetup
+            if screen == .podTypeSelected || screen == .pairAndPrime {
+                return .o5KeySetup
+            }
         }
+        guard screen == .podTypeSelected else { return screen }
         if podType.usesRileyLink {
             return .rileyLinkSetup
         }
