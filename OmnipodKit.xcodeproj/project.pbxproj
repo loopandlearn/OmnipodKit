@@ -72,6 +72,7 @@
 		D8D0ED182D74EF41000B0AF4 /* OmniTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OmniTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8DF84DD2D5D243B00798277 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8F83F882D155ADA0005D165 /* OmnipodKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = OmnipodKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D8F83FC02D155ADA0005D165 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -244,6 +245,7 @@
 		D8F83F7E2D155ADA0005D165 = {
 			isa = PBXGroup;
 			children = (
+				D8F83FC02D155ADA0005D165 /* Config.xcconfig */,
 				B66A6F082E6CFD4B00F1641B /* Localization */,
 				D8DF84DD2D5D243B00798277 /* README.md */,
 				D8F83F8A2D155ADA0005D165 /* OmnipodKit */,
@@ -793,6 +795,7 @@
 		};
 		D8F83F912D155ADA0005D165 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8F83FC02D155ADA0005D165 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -868,6 +871,7 @@
 		};
 		D8F83F922D155ADA0005D165 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D8F83FC02D155ADA0005D165 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

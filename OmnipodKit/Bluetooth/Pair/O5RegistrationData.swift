@@ -9,14 +9,50 @@ import Foundation
 import CryptoSwift
 
 
+enum O5RegistrationSource: String {
+    case builtIn   // compiled into the binary via the optional O5Data symbol
+    case imported  // loaded from a user-supplied .o5keypair file
+    case fetched   // downloaded from the keypair API
+}
+
 struct O5RegistrationData {
     private static var _registry: [UInt32: O5RegistrationData] = [:]
+    private static var _sources: [UInt32: O5RegistrationSource] = [:]
     private static let lock = NSLock()
 
+    /// Plain install (used by the embedded built-in installer that ships as compiled code
+    /// and cannot be modified to pass a source). Source is tagged separately by
+    /// `loadOptionalO5Data` once the symbol-call returns.
     static func install(_ value: O5RegistrationData) {
         lock.lock()
         defer { lock.unlock() }
         _registry[value.controllerId] = value
+    }
+
+    static func install(_ value: O5RegistrationData, source: O5RegistrationSource) {
+        lock.lock()
+        defer { lock.unlock() }
+        _registry[value.controllerId] = value
+        _sources[value.controllerId] = source
+    }
+
+    static func markSource(_ controllerId: UInt32, _ source: O5RegistrationSource) {
+        lock.lock()
+        defer { lock.unlock() }
+        _sources[controllerId] = source
+    }
+
+    static func source(for controllerId: UInt32) -> O5RegistrationSource? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _sources[controllerId]
+    }
+
+    static func remove(controllerId: UInt32) {
+        lock.lock()
+        defer { lock.unlock() }
+        _registry.removeValue(forKey: controllerId)
+        _sources.removeValue(forKey: controllerId)
     }
 
     static func get(_ controllerId: UInt32) -> O5RegistrationData? {
@@ -49,6 +85,35 @@ struct O5RegistrationData {
         lock.lock()
         defer { lock.unlock() }
         return _registry.isEmpty
+    }
+
+    /// Inverse of `fromJSON`. The shape matches the .o5keypair file format so that
+    /// persisted entries and imported files share a single representation.
+    func toJSON() -> [String: Any] {
+        return [
+            "controllerId": NSNumber(value: controllerId),
+            "privateKey": privateKeyHex,
+            "publicKey": publicKeyHex,
+            "intermediateCA": intermediateCABase64,
+            "tlsCertificate": tlsCertificateBase64,
+        ]
+    }
+
+    /// Parse an O5RegistrationData from a JSON dictionary (e.g. from an .o5keypair file or API response).
+    static func fromJSON(_ json: [String: Any]) -> O5RegistrationData? {
+        guard let controllerId = (json["controllerId"] as? NSNumber)?.uint32Value,
+              let privateKeyHex = json["privateKey"] as? String,
+              let publicKeyHex = json["publicKey"] as? String,
+              let intermediateCABase64 = json["intermediateCA"] as? String,
+              let tlsCertificateBase64 = json["tlsCertificate"] as? String
+        else { return nil }
+        return O5RegistrationData(
+            controllerId: controllerId,
+            privateKeyHex: privateKeyHex,
+            publicKeyHex: publicKeyHex,
+            intermediateCABase64: intermediateCABase64,
+            tlsCertificateBase64: tlsCertificateBase64
+        )
     }
 
     // MARK: - Identity
