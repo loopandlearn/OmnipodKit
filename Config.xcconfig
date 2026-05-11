@@ -1,3 +1,9 @@
 // OmnipodKit build configuration
-// Inherits overrides from the parent project's ConfigOverride.xcconfig
+
+// Inherits overrides from Trio's ConfigOverride.xcconfig (if present)
 #include? "../ConfigOverride.xcconfig"
+#include? "../../ConfigOverride.xcconfig"
+
+// Inherits overrides from Loop's LoopConfigOverride.xcconfig (if present)
+#include? "../LoopConfigOverride.xcconfig"
+#include? "../../LoopConfigOverride.xcconfig"
