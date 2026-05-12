@@ -188,10 +188,10 @@ struct PodCertificateDetailView: View {
         lines.append("## O5RegistrationData")
         lines.append("* source: \(label(for: source))")
         lines.append(String(format: "* controllerId: %u (0x%08X)", data.controllerId, data.controllerId))
-        lines.append("* privateKey: \(data.privateKeyHex)")
+        //lines.append("* privateKey: \(data.privateKeyHex)")
         lines.append("* publicKey: \(data.publicKeyHex)")
-        lines.append("* intermediateCA: \(data.intermediateCABase64)")
-        lines.append("* tlsCertificate: \(data.tlsCertificateBase64)")
+        //lines.append("* intermediateCA: \(data.intermediateCABase64)")
+        //lines.append("* tlsCertificate: \(data.tlsCertificateBase64)")
         return lines.joined(separator: "\n")
     }
 
