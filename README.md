@@ -22,24 +22,16 @@ by scrolling to the bottom of the pod settings view and tapping on
 The `Omnipod` (OmniKit) and `Omnipod DASH` (OmniBLE) pump managers
 currently displayed with `Add Pump` are the original unmodified
 pump managers which maintain their own separate pump manager state.
-Currently if you already have an active pod session using a previous pump manager,
-you must select `Switch to other insulin delivery device`
-after deactivating any active pod before you can do an `Add Pump`
-to select `All Omnipod Types` for the OmnipodKit pump manager.
+Currently if you already have an active pod session using a previous pump manager, you must wait until that pod session is completed and you deactivated the pod. 
+
+After the pod is deactivated:
+
+* Scroll to the bottom of the Omnipod screen and select `Switch to other insulin delivery device`
+* From the main OS-AID screen, tap on `Add Pump`
+* Select `All Omnipod Types`
+   * Follow the onboarding prompts until you get to the pod selection screen
+   * Select your pod type and continue
 
 Eventually the OmniKit and OmniBLE pump manager will be replaced by OmnipodKit.
-When this happens, OmnipodKit will handle any conversion of
-any OmniKit or OmniBLE state (including for a currently active pod)
-with minor app changes and the OmniKit and OmniBLE pump managers
-will no longer be available and eventually unsupported.
-
-### Status as of May 14, 2026
-
-Modify the status of OmnipodKit to be public.
-
-* Update the README file to be appropriate for a public version of this repository.
-
-    * Now that repository is public, get more people using the repository to evaluate this as a replacement for OmniBLE and OmniKit
-    * In parallel, continue work on a few features needed before O5 support is publicly available
-    * The O5 work will continue to be done privately, then made available to the public repository after thorough testing
-
+When this happens, OmnipodKit can handle the conversion of
+any OmniKit or OmniBLE state (including an active pod).
