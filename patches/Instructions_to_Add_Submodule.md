@@ -6,7 +6,7 @@ The OmnipodKit submodule must be added to the workspace for the OS-AID that will
 
 ### To Add to LoopWorkspace
 
-Included in the OmnipodKit repository is the patch to add the OmnipodKit (private repo) pump manager to a fresh clone of [LoopWorkspace](https://github.com/LoopKit/LoopWorkspace/).
+Included in the OmnipodKit repository is the patch to add the OmnipodKit pump manager to a fresh clone of [LoopWorkspace](https://github.com/LoopKit/LoopWorkspace/).
 
 * This patch is valid for either `main` or `dev` branches for LoopWorkspace.
 
@@ -26,7 +26,7 @@ git commit -am "add submodule OmnipodKit"
 xed .
 ```
 
-When Xcode opens, if questioned, select use the version on disk.
+When Xcode opens, if questioned, select "use the version on disk".
 
 After building Loop, be sure to select the new `All Omnipod Types`
 when doing an `Add Pump` to use the new OmnipodKit pump manager.
@@ -40,8 +40,9 @@ Included in the OmnipodKit repository is the patch to add OmnipodKit to a fresh 
 * This patch works with Trio 0.6.0.72 or newer (30 March 2026), including main branch Trio 0.7.0.
 
 The commands below should be pasted into Terminal with the path at the top-of-a-buildable Trio directory.
+
 This patch handles all the Trio pump manager integration requirements to add the
-OmnipodKit (private repo) pump manager to Trio, with caveats listed above.
+OmnipodKit pump manager to Trio, with for versions listed above.
 
 If Trio is open in Xcode, then before executing these commands:
 
@@ -57,11 +58,11 @@ git commit -am "add submodule OmnipodKit"
 xed .
 ```
 
-When Xcode opens, if questioned, select use the version on disk.
+When Xcode opens, if questioned, select "use the version on disk".
 
 After building with Xcode, this file will be modified as well: `Trio/Sources/Localizations/Main/Localizable.xcstrings`
 
-After building Loop, be sure to select the new `All Omnipod Types`
+After building Trio, be sure to select the new `All Omnipod Types`
 when doing an `Add Pump` to use the new OmnipodKit pump manager.
 
 ### Manually Add a Plugin to LoopWorkspace
