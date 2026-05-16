@@ -97,7 +97,8 @@ struct PairPodView: View {
                             self.viewModel.continueButtonTapped()
                         }) {
                             Text("Abort")
-                                .actionButtonStyle(.destructive)
+                                .actionButtonStyle(self.viewModel.podIsActivated ?
+                                    .destructive : .primary)
                         }
                         .disabled(false)
                         .zIndex(1)
