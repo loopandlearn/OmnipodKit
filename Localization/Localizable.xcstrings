@@ -2563,6 +2563,9 @@
         }
       }
     },
+    "Pod Fault" : {
+      "comment" : "Error message for reservoir view during unspecified pod fault"
+    },
     "Pod Fault %1$03d" : {
       "comment" : "Error message for reservoir view during general pod fault: (1: fault code value)",
       "localizations" : {
