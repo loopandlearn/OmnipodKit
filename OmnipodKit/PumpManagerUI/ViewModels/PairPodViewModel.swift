@@ -243,7 +243,11 @@ class PairPodViewModel: ObservableObject, Identifiable {
         switch state {
         case .error(let error):
             if !error.recoverable {
-                self.didRequestDeactivation?()
+                if podIsActivated {
+                    self.didRequestDeactivation?()
+                } else {
+                    self.didCancelSetup?()
+                }
             } else {
                 // Retry
                 pairAndPrime()
