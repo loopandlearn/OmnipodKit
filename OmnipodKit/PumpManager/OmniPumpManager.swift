@@ -628,7 +628,7 @@ extension OmniPumpManager {
             return .noPod
         }
         guard !podState.isFaulted else {
-            return .fault(podState.fault)
+            return .fault(podState.fault) // nil for activationTimeout and podIncompatible
         }
 
         if podState.isActive {
