@@ -432,7 +432,6 @@
 				fi,
 				fr,
 				he,
-				hi,
 				it,
 				ja,
 				nb,
