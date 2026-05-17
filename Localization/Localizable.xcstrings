@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     "\n\n⚠️ Critical Pod Fault %1$03d (0x%2$02X)" : {
       "comment" : "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)",
       "extractionState" : "manual",
