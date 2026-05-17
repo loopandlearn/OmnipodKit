@@ -878,7 +878,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " (inattivo)"
+            "value" : "(inattivo)"
           }
         },
         "ja" : {
@@ -1140,7 +1140,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "بطارية \"%@\" منخفضة البطارية"
+            "value" : "%@\" بطارية منخفضة"
           }
         },
         "cs" : {
@@ -1152,13 +1152,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" har et lavt batteriniveau"
+            "value" : "\"%@\" har lavt batteri"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" hat eine schwache Batterie"
+            "value" : "„%@“ hat einen niedrigen Akkustand"
           }
         },
         "en" : {
@@ -1170,13 +1170,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" tiene la batería baja"
+            "value" : "\"%@\" tiene batería baja"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\"-pariston varaus on vähissä."
+            "value" : "\"%@\" has a low battery"
           }
         },
         "fr" : {
@@ -1188,7 +1188,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" יש סוללה חלשה"
+            "value" : "\"%@\" has a low battery"
           }
         },
         "hu" : {
@@ -1200,7 +1200,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La batteria di \"%@\" è scarica."
+            "value" : "\"%@\" ha la batteria scarica"
           }
         },
         "ja" : {
@@ -1218,43 +1218,43 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" har lavt batterinivå"
+            "value" : "\" %@ \" har lavt batterinivå"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" heeft een bijna lege batterij"
+            "value" : "\"%@\" batterij bijna leeg"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" ma rozładowaną baterię"
+            "value" : "„ %@ ” ma słabą baterię"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O \"%@\" tem a pilha fraca"
+            "value" : "\"%@\" has a low battery"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" are o baterie descărcată"
+            "value" : "\"%@\" are o baterie scăzută"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "У \"%@\" разряжена батарея"
+            "value" : "\"%@\" имеет низкий заряд батареи"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" má vybitú batériu"
+            "value" : "\"%@\" má slabú batériu"
           }
         },
         "sl" : {
@@ -1272,7 +1272,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\" pil seviyesi düşük"
+            "value" : "\" %@ \" pili zayıf"
           }
         },
         "uk" : {
@@ -1284,13 +1284,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@” có pin yếu"
+            "value" : "\"%@\" gần hết pin"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"%@\"电池电量不足"
+            "value" : "%@ 电量低"
           }
         }
       }
@@ -2160,7 +2160,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ insulin or less remaining in Pod. Change Pod soon."
+            "value" : "מאגר האינסולין הנותר בפוד %@ נמוך יש להחליף פוד בקרוב."
           }
         },
         "hu" : {
@@ -2172,7 +2172,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ insulina o meno rimanenti nel Pod. Cambia il Pod al più presto."
+            "value" : "%@ insulina o meno rimanenti nel Pod. Cambia Pod al più presto."
           }
         },
         "ja" : {
@@ -2190,7 +2190,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ insulin eller mindre gjenstår i Pod. Bytt Pod snart."
+            "value" : "%@ insulin eller mindre i Pod. Bytt Pod snart."
           }
         },
         "nl" : {
@@ -3834,7 +3834,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Timp de activare depășit"
+            "value" : "Timpul de activare a fost depășit"
           }
         },
         "ru" : {
@@ -4440,7 +4440,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tutti gli avvisi del Pod non emettono alcun segnale acustico e i segnali acustici di promemoria di conferma vengono soppressi. Il Pod emetterà un segnale acustico solo in caso di guasti irreversibili del Pod e durante la riproduzione di segnali acustici di prova. \n \n⚠️Avviso: se il telefono è fuori dalla portata del Pod mentre questa funzione è attivata, non riceverai alcuna notifica in-app e il Pod non emetterà alcun segnale acustico di avviso."
+            "value" : "Tutti gli avvisi del Pod non emettono alcun segnale acustico e i segnali acustici di promemoria di conferma vengono soppressi. Il Pod emetterà un segnale acustico solo in caso di guasti irreversibili del Pod e durante la riproduzione di segnali acustici di prova. \n \n⚠️Avviso: se il telefono è fuori dalla portata del Pod mentre questa funzione è attiva, non riceverai alcuna notifica in-app e il Pod non emetterà alcun segnale acustico di avviso."
           }
         },
         "ja" : {
@@ -6808,7 +6808,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "الجرعة"
+            "value" : "Bolus"
           }
         },
         "cs" : {
@@ -6844,7 +6844,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lisäannos"
+            "value" : "Bolus"
           }
         },
         "fr" : {
@@ -6856,7 +6856,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bolus"
+            "value" : "בולוס"
           }
         },
         "hu" : {
@@ -6952,7 +6952,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Liều bolus"
+            "value" : "Bolus"
           }
         },
         "zh-Hans" : {
@@ -7558,7 +7558,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bolusare cu rata bazală temporară"
+            "value" : "Bolusare cu bazală temporară"
           }
         },
         "ru" : {
@@ -7606,7 +7606,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "推注中（启用临时基础率）"
+            "value" : "使用临时基础率推注"
           }
         }
       }
@@ -8164,7 +8164,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Definita"
+            "value" : "Certa"
           }
         },
         "ja" : {
@@ -8206,7 +8206,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sigur"
+            "value" : "Doză confirmată"
           }
         },
         "ru" : {
@@ -8638,7 +8638,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change Pod now. Insulin delivery will stop in 1 hour."
+            "value" : "יש להחליף פוד כעת. בעוד שעה יפסק מתן אינסולין."
           }
         },
         "hu" : {
@@ -8800,7 +8800,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change Pod now. Pod has been active for 72 hours."
+            "value" : "יש להחליף פוד כעת. הפוד פעיל 72 שעות."
           }
         },
         "hu" : {
@@ -9664,7 +9664,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Problemă comunicații"
+            "value" : "Problemă de comunicații"
           }
         },
         "ru" : {
@@ -10384,13 +10384,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Påmindelser om succesfulde handlinger vil lyde for de kommandoer du sætter igang, annulleret, suspenderet, genoptaget bolus, gemme notifikationspåmindelser etc. Når %@ automatisk justerer tilførslen, bliver påmindelser om succesfulde handlinger ikke benyttet."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Vertrauenserinnerungen ertönen für von Ihnen initiierte Befehle, wie Bolus, Bolus abbrechen, Unterbrechen, Fortsetzen, Benachrichtigungserinnerungen speichern usw. Wenn %@ die Abgabe automatisch anpasst, werden keine Vertrauenserinnerungen verwendet."
           }
         },
         "en" : {
@@ -10402,7 +10402,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Los recordatorios de confianza sonarán para los comandos que seleccione, como bolo, cancelar bolo, suspender, reanudar, guardar recordatorios de notificación, etc. Cuando %@ ajusta automáticamente la administración de insulina, no se utilizan recordatorios de confianza."
           }
         },
         "fi" : {
@@ -10414,7 +10414,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les bips de confirmation retentiront pour les commandes que vous initiez, comme un bolus, l'annulation d'un bolus, la suspension, la reprise, la sauvegarde des rappels de notification, etc. Lorsque %@ ajuste automatiquement l'administration, aucun bip de confirmation n'est utilisé."
+            "value" : "Les rappels de confirmation retentiront pour les commandes que vous initiez, comme administrer ou annuler un bolus, suspendre, reprendre, enregistrer les rappels de notification, etc. Lorsque %@ ajuste automatiquement l'administration, aucun rappel de confirmation n’est utilisé."
           }
         },
         "he" : {
@@ -10450,19 +10450,19 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tillitspåminnelser høres for kommandoer du starter, for eksempel bolus, avbryt bolus, suspendere, gjenoppta, lagre varslingspåminnelser osv. Når %@ automatisk justerer leveringen, brukes ingen tillitspåminnelser."
+            "value" : "Tillitspåminnelser høres for kommandoer du starter, for eksempel bolus, avbryt bolus, suspendere, gjenoppta, lagre varslingspåminnelser osv. Når %@ automatisk justerer leveringen, brukes mistillitspåminnelser."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Piepjes uit de Pod zullen klinken voor commando's die je hebt geïnitieerd, zoals bolus, annulering, geschorst, hervatten, opslaan van meldingen etc. Als %@ automatisch de levering wijzigt, worden er geen piepjes gebruikt."
+            "value" : "Bevestigingsherinneringen zijn hoorbaar voor opdrachten die je start, zoals bolussen, bolus annuleren, onderbreken, hervatten, meldingsherinneringen opslaan, enz. Wanneer %@ de toediening automatisch aanpast, zijn er geen bevestigingsherinneringen hoorbaar."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Przypomnienia (sygnały dźwiękowe) będą emitowane w przypadku poleceń, które zainicjujesz, takich jak bolus, anulowanie bolusa, wstrzymanie, wznowienie, zapisanie przypomnień o powiadomieniach itp. Kiedy %@ automatycznie dostosowuje podawanie, nie są używane żadne sygnały dźwiękowe."
           }
         },
         "pt-BR" : {
@@ -10474,19 +10474,19 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notificările de confirmare vor suna pentru comenzile pe care le inițiați, cum ar fi bolus, anulare bolus, suspendare, reluare, salvare mementouri de notificare etc. Când %@ ajustează automat administrarea, nu se folosesc notificări de confirmare."
+            "value" : "Mementourile de confirmare vor suna pentru comenzile pe care le inițiați, precum bolus, anularea bolusului, suspendare, reluare, salvarea mementourilor de confirmare etc. Când %@ ajustează automat administrarea, nu sunt folosite mementouri de confirmare."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Напоминания будут звучать для инициированных вами команд, таких как болюс, отмена болюса, приостановка, возобновление, напоминания о сохранении уведомлений и т.д. Когда %@ автоматически регулирует подачу инсулина, напоминания не будут использоваться."
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Pripomienky spoľahlivosti zaznejú pri príkazoch, ktoré spustíte, ako je bolus, zrušenie bolusu, pozastavenie, obnovenie, uloženie upozornení atď. Keď %@ automaticky upraví podanie, nepoužijú sa žiadne pripomenutia spoľahlivosti."
           }
         },
         "sl" : {
@@ -10504,7 +10504,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound for commands you initiate, like bolus, cancel bolus, suspend, resume, save notification reminders, etc. When %@ automatically adjusts delivery, no confidence reminders are used."
+            "value" : "Emniyet hatırlatıcıları, bolus, bolus iptali, askıya alma, devam ettirme, bildirim hatırlatıcılarını kaydetme gibi başlattığınız komutlar için çalacaktır. %@ iletimi otomatik olarak ayarladığında emniyet hatırlatıcıları kullanılmaz."
           }
         },
         "uk" : {
@@ -10546,13 +10546,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Påmindelser om succesfulde handlinger vil lyde, når %@ automatisk justerer tilførslen og de kommandoer, du sætter igang."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Vertrauenserinnerungen ertönen, wenn %@ die Lieferung automatisch anpasst, sowie für von Ihnen initiierte Befehle."
           }
         },
         "en" : {
@@ -10564,7 +10564,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Recordatorios de confianza sonarán cuando %@ automáticamente ajuste la administración de insulina, así como para los comandos que selecciones."
           }
         },
         "fi" : {
@@ -10618,13 +10618,13 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Piepjes zullen klinken als %@ de levering automatisch aanpast evenals voor commando's die je initieert."
+            "value" : "Bevestigingsherinneringen zijn hoorbaar wanneer %@ de toediening automatisch aanpast, evenals voor opdrachten die je geeft."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Przypomnienia potwierdzające są emitowane, gdy %@ automatycznie dostosowuje podawanie insuliny, a także w przypadku poleceń inicjowanych przez użytkownika."
           }
         },
         "pt-BR" : {
@@ -10636,19 +10636,19 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notificările de confirmare vor suna atunci când %@ ajustează automat administrarea, precum și pentru comenzile pe care le inițiați."
+            "value" : "Mementourile de confirmare vor suna atunci când %@ ajustează automat administrare, precum și pentru comenzile pe care le inițiați."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Напоминания будут звучать, когда %@ автоматически регулирует подачу инсулина, а также для команд, которые вы инициируете."
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Keď %@ automaticky upraví podávanie, ako aj prevedie príkazy, ktoré iniciujete, zaznejú pripomenutia spoľahlivosti."
           }
         },
         "sl" : {
@@ -10666,7 +10666,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confidence reminders will sound when %@ automatically adjusts delivery as well as for commands you initiate."
+            "value" : "Emniyet hatırlatıcıları, Başlattığınız komutların yanı sıra %@ iletimi otomatik olarak ayarladığında çalacaktır."
           }
         },
         "uk" : {
@@ -11524,7 +11524,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Überlagerungen möglich. Bitte wechsel Deinen Standort."
+            "value" : "Überlagerungen möglich. Bitte wechseln Sie an einen neuen Standort."
           }
         },
         "en" : {
@@ -12982,7 +12982,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deaktiviert"
+            "value" : "Ausgeschaltet"
           }
         },
         "en" : {
@@ -13456,7 +13456,7 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prázdná nádrž"
+            "value" : "Prázdný zásobník"
           }
         },
         "da" : {
@@ -13516,7 +13516,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "空のリザーバー"
+            "value" : "リザーバが空です"
           }
         },
         "ko" : {
@@ -13528,7 +13528,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tøm reservoaret"
+            "value" : "Tomt reservoar"
           }
         },
         "nl" : {
@@ -13564,7 +13564,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prázdny zásobník"
+            "value" : "Prázdna nádrž"
           }
         },
         "sl" : {
@@ -13576,7 +13576,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Poddfel; tom reservoar"
+            "value" : "Podfel, tom reservoarl"
           }
         },
         "tr" : {
@@ -13594,7 +13594,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hết insulin"
+            "value" : "Ngăn chứa insulin rỗng"
           }
         },
         "zh-Hans" : {
@@ -13714,7 +13714,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rezervor gol"
+            "value" : "Rezervor Gol"
           }
         },
         "ru" : {
@@ -16468,7 +16468,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A apărut un eveniment de eroare"
+            "value" : "A avut loc un eveniment de eroare"
           }
         },
         "ru" : {
@@ -16738,7 +16738,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Finish Deactivation"
+            "value" : "סיום תהליך השתבתת פוד"
           }
         },
         "hu" : {
@@ -16750,7 +16750,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Completa disattivazione"
+            "value" : "Termina disattivazione"
           }
         },
         "ja" : {
@@ -17074,7 +17074,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Promemoria configurazione completa"
+            "value" : "Promemoria di completamento della configurazione"
           }
         },
         "ja" : {
@@ -17116,7 +17116,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memento finalizare configurare"
+            "value" : "Reamintire pentru încheierea configurării"
           }
         },
         "ru" : {
@@ -18652,7 +18652,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einfügen der Kanüle"
+            "value" : "Einfügen von Kanüle"
           }
         },
         "en" : {
@@ -18682,7 +18682,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inserting cannula"
+            "value" : "החדרת קנולה"
           }
         },
         "hu" : {
@@ -18712,7 +18712,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skyter inn kanyle"
+            "value" : "Innsetting av kanyle"
           }
         },
         "nl" : {
@@ -18736,7 +18736,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se inserează canula"
+            "value" : "Se introduce canula"
           }
         },
         "ru" : {
@@ -19486,13 +19486,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L'administration d'insuline est interrompue. Changez de Pod maintenant."
+            "value" : "L'administration d'insuline s'est arrêtée. Changez de Pod maintenant."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin delivery stopped. Change Pod now."
+            "value" : "מתן אינסולין הופסק. החלף פוד כעת."
           }
         },
         "hu" : {
@@ -19948,7 +19948,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin ausgesetzt"
+            "value" : "Insulinabgabe unterbrochen"
           }
         },
         "en" : {
@@ -19960,13 +19960,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulina suspendida"
+            "value" : "Insulina Suspendida"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin Suspended"
+            "value" : "Insuliini pysäytetty"
           }
         },
         "fr" : {
@@ -19990,7 +19990,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulina Sospesa"
+            "value" : "Erogazione Insulina sospesa"
           }
         },
         "ja" : {
@@ -20008,19 +20008,19 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin suspendert"
+            "value" : "Insulintilførsel utsatt"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insuline tijdelijk uitgeschakeld"
+            "value" : "Insuline Onderbroken"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin Suspended"
+            "value" : "Podawanie Zawieszone"
           }
         },
         "pt-BR" : {
@@ -20038,7 +20038,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Подача приостановлена"
+            "value" : "Подача инсулина приостановлена"
           }
         },
         "sk" : {
@@ -20056,13 +20056,13 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pump pausad"
+            "value" : "Insulintillförsel pausad"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "İnsülin Durduldu"
+            "value" : "İnsülin Askıya Alındı"
           }
         },
         "uk" : {
@@ -20302,7 +20302,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin type not configured"
+            "value" : "סוג אינסולין טרם הוגדר"
           }
         },
         "hu" : {
@@ -20416,7 +20416,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "خطأ داخلي في المضخة %%1$03d"
+            "value" : "خطأ ناشئ من المضخة"
           }
         },
         "cs" : {
@@ -20518,7 +20518,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defecțiune internă a pompei %%1$03d"
+            "value" : "Defecțiune internă pompă %%1$03d"
           }
         },
         "ru" : {
@@ -22246,7 +22246,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Low reservoir"
+            "value" : "רמת מאגר אינסולין נמוכה"
           }
         },
         "hu" : {
@@ -22408,7 +22408,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Low Reservoir"
+            "value" : "רמת מאגר אינסולין נמוכה"
           }
         },
         "hu" : {
@@ -22684,7 +22684,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "بطارية رايلي لينك منخفضة"
+            "value" : "بطارية RileyLink منخفضة"
           }
         },
         "cs" : {
@@ -22702,7 +22702,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schwache RileyLink-Batterie"
+            "value" : "Niedriger RileyLink Batteriestatus"
           }
         },
         "en" : {
@@ -22720,7 +22720,7 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "RileyLink-akku on tyhjä"
+            "value" : "Low RileyLink Battery"
           }
         },
         "fr" : {
@@ -22732,7 +22732,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "סוללת רילילינק נמוכה"
+            "value" : "סוללת RileyLink חלשה"
           }
         },
         "hu" : {
@@ -22744,7 +22744,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batteria RileyLink bassa"
+            "value" : "Batteria Rileylink quasi scarica"
           }
         },
         "ja" : {
@@ -22768,37 +22768,37 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batterij bijna leeg"
+            "value" : "Batterij RileyLink Bijna Leeg"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Niski poziom naładowania baterii RileyLink"
+            "value" : "Niski poziom baterii RileyLink"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bateria RileyLink fraca"
+            "value" : "Low RileyLink Battery"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Baterie RileyLink descărcată"
+            "value" : "Baterie RileyLink scăzută"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Разряженная батарея RileyLink"
+            "value" : "Низкий заряд батареи RileyLink"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nízky stav batérie RileyLink"
+            "value" : "Nízky stav batérie RileyLinku"
           }
         },
         "sl" : {
@@ -22810,7 +22810,7 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Svagt batteri i RileyLink"
+            "value" : "Lågt batteri i RileyLink"
           }
         },
         "tr" : {
@@ -22828,13 +22828,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pin RileyLink thấp"
+            "value" : "Báo động pin RileyLink thấp"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "莱利连线电池电量低"
+            "value" : "RileyLink 电量低"
           }
         }
       }
@@ -23272,7 +23272,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Asigurați-vă că RileyLink este pornit și situat în apropriere"
+            "value" : "Asigurați-vă că dispozitivul RileyLink este pornit și situat în apropriere"
           }
         },
         "ru" : {
@@ -25030,7 +25030,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Det benyttes ingen tillitspåminnelser."
+            "value" : "Ingen aktive påminnelser."
           }
         },
         "nl" : {
@@ -25324,7 +25324,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Insulin"
+            "value" : "חסר אינסולין"
           }
         },
         "hu" : {
@@ -25486,7 +25486,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No Pod"
+            "value" : "אין פוד פעיל"
           }
         },
         "hu" : {
@@ -25780,7 +25780,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keinen Pod gefunden"
+            "value" : "Keine Pods gefunden"
           }
         },
         "en" : {
@@ -25810,7 +25810,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No pods found"
+            "value" : "לא נמצא פוד"
           }
         },
         "hu" : {
@@ -26188,7 +26188,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nu s-a primit răspuns de la pompă"
+            "value" : "Niciun răspuns de la pompă"
           }
         },
         "ru" : {
@@ -27782,7 +27782,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tilstoppelse oppdaget"
+            "value" : "Blokkering oppdaget"
           }
         },
         "nl" : {
@@ -27914,7 +27914,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Occlusion Detected"
+            "value" : "חסימה בפוד"
           }
         },
         "hu" : {
@@ -27944,7 +27944,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Okklusjon oppdaget"
+            "value" : "Blokkering oppdaget"
           }
         },
         "nl" : {
@@ -27968,7 +27968,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ocluzie detectată"
+            "value" : "Blocaj detectat"
           }
         },
         "ru" : {
@@ -28268,7 +28268,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "OK"
+            "value" : "Ok"
           }
         },
         "nl" : {
@@ -29528,13 +29528,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Appairage terminé"
+            "value" : "Activation terminé"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pairing completed"
+            "value" : "תהליך הכנת פוד הסתיים"
           }
         },
         "hu" : {
@@ -31002,7 +31002,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Si prega di portare solo il Pod originale nel raggio d'azione o disattivare il Pod originale"
+            "value" : "Si prega di portare solo il Pod originale nel raggio d'azione o di disattivare il Pod originale"
           }
         },
         "ja" : {
@@ -31794,13 +31794,13 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Veuillez finir d'appairer votre Pod."
+            "value" : "Veuillez finir de jumeler votre Pod."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please finish pairing your pod."
+            "value" : "נא לסיים את תהליך הכנת הפוד"
           }
         },
         "hu" : {
@@ -31830,7 +31830,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fullfør sammenkoblingen av pod."
+            "value" : "Vennligst fullfør sammenkoblingen av pod."
           }
         },
         "nl" : {
@@ -31854,7 +31854,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vă rugăm să terminați asocierea pompei."
+            "value" : "Vă rog să finalizați asocierea pompei."
           }
         },
         "ru" : {
@@ -32016,7 +32016,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Asociați o pompă nouă"
+            "value" : "Vă rog să asociați o pompă nouă"
           }
         },
         "ru" : {
@@ -32088,13 +32088,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Placer venligst RileyLink længere væk fra pod'en"
+            "value" : "Flyt RileyLink længere væk fra Pod'en"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bitte positionieren Sie den RileyLink weiter vom Pod entfernt"
+            "value" : "Bitte positionieren Sie den RileyLink weiter entfernt vom Pod"
           }
         },
         "en" : {
@@ -32106,13 +32106,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por favor, coloque el RileyLink más lejos de la vaina"
+            "value" : "Por favor, intente reposicionar el RileyLink más lejos del Pod"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siirrä RileyLink kauemmas kapselista."
+            "value" : "Siirrä RileyLink kauemmas pumpusta"
           }
         },
         "fr" : {
@@ -32124,7 +32124,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "אנא מקם מחדש את ה- RileyLink רחוק יותר מהתרמיל"
+            "value" : "יש למקום את RileyLink רחוק יותר מהפוד"
           }
         },
         "hu" : {
@@ -32136,7 +32136,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riposizionare il RileyLink più lontano dalla capsula."
+            "value" : "Si prega di riposizionare il RileyLink più lontano dal Pod"
           }
         },
         "ja" : {
@@ -32154,19 +32154,19 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vennligst flytt RileyLink lenger bort fra pod'en"
+            "value" : "Vennligst flytt RileyLink lenger fra pod"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plaats de RileyLink verder van de pod."
+            "value" : "Plaats de RileyLink verder van de pod"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Umieść RileyLink dalej od kapsuły"
+            "value" : "Proszę przesunąć RileyLink dalej od POD'a."
           }
         },
         "pt-BR" : {
@@ -32178,19 +32178,19 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vă rugăm să repoziționați RileyLink mai departe de capsulă"
+            "value" : "Vă rugăm să repoziționați dispozitivul RileyLink mai departe de pompă"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пожалуйста, переместите RileyLink дальше от капсулы"
+            "value" : "Пожалуйста, переместите RileyLink подальше от пода"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zmeňte polohu zariadenia RileyLink ďalej od modulu"
+            "value" : "Premiestnite RileyLink ďalej od podu"
           }
         },
         "sl" : {
@@ -32202,13 +32202,13 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vänligen flytta RileyLink längre bort från kapseln"
+            "value" : "Flytta din RileyLink längre från podden"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lütfen RileyLink'i kapsülden daha uzağa yerleştirin"
+            "value" : "Lütfen RileyLink'i pod'dan daha uzağa yerleştirin"
           }
         },
         "uk" : {
@@ -32226,7 +32226,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请将 RileyLink 调整到离吊舱更远的位置"
+            "value" : "请将 RileyLink 稍微远离 Pod。"
           }
         }
       }
@@ -32250,13 +32250,13 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Flyt venligst RileyLink i forhold til pod'en"
+            "value" : "Flyt RileyLink i forhold til Pod'en"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bitte positionieren Sie den RileyLink neu in Bezug auf den Pod"
+            "value" : "Bitte versuchen Sie, den Pod oder den RileyLink neu zu positionieren und versuchen Sie es erneut."
           }
         },
         "en" : {
@@ -32268,13 +32268,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por favor, reposicione el RileyLink con respecto a la vaina"
+            "value" : "Por favor, reposicione el RileyLink con respecto al Pod"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aseta RileyLink uudelleen suhteessa jalustaan."
+            "value" : "Muuta RileyLinkin paikkaa suhteessa pumppuun"
           }
         },
         "fr" : {
@@ -32298,7 +32298,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riposizionare RileyLink rispetto alla capsula."
+            "value" : "Si prega di riposizionare il RileyLink rispetto al Pod"
           }
         },
         "ja" : {
@@ -32316,7 +32316,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vennligst plasser RileyLink på nytt i forhold til pod"
+            "value" : "Vennligst flytt RileyLink i forhold til pod"
           }
         },
         "nl" : {
@@ -32328,7 +32328,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zmień położenie RileyLink względem kapsuły"
+            "value" : "Proszę zmienić położenie RileyLink względem POD'a."
           }
         },
         "pt-BR" : {
@@ -32340,19 +32340,19 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vă rugăm să repoziționați RileyLink în raport cu capsula"
+            "value" : "Va rugăm să repoziționați dispozitivul RileyLink mai aproape de pompă"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пожалуйста, измените положение RileyLink относительно капсулы"
+            "value" : "Пожалуйста, измените положение RileyLink относительно пода"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zmeňte polohu zariadenia RileyLink vzhľadom na modul"
+            "value" : "Zmeňte polohu RileyLink vzhľadom k podu"
           }
         },
         "sl" : {
@@ -32364,13 +32364,13 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vänligen flytta RileyLink i förhållande till kapseln"
+            "value" : "Flytta din RileyLink i förhållande till podden"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lütfen RileyLink'i kapsüle göre yeniden konumlandırın"
+            "value" : "Lütfen RileyLink'i pod'a göre yeniden konumlandırın"
           }
         },
         "uk" : {
@@ -32388,7 +32388,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请调整 RileyLink 与吊舱的相对位置"
+            "value" : "请调整 RileyLink 与 Pod 之间的位置。"
           }
         }
       }
@@ -32412,7 +32412,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prøv at flytte pod'en eller RileyLink, og prøv igen."
+            "value" : "Flyt Pod eller RileyLink til et andet sted og prøv igen"
           }
         },
         "de" : {
@@ -32430,13 +32430,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por favor, intente reposicionar el pod o el RileyLink e inténtelo de nuevo."
+            "value" : "Por favor, intente reposicionar el Pod o el RileyLink e inténtelo de nuevo."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kokeile sijoittaa kapseli tai RileyLink uudelleen ja yritä uudelleen."
+            "value" : "Yritä siirtää pumppua tai RileyLinkiä ja yritä uudelleen"
           }
         },
         "fr" : {
@@ -32448,7 +32448,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "אנא נסה למקם מחדש את התרמיל או את RileyLink ונסה שוב"
+            "value" : "יש למקום מחדש את הפוד או  RileyLink ולנסות שוב"
           }
         },
         "hu" : {
@@ -32460,7 +32460,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Provare a riposizionare la capsula o il RileyLink e riprovare."
+            "value" : "Prova a riposizionare il Pod o il RileyLink e riprova"
           }
         },
         "ja" : {
@@ -32478,19 +32478,19 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prøv å flytte pod eller RileyLink og prøv på nytt"
+            "value" : "Prøv å flytte pod eller RileyLink og prøv igjen"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Probeer de positie van de pod of de RileyLink te veranderen en probeer het opnieuw."
+            "value" : "Probeer de pod of de RileyLink te herpositioneren en probeer het opnieuw"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spróbuj zmienić położenie kapsuły lub RileyLink i spróbuj ponownie"
+            "value" : "Spróbuj zmienić położenie POD'a lub RileyLink i spróbuj ponownie"
           }
         },
         "pt-BR" : {
@@ -32502,19 +32502,19 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vă rugăm să încercați să repoziționați capsula sau RileyLink și să încercați din nou"
+            "value" : "Vă rugăm să încercați să repoziționați pompa sau dispozitivul RileyLink și să încercați din nou"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пожалуйста, попробуйте изменить положение капсулы или RileyLink и повторите попытку."
+            "value" : "Пожалуйста, попробуйте изменить положение пода или RileyLink и повторите попытку."
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skúste zmeniť polohu modulu alebo zariadenia RileyLink a skúste to znova"
+            "value" : "Skúste premiestniť modul alebo RileyLink a skúste znova"
           }
         },
         "sl" : {
@@ -32526,13 +32526,13 @@
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Försök att placera om podden eller RileyLink och försök igen"
+            "value" : "Pröva att flytta på podden eller din RileyLink och försök igen"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lütfen podun veya RileyLink'in konumunu değiştirip tekrar deneyin"
+            "value" : "Lütfen pod'un veya RileyLink'in konumunu değiştirip tekrar deneyin"
           }
         },
         "uk" : {
@@ -32550,7 +32550,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请尝试调整 pod 或 RileyLink 的位置，然后再试一次"
+            "value" : "请调整 Pod 或 RileyLink 的位置后重试。"
           }
         }
       }
@@ -33738,7 +33738,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur du pod"
+            "value" : "Erreur du Pod"
           }
         },
         "he" : {
@@ -33774,7 +33774,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod-feil"
+            "value" : "Pod Feil"
           }
         },
         "nl" : {
@@ -33960,7 +33960,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memento pentru expirarea pompei"
+            "value" : "Memento expirare pompă"
           }
         },
         "ru" : {
@@ -35172,7 +35172,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Podfehler: %@"
+            "value" : "Pod-Fehler: %@"
           }
         },
         "en" : {
@@ -35196,7 +35196,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur du pod : %@"
+            "value" : "Erreur du Pod: %@"
           }
         },
         "he" : {
@@ -35256,7 +35256,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defecțiune Pompă: %@"
+            "value" : "Defecțiune pompă: %@"
           }
         },
         "ru" : {
@@ -35376,7 +35376,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod non è pronto per l’inserimento della cannula."
+            "value" : "Il Pod non è pronto per l’inserimento della cannula."
           }
         },
         "ja" : {
@@ -35418,7 +35418,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pompa nu este pregătită pentru introducerea canulei."
+            "value" : "Pompa nu este gata pentru inserarea canulei."
           }
         },
         "ru" : {
@@ -35820,7 +35820,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Verstopfung"
+            "value" : "Pod-Verstopfung"
           }
         },
         "en" : {
@@ -35880,7 +35880,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Okklusjon"
+            "value" : "Pod blokkering"
           }
         },
         "nl" : {
@@ -36168,7 +36168,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Appairage du Pod incomplet"
+            "value" : "Association du pod incomplète"
           }
         },
         "he" : {
@@ -36306,7 +36306,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod sendet eine Bestätigung anstelle einer Antwort"
+            "value" : "Pod sendet Bestätigung anstelle von Antwort"
           }
         },
         "en" : {
@@ -36390,7 +36390,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pompa a trimis o confirmare în loc de răspuns"
+            "value" : "Pompa a transmis o confirmare în loc de răspuns"
           }
         },
         "ru" : {
@@ -36852,7 +36852,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod suspendert påminnelse"
+            "value" : "Pod påminnelse er suspendert"
           }
         },
         "nl" : {
@@ -36996,7 +36996,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scarsa potenza segnale"
+            "value" : "Segnale debole"
           }
         },
         "ja" : {
@@ -37956,7 +37956,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Priming completed"
+            "value" : "תהליך הכנת פוד הסתיים"
           }
         },
         "hu" : {
@@ -38010,7 +38010,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inițiere finalizată"
+            "value" : "Amorsare finalizată"
           }
         },
         "ru" : {
@@ -40416,7 +40416,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CV-levering"
+            "value" : "Gjenoppta levering"
           }
         },
         "nl" : {
@@ -40602,7 +40602,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reluați administrarea de insulină"
+            "value" : "Reluați administrarea insulinei"
           }
         },
         "ru" : {
@@ -40926,7 +40926,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reluare: %@ %@"
+            "value" : "Reluați: %@ %@"
           }
         },
         "ru" : {
@@ -42288,13 +42288,13 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plánovaný bazální"
+            "value" : "Plánovaný bazál"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Planlagt Basal"
+            "value" : "Planlagt basal"
           }
         },
         "de" : {
@@ -42312,13 +42312,13 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Basal programada"
+            "value" : "Insulina basal programada"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scheduled Basal"
+            "value" : "Ohjelmoitu basaali"
           }
         },
         "fr" : {
@@ -42348,7 +42348,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "予定ベース"
+            "value" : "定期基礎"
           }
         },
         "ko" : {
@@ -42360,25 +42360,25 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Planlagt Basal"
+            "value" : "Planlagt basal"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gepland basaal"
+            "value" : "Ingesteld Basaal"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scheduled Basal"
+            "value" : "Zaplanowana dawka podstawowa"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scheduled Basal"
+            "value" : "Basal Agendado"
           }
         },
         "ro" : {
@@ -42390,7 +42390,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Запланированный Базал"
+            "value" : "Запланированная база"
           }
         },
         "sk" : {
@@ -42414,7 +42414,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Programlanmış Bazal"
+            "value" : "Programlanan Bazal"
           }
         },
         "uk" : {
@@ -43638,7 +43638,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Perdita di segnale"
+            "value" : "Perdita segnale"
           }
         },
         "ja" : {
@@ -43656,7 +43656,7 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signal Tap"
+            "value" : "Signaltap"
           }
         },
         "nl" : {
@@ -43680,7 +43680,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pierdere de semnal"
+            "value" : "Semnal pierdut"
           }
         },
         "ru" : {
@@ -43788,7 +43788,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Signal strength too high"
+            "value" : "עוצמת האות חזקה מדי"
           }
         },
         "hu" : {
@@ -45622,7 +45622,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Memento pentru suspendarea în curs"
+            "value" : "Memento privind suspendarea în desfășurare"
           }
         },
         "ru" : {
@@ -46066,7 +46066,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sospeso: %@ %@"
+            "value" : "Sospensione %@ %@"
           }
         },
         "ja" : {
@@ -46672,7 +46672,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Unterbrechungszeit ist abgelaufen. Öffne die App und fahre fort."
+            "value" : "Die Unterbrechungszeit ist abgelaufen. Öffnen Sie die App und fahren Sie fort."
           }
         },
         "en" : {
@@ -46990,7 +46990,7 @@
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Midlertidig Basal"
+            "value" : "Midlertidig basal"
           }
         },
         "de" : {
@@ -47014,19 +47014,19 @@
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Temp Basal"
+            "value" : "Tilapäinen basaali"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Basal Temp."
+            "value" : "Débit basal temporaire"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Temp Basal"
+            "value" : "בזאלי זמני"
           }
         },
         "hu" : {
@@ -47056,19 +47056,19 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Temp Basal"
+            "value" : "Midlertidig basal"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijk basaal"
+            "value" : "Tijdelijk Basaal"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Temp Basal"
+            "value" : "Tymczasowa dawka podst."
           }
         },
         "pt-BR" : {
@@ -47086,7 +47086,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Врем. базал"
+            "value" : "ВБС"
           }
         },
         "sk" : {
@@ -47110,7 +47110,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geçici Bazal Oranı"
+            "value" : "Geçici Bazal"
           }
         },
         "uk" : {
@@ -47242,13 +47242,13 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bazală temporară în curs de rulare"
+            "value" : "Bazală temporară în desfășurare"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пока еще работает ВБС"
+            "value" : "Пока еще работает временный базал"
           }
         },
         "sk" : {
@@ -47566,7 +47566,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BasalăTemporară: %@ U/oră %@ %@ %@ U %@"
+            "value" : "BazalăTemporară: %@ U/oră %@ %@ %@ U %@"
           }
         },
         "ru" : {
@@ -47968,7 +47968,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Insulinabschaltung ist beendet.\n\nDu kannst die Abgabe über das Banner auf dem Startbildschirm oder über den Bildschirm mit den Pumpeneinstellungen fortsetzen. Du wirst in 15 Minuten erneut erinnert."
+            "value" : "Die Insulinabschaltung ist beendet.\n\nSie können die Abgabe über das Banner auf dem Startbildschirm oder über den Bildschirm mit den Pumpeneinstellungen fortsetzen. Sie werden in 15 Minuten erneut erinnert."
           }
         },
         "en" : {
@@ -48052,7 +48052,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Perioada de suspendarea a administrării de insulină s-a încheiat.\n\nPuteți relua administrarea din bannerul de pe ecranul principal sau de pe ecranul de setări al pompei. Vi se va aminti din nou în 15 minute."
+            "value" : "Perioada de suspendarea a administrării de insulină s-a încheiat.\n\nPuteți relua administrarea din panoul de pe ecranul principal sau de pe ecranul de setări al pompei. Vi se va aminti din nou în 15 minute."
           }
         },
         "ru" : {
@@ -48484,7 +48484,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The time on your pump is different from the current time. You can review the pump time and and sync to current time in settings."
+            "value" : "השעה במשאבה שונה מהשעה הנוכחית. האם ברצונך לעדכן את השעה במשאבה לשעה הנוכחית?"
           }
         },
         "hu" : {
@@ -49510,7 +49510,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "S-a detectat schimbarea orei"
+            "value" : "Schimbarea orei detectată"
           }
         },
         "ru" : {
@@ -49952,7 +49952,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Troppi Pod trovati"
+            "value" : "Trovati troppi Pod"
           }
         },
         "ja" : {
@@ -51614,7 +51614,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Doză neconfirmată"
+            "value" : "Nesigur"
           }
         },
         "ru" : {
@@ -52088,7 +52088,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nieoczekiwana odpowiedź PODa"
+            "value" : "Nieoczekiwana odpowiedź POD'a"
           }
         },
         "pt-BR" : {
@@ -52646,7 +52646,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown pod fault %%1$03d"
+            "value" : "خطأ غير معروف من المضخة"
           }
         },
         "cs" : {
@@ -53234,7 +53234,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Așteptați finalizarea bolusului curent sau opriți bolusul"
+            "value" : "Așteptați finalizarea bolusului curent sau anulați bolusul"
           }
         },
         "ru" : {
@@ -53396,7 +53396,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Așteptați finalizarea bazalei temporare curente sau suspendați pentru oprirea ei"
+            "value" : "Așteptați finalizarea bazalei temporare curente sau suspendați pentru anulare"
           }
         },
         "ru" : {
@@ -53660,7 +53660,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En attente d'appairage"
+            "value" : "En attente d'association"
           }
         },
         "he" : {
