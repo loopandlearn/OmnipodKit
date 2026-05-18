@@ -133,7 +133,7 @@ struct LowReservoirView: View {
     }
 
     private var picker: some View {
-        Picker("", selection: $selectedValue) {
+        Picker(String(""), selection: $selectedValue) {
             ForEach(self.allowedLowReservoirValues, id: \.self) { value in
                 Text(formatLowReservoirAlertValue(value))
             }

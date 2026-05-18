@@ -267,7 +267,7 @@ struct OptionalDatePicker: View {
                 .buttonStyle(.plain)
             } else {
                 DatePicker(
-                    "",
+                    String(""),
                     selection: $pickerDate,
                     displayedComponents: [.hourAndMinute]
                 )
