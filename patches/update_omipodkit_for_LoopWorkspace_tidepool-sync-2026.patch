@@ -1,0 +1,813 @@
+diff --git a/OmnipodKit/OmnipodKit.xcodeproj/project.pbxproj b/OmnipodKit/OmnipodKit.xcodeproj/project.pbxproj
+index 09fc57c..bd5b9ba 100644
+--- a/OmnipodKit/OmnipodKit.xcodeproj/project.pbxproj
++++ b/OmnipodKit/OmnipodKit.xcodeproj/project.pbxproj
+@@ -554,7 +554,7 @@
+ 				INFOPLIST_KEY_CFBundleDisplayName = "Copyright © 2025 LoopKit Authors. All rights reserved.";
+ 				INFOPLIST_KEY_NSPrincipalClass = "";
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LD_DYLIB_INSTALL_NAME = "";
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+@@ -597,7 +597,7 @@
+ 				INFOPLIST_KEY_CFBundleDisplayName = "Copyright © 2025 LoopKit Authors. All rights reserved.";
+ 				INFOPLIST_KEY_NSPrincipalClass = "";
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LD_DYLIB_INSTALL_NAME = "";
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+@@ -718,7 +718,7 @@
+ 				GENERATE_INFOPLIST_FILE = NO;
+ 				INFOPLIST_FILE = OmnipodKit/Info.plist;
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -762,7 +762,7 @@
+ 				GENERATE_INFOPLIST_FILE = NO;
+ 				INFOPLIST_FILE = OmnipodKit/Info.plist;
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -846,7 +846,7 @@
+ 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+ 				GCC_WARN_UNUSED_FUNCTION = YES;
+ 				GCC_WARN_UNUSED_VARIABLE = YES;
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = NO;
+ 				LOCALIZED_STRING_MACRO_NAMES = (
+ 					NSLocalizedString,
+@@ -915,7 +915,7 @@
+ 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+ 				GCC_WARN_UNUSED_FUNCTION = YES;
+ 				GCC_WARN_UNUSED_VARIABLE = YES;
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
++				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+ 				LOCALIZATION_PREFERS_STRING_CATALOGS = NO;
+ 				LOCALIZED_STRING_MACRO_NAMES = (
+ 					NSLocalizedString,
+diff --git a/OmnipodKit/OmnipodKit/Common/HKUnit.swift b/OmnipodKit/OmnipodKit/Common/HKUnit.swift
+deleted file mode 100644
+index 46a68a3..0000000
+--- a/OmnipodKit/OmnipodKit/Common/HKUnit.swift
++++ /dev/null
+@@ -1,25 +0,0 @@
+-//
+-//  HKUnit.swift
+-//  OmnipodKit
+-//
+-//  From OmniBLE/Common/HKUnit.swift
+-//  Created by Nathan Racklyeft on 1/17/16.
+-//  Copyright © 2016 Nathan Racklyeft. All rights reserved.
+-//
+-
+-import HealthKit
+-
+-extension HKUnit {
+-    static let milligramsPerDeciliter: HKUnit = {
+-        return HKUnit.gramUnit(with: .milli).unitDivided(by: .literUnit(with: .deci))
+-    }()
+-
+-    static let millimolesPerLiter: HKUnit = {
+-        return HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
+-    }()
+-
+-    static let internationalUnitsPerHour: HKUnit = {
+-        return HKUnit.internationalUnit().unitDivided(by: .hour())
+-    }()
+-
+-}
+diff --git a/OmnipodKit/OmnipodKit/OmnipodCommon/PumpManagerAlert.swift b/OmnipodKit/OmnipodKit/OmnipodCommon/PumpManagerAlert.swift
+index 6b34d69..9c651da 100644
+--- a/OmnipodKit/OmnipodKit/OmnipodCommon/PumpManagerAlert.swift
++++ b/OmnipodKit/OmnipodKit/OmnipodCommon/PumpManagerAlert.swift
+@@ -8,7 +8,7 @@
+ //
+ 
+ import Foundation
+-import HealthKit
++import LoopAlgorithm
+ import LoopKit
+ 
+ // XXX still needs be declared public with the current Trio implementation
+@@ -72,8 +72,8 @@ public enum PumpManagerAlert: Hashable {
+         case .podExpireImminent:
+             return LocalizedString("Change Pod now. Insulin delivery will stop in 1 hour.", comment: "Alert content body for podExpireImminent pod alert")
+         case .lowReservoir(_, let lowReservoirReminderValue):
+-            let quantityFormatter = QuantityFormatter(for: .internationalUnit())
+-            let valueString = quantityFormatter.string(from: HKQuantity(unit: .internationalUnit(), doubleValue: lowReservoirReminderValue)) ?? String(describing: lowReservoirReminderValue)
++            let quantityFormatter = QuantityFormatter(for: .internationalUnit)
++            let valueString = quantityFormatter.string(from: LoopQuantity(unit: .internationalUnit, doubleValue: lowReservoirReminderValue)) ?? String(describing: lowReservoirReminderValue)
+             return String(format: LocalizedString("%1$@ insulin or less remaining in Pod. Change Pod soon.", comment: "Format string for alert content body for lowReservoir pod alert. (1: reminder value)"), valueString)
+         case .suspendInProgress:
+             return LocalizedString("Suspend In Progress Reminder", comment: "Alert content body for suspendInProgress pod alert")
+diff --git a/OmnipodKit/OmnipodKit/OmnipodCommon/UnfinalizedDose.swift b/OmnipodKit/OmnipodKit/OmnipodCommon/UnfinalizedDose.swift
+index dc31da6..9fb308f 100644
+--- a/OmnipodKit/OmnipodKit/OmnipodCommon/UnfinalizedDose.swift
++++ b/OmnipodKit/OmnipodKit/OmnipodCommon/UnfinalizedDose.swift
+@@ -67,6 +67,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+     var isHighTemp: Bool =
+         false // Track this for situations where cancelling temp basal is unacknowledged, and recovery fails, and we have to assume the most possible delivery
+     var insulinType: InsulinType?
++    var decisionId: UUID?
+ 
+     var finishTime: Date? {
+         get {
+@@ -106,6 +107,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+     }
+ 
+     init(
++        decisionId: UUID?,
+         bolusAmount: Double,
+         startTime: Date,
+         scheduledCertainty: ScheduledCertainty,
+@@ -120,9 +122,11 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+         scheduledUnits = nil
+         self.automatic = automatic
+         self.insulinType = insulinType
++        self.decisionId = decisionId
+     }
+ 
+     init(
++        decisionId: UUID?,
+         tempBasalRate: Double,
+         startTime: Date,
+         duration: TimeInterval,
+@@ -140,6 +144,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+         self.automatic = automatic
+         self.isHighTemp = isHighTemp
+         self.insulinType = insulinType
++        self.decisionId = decisionId
+     }
+ 
+     init(suspendStartTime: Date, scheduledCertainty: ScheduledCertainty) {
+@@ -324,6 +329,10 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+         if let rawInsulinType = rawValue["insulinType"] as? InsulinType.RawValue {
+             insulinType = InsulinType(rawValue: rawInsulinType)
+         }
++
++        if let decisionIdString = rawValue["decisionId"] as? String {
++            self.decisionId = UUID(uuidString: decisionIdString)
++        }
+     }
+ 
+     public var rawValue: RawValue {
+@@ -340,6 +349,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
+         rawValue["scheduledTempRate"] = scheduledTempRate
+         rawValue["duration"] = duration
+         rawValue["insulinType"] = insulinType?.rawValue
++        rawValue["decisionId"] = decisionId?.uuidString
+ 
+         return rawValue
+     }
+@@ -374,6 +384,7 @@ extension DoseEntry {
+                 endDate: dose.finishTime,
+                 value: dose.scheduledUnits ?? dose.units,
+                 unit: .units,
++                decisionId: dose.decisionId,
+                 deliveredUnits: dose.finalizedUnits,
+                 insulinType: dose.insulinType,
+                 automatic: dose.automatic,
+@@ -386,6 +397,7 @@ extension DoseEntry {
+                 endDate: dose.finishTime,
+                 value: dose.scheduledTempRate ?? dose.rate,
+                 unit: .unitsPerHour,
++                decisionId: dose.decisionId,
+                 deliveredUnits: dose.finalizedUnits,
+                 insulinType: dose.insulinType,
+                 automatic: dose.automatic,
+@@ -408,6 +420,7 @@ extension StartProgram {
+         switch self {
+         case let .bolus(volume: volume, automatic: automatic):
+             return UnfinalizedDose(
++                decisionId: nil,
+                 bolusAmount: volume,
+                 startTime: programDate,
+                 scheduledCertainty: certainty,
+@@ -416,6 +429,7 @@ extension StartProgram {
+             )
+         case let .tempBasal(unitsPerHour: rate, duration: duration, isHighTemp, automatic):
+             return UnfinalizedDose(
++                decisionId: nil,
+                 tempBasalRate: rate,
+                 startTime: programDate,
+                 duration: duration,
+diff --git a/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManager.swift b/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManager.swift
+index 12857ac..0da35d7 100644
+--- a/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManager.swift
++++ b/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManager.swift
+@@ -85,8 +85,16 @@ extension OmniPumpManagerError: LocalizedError {
+ // even though for non-Eros pods the RileyLink code will not be used.
+ public class OmniPumpManager: RileyLinkPumpManager {
+ 
++    public var inSignalLoss: Bool {
++        isSignalLost(at: Date(), lastPumpDataReportDate: state.lastPumpDataReportDate)
++    }
++
++    public var isInoperable: Bool {
++        basalDeliveryState(for: state) == .pumpInoperable
++    }
++
+     // This string should match the PumpManagerIdentifier string.
+-    public static let pluginIdentifier: String = "Omni"
++    public let pluginIdentifier: String = "Omni"
+ 
+     // The displayed Insulin Pump name in Loop Settings and in the Pump Settings view
+     public var localizedTitle: String
+@@ -425,11 +433,11 @@ public class OmniPumpManager: RileyLinkPumpManager {
+             self.setState { state in
+                 state.lastRileyLinkBatteryAlertDate = Date()
+             }
+-            self.pumpDelegate.notify { delegate in
++            Task {
+                 let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: "lowRLBattery")
+                 let alertBody = String(format: LocalizedString("\"%1$@\" has a low battery", comment: "Format string for low battery alert body for RileyLink. (1: device name)"), device.name ?? "unnamed")
+                 let content = Alert.Content(title: LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert"), body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
+-                delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
++                await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
+             }
+         }
+     }
+@@ -509,7 +517,14 @@ extension OmniPumpManager {
+     }
+ 
+     private func basalDeliveryState(for state: OmniPumpManagerState, at date: Date = Date()) -> PumpManagerStatus.BasalDeliveryState {
+-        // Treat a non-active (faulted or setup incomplete) pod just like no pod
++        switch podCommState(for: state) {
++        case .fault:
++            return .pumpInoperable
++        default:
++            break
++        }
++
++        // Treat a non-active (setup incomplete) pod just like no pod
+         guard let podState = state.podState, podState.isActive else {
+             return .active(.distantPast)
+         }
+@@ -834,7 +849,7 @@ extension OmniPumpManager {
+                     localizedMessage: LocalizedString("Insulin Suspended", comment: "Status highlight that insulin delivery was suspended."),
+                     imageName: "pause.circle.fill",
+                     state: .warning)
+-            } else if timeSinceLastResponse > .minutes(12) {
++            } else if isSignalLost(at: date, lastPumpDataReportDate: state.lastPumpDataReportDate) {
+                 return PumpStatusHighlight(
+                     localizedMessage: LocalizedString("Signal Loss", comment: "Status highlight when communications with the pod haven't happened recently."),
+                     imageName: "exclamationmark.circle.fill",
+@@ -849,6 +864,10 @@ extension OmniPumpManager {
+         }
+     }
+ 
++    private func isSignalLost(at date: Date, lastPumpDataReportDate: Date?) -> Bool {
++        date.timeIntervalSince(lastPumpDataReportDate ?? .distantPast) > .minutes(12)
++    }
++
+     func isRunningManualTempBasal(for state: OmniPumpManagerState) -> Bool {
+         if let tempBasal = state.podState?.unfinalizedTempBasal, !tempBasal.isFinished(), !tempBasal.automatic {
+             return true
+@@ -2324,9 +2343,9 @@ extension OmniPumpManager: PumpManager {
+     }
+ 
+     fileprivate func clearSuspendReminder() {
+-        self.pumpDelegate.notify { (delegate) in
+-            delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
+-            delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
++        Task {
++            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
++            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
+         }
+     }
+ 
+@@ -2382,7 +2401,7 @@ extension OmniPumpManager: PumpManager {
+ 
+     // MARK: - Programming Delivery
+ 
+-    public func enactBolus(units: Double, activationType: BolusActivationType, completion: @escaping (PumpManagerError?) -> Void) {
++    public func enactBolus(decisionId: UUID?, units: Double, activationType: BolusActivationType, completion: @escaping (PumpManagerError?) -> Void) {
+         guard self.hasActivePod else {
+             completion(.configuration(OmniPumpManagerError.noPodPaired))
+             return
+@@ -2447,7 +2466,7 @@ extension OmniPumpManager: PumpManager {
+             //      in 63 minutes if bolus had not completed by then.
+             let bolusWasAutomaticIndicator: TimeInterval = activationType.isAutomatic ? TimeInterval(minutes: 0x3F) : 0
+ 
+-            let result = session.bolus(units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator)
++            let result = session.bolus(decisionId: decisionId, units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator)
+ 
+             switch result {
+             case .success:
+@@ -2530,12 +2549,11 @@ extension OmniPumpManager: PumpManager {
+         }
+     }
+ 
+-    // Legacy version called via the PumpManager interface that wasn't updated to include an automatic variable as enactBolus() was
+-    public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
+-        enactTempBasal(unitsPerHour: unitsPerHour, for: duration, automatic: true, completion: completion)
++    public func enactTempBasal(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
++        runTemporaryBasalProgram(decisionId: decisionId, unitsPerHour: unitsPerHour, for: duration, automatic: true, completion: completion)
+     }
+ 
+-    public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
++    public func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
+         guard unitsPerHour <= state.maxBasalRateUnitsPerHour else {
+             completion(.configuration(OmniPumpManagerError.invalidSetting))
+             return
+@@ -2661,7 +2679,7 @@ extension OmniPumpManager: PumpManager {
+                 let scheduledRate = self.state.basalSchedule.currentRate(using: calendar, at: self.dateGenerator())
+                 let isHighTemp = rate > scheduledRate
+ 
+-                let result = session.setTempBasal(rate: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep)
++                let result = session.setTempBasal(decisionId: decisionId, rate: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep)
+                 switch result {
+                 case .success:
+                     session.dosesForStorage() { (doses) -> Bool in
+@@ -2701,7 +2719,7 @@ extension OmniPumpManager: PumpManager {
+     public func syncDeliveryLimits(limits deliveryLimits: DeliveryLimits, completion: @escaping (Result<DeliveryLimits, Error>) -> Void) {
+         setState { state in
+             if let maxBasalRate = deliveryLimits.maximumBasalRate?.doubleValue(for: .internationalUnitsPerHour),
+-               let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit())
++               let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit)
+             {
+                 state.maxBasalRateUnitsPerHour = maxBasalRate
+                 state.maxBolusUnits = maxBolus
+@@ -2861,16 +2879,16 @@ extension OmniPumpManager: PumpManager {
+     func issueAlert(alert: PumpManagerAlert) {
+         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
+         let loopAlert = Alert(identifier: identifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .immediate)
+-        pumpDelegate.notify { (delegate) in
+-            delegate?.issueAlert(loopAlert)
++        Task {
++            await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+         }
+ 
+         if let repeatInterval = alert.repeatInterval {
+             // Schedule an additional repeating 15 minute reminder for suspend period ended.
+             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
+             let loopAlert = Alert(identifier: repeatingIdentifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .repeating(repeatInterval: repeatInterval))
+-            pumpDelegate.notify { (delegate) in
+-                delegate?.issueAlert(loopAlert)
++            Task {
++                await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+             }
+         }
+ 
+@@ -2881,13 +2899,13 @@ extension OmniPumpManager: PumpManager {
+ 
+     func retractAlert(alert: PumpManagerAlert) {
+         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
+-        pumpDelegate.notify { (delegate) in
+-            delegate?.retractAlert(identifier: identifier)
++        Task {
++            await self.pumpDelegate.delegate?.retractAlert(identifier: identifier)
+         }
+         if alert.isRepeating {
+             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
+-            pumpDelegate.notify { (delegate) in
+-                delegate?.retractAlert(identifier: repeatingIdentifier)
++            Task {
++                await self.pumpDelegate.delegate?.retractAlert(identifier: repeatingIdentifier)
+             }
+         }
+         self.setState { (state) in
+@@ -2968,11 +2986,24 @@ extension OmniPumpManager: PumpManager {
+     }
+ 
+     private func notifyPodFault(fault: DetailedStatus) {
++        // Record the fault as a pump event so it is persisted to the pump event store and
++        // uploaded to remote services (e.g. Nightscout, as a note). This fires once per
++        // fault, on the no-fault→fault transition in podComms(_:didChange:).
+         pumpDelegate.notify { delegate in
++            let date = Date()
++            let event = NewPumpEvent(date: date,
++                                     dose: nil,
++                                     raw: "Pod Fault \(fault.faultEventCode.rawValue) \(date)".data(using: .utf8)!,
++                                     title: fault.faultEventCode.description,
++                                     type: .alarm)
++            delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false) { _ in }
++        }
++
++        Task {
+             let content = Alert.Content(title: fault.faultEventCode.notificationTitle,
+                                         body: fault.faultEventCode.notificationBody,
+                                         acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Alert acknowledgment OK button"))
+-            delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
++            await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
+                                                                     alertIdentifier: fault.faultEventCode.description),
+                                        foregroundContent: content, backgroundContent: content,
+                                        trigger: .immediate))
+@@ -3117,10 +3148,8 @@ extension OmniPumpManager: AlertSoundVendor {
+ // MARK: - AlertResponder implementation
+ 
+ extension OmniPumpManager {
+-    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier, completion: @escaping (Error?) -> Void) {
+-        guard self.hasActivePod, !state.activeAlerts.isEmpty else {
+-            log.default("@@@ Skipping acknowledge alert %{public}@ with no active pod or alerts", alertIdentifier)
+-            completion(nil)
++    public func acknowledgeAlert(alertIdentifier: Alert.AlertIdentifier) async throws {
++        guard self.hasActivePod else {
+             return
+         }
+ 
+@@ -3137,35 +3166,35 @@ extension OmniPumpManager {
+                         // Don't clear this pod alert here with the pod still suspended so that the suspend time expired
+                         // pod alert beeping will continue until the pod is resumed which will then deactivate this alert.
+                         log.default("Skipping acknowledgement of suspend time expired alert with a suspended pod")
+-                        completion(nil)
+                         return
+                     }
+ 
+-                    // Acknowledge the pod alert for the triggering slot
+-                    self.runSession(withName: "Acknowledge Alert") { (result) in
+-                        switch result {
+-                        case .success(let session):
+-                            self.handleSilencePodEnd(session: session)
+-
+-                            do {
+-                                let beepBlock = self.beepMessageBlock(beepType: .beep)
+-                                let _ = try session.acknowledgeAlerts(alerts: AlertSet(slots: [slot]), beepBlock: beepBlock)
+-                            } catch {
++                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) -> Void in
++                        self.runSession(withName: "Acknowledge Alert") { (result) in
++                            switch result {
++                            case .success(let session):
++                                self.handleSilencePodEnd(session: session)
++
++                                do {
++                                    let beepBlock = self.beepMessageBlock(beepType: .beep)
++                                    let _ = try session.acknowledgeAlerts(alerts: AlertSet(slots: [slot]), beepBlock: beepBlock)
++                                } catch {
++                                    self.setState { state in
++                                        state.alertsWithPendingAcknowledgment.insert(alert)
++                                    }
++                                    continuation.resume(throwing: error)
++                                    return
++                                }
++                                self.setState { state in
++                                    state.activeAlerts.remove(alert)
++                                }
++                                continuation.resume()
++                            case .failure(let error):
+                                 self.setState { state in
+                                     state.alertsWithPendingAcknowledgment.insert(alert)
+                                 }
+-                                completion(error)
+-                                return
++                                continuation.resume(throwing: error)
+                             }
+-                            self.setState { state in
+-                                state.activeAlerts.remove(alert)
+-                            }
+-                            completion(nil)
+-                        case .failure(let error):
+-                            self.setState { state in
+-                                state.alertsWithPendingAcknowledgment.insert(alert)
+-                            }
+-                            completion(error)
+                         }
+                     }
+                 } else {
+@@ -3176,14 +3205,12 @@ extension OmniPumpManager {
+                             state.acknowledgedTimeOffsetAlert = true
+                         }
+                     }
+-                    completion(nil)
+                 }
+             }
+         }
+ 
+         if !found {
+             log.error("@@@ acknowledge alert %{public}@ not found!", alertIdentifier)
+-            completion(nil)
+         }
+     }
+ }
+diff --git a/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManagerState.swift b/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManagerState.swift
+index 6c705e2..67b3422 100644
+--- a/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManagerState.swift
++++ b/OmnipodKit/OmnipodKit/PumpManager/OmniPumpManagerState.swift
+@@ -20,7 +20,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
+     var isOnboarded: Bool = false
+ 
+     // XXX still needs be declared public with the current Trio implementation
+-    private(set) public var podState: PodState?
++    public private(set) var podState: PodState?
+ 
+     // State should only be modifiable by PodComms
+     mutating func updatePodStateFromPodComms(_ podState: PodState?) {
+diff --git a/OmnipodKit/OmnipodKit/PumpManager/PodCommsSession.swift b/OmnipodKit/OmnipodKit/PumpManager/PodCommsSession.swift
+index 290d2b8..822bd99 100644
+--- a/OmnipodKit/OmnipodKit/PumpManager/PodCommsSession.swift
++++ b/OmnipodKit/OmnipodKit/PumpManager/PodCommsSession.swift
+@@ -661,7 +661,7 @@ class PodCommsSession: MessageTransportDelegate {
+         case unacknowledged(error: PodCommsError)
+     }
+ 
+-    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0) -> DeliveryCommandResult {
++    func bolus(decisionId: UUID?, units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0) -> DeliveryCommandResult {
+ 
+         if podState.unacknowledgedCommand != nil {
+             do {
+@@ -708,7 +708,7 @@ class PodCommsSession: MessageTransportDelegate {
+             podState.unacknowledgedCommand = PendingCommand.program(.bolus(volume: units, automatic: automatic), transport.messageNumber, currentDate)
+             let statusResponse: StatusResponse = try send([bolusScheduleCommand, bolusExtraCommand])
+             podState.unacknowledgedCommand = nil
+-            podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic)
++            podState.unfinalizedBolus = UnfinalizedDose(decisionId: decisionId, bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic)
+             podState.updateFromStatusResponse(statusResponse, at: currentDate)
+             return DeliveryCommandResult.success(statusResponse: statusResponse)
+         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
+@@ -721,7 +721,7 @@ class PodCommsSession: MessageTransportDelegate {
+         }
+     }
+ 
+-    func setTempBasal(rate: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0) -> DeliveryCommandResult {
++    func setTempBasal(decisionId: UUID?, rate: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0) -> DeliveryCommandResult {
+ 
+         if podState.unacknowledgedCommand != nil {
+             do {
+@@ -740,7 +740,7 @@ class PodCommsSession: MessageTransportDelegate {
+             podState.unacknowledgedCommand = PendingCommand.program(.tempBasal(unitsPerHour: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic), transport.messageNumber, startTime)
+             let status: StatusResponse = try send([tempBasalCommand, tempBasalExtraCommand])
+             podState.unacknowledgedCommand = nil
+-            podState.unfinalizedTempBasal = UnfinalizedDose(tempBasalRate: rate, startTime: startTime, duration: duration, isHighTemp: isHighTemp, automatic: automatic, scheduledCertainty: .certain, insulinType: podState.insulinType)
++            podState.unfinalizedTempBasal = UnfinalizedDose(decisionId: decisionId, tempBasalRate: rate, startTime: startTime, duration: duration, isHighTemp: isHighTemp, automatic: automatic, scheduledCertainty: .certain, insulinType: podState.insulinType)
+             podState.updateFromStatusResponse(status, at: currentDate)
+             return DeliveryCommandResult.success(statusResponse: status)
+         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
+diff --git a/OmnipodKit/OmnipodKit/PumpManager/PodState.swift b/OmnipodKit/OmnipodKit/PumpManager/PodState.swift
+index 9b20c2a..63c9177 100644
+--- a/OmnipodKit/OmnipodKit/PumpManager/PodState.swift
++++ b/OmnipodKit/OmnipodKit/PumpManager/PodState.swift
+@@ -387,7 +387,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
+         if deliveryStatus.bolusing && unfinalizedBolus == nil { // active bolus that we aren't tracking
+             if podProgressStatus.readyForDelivery {
+                 // Create an unfinalizedBolus with the remaining bolus amount to capture what we can.
+-                unfinalizedBolus = UnfinalizedDose(bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
++                unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
+             }
+         }
+         if deliveryStatus.tempBasalRunning && unfinalizedTempBasal == nil { // active temp basal that we aren't tracking
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/OmniPumpManager+UI.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/OmniPumpManager+UI.swift
+index ee96aef..9a5d574 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/OmniPumpManager+UI.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/OmniPumpManager+UI.swift
+@@ -67,7 +67,7 @@ public enum OmniStatusBadge: DeviceStatusBadge {
+ // MARK: - PumpStatusIndicator
+ extension OmniPumpManager {
+     
+-    public var pumpStatusHighlight: DeviceStatusHighlight? {
++    public var pumpStatusHighlight: PumpStatusHighlight? {
+         return buildPumpStatusHighlight(for: state)
+     }
+ 
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/ViewModels/OmniSettingsViewModel.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/ViewModels/OmniSettingsViewModel.swift
+index a252510..1eb57b1 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/ViewModels/OmniSettingsViewModel.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/ViewModels/OmniSettingsViewModel.swift
+@@ -10,7 +10,7 @@
+ import SwiftUI
+ import LoopKit
+ import LoopKitUI
+-import HealthKit
++import LoopAlgorithm
+ import Combine
+ 
+ 
+@@ -190,7 +190,7 @@ class OmniSettingsViewModel: ObservableObject {
+         switch basalDeliveryState {
+         case .active(_), .initiatingTempBasal:
+             return true
+-        case .tempBasal(_), .cancelingTempBasal, .suspending, .suspended(_), .resuming, .none:
++        default:
+             return false
+         }
+     }
+@@ -236,7 +236,7 @@ class OmniSettingsViewModel: ObservableObject {
+         return nil
+     }
+ 
+-    let reservoirVolumeFormatter = QuantityFormatter(for: .internationalUnit())
++    let reservoirVolumeFormatter = QuantityFormatter(for: .internationalUnit)
+ 
+     var didFinish: (() -> Void)?
+ 
+@@ -337,8 +337,8 @@ class OmniSettingsViewModel: ObservableObject {
+         }
+     }
+ 
+-    func runTemporaryBasalProgram(unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
+-        pumpManager.enactTempBasal(unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
++    func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
++        pumpManager.runTemporaryBasalProgram(decisionId: decisionId, unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
+     }
+ 
+     func saveScheduledExpirationReminder(_ selectedDate: Date?, _ completion: @escaping (Error?) -> Void) {
+@@ -468,13 +468,13 @@ class OmniSettingsViewModel: ObservableObject {
+     func reservoirText(for level: ReservoirLevel) -> String {
+         switch level {
+         case .aboveThreshold:
+-            let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: Pod.maximumReservoirReading)
++            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: Pod.maximumReservoirReading)
+             let thresholdString = reservoirVolumeFormatter.string(from: quantity, includeUnit: false) ?? ""
+             let unitString = reservoirVolumeFormatter.localizedUnitStringWithPlurality(forValue: Pod.maximumReservoirReading, avoidLineBreaking: true)
+             return String(format: LocalizedString("%1$@+ %2$@", comment: "Format string for reservoir level above max measurable threshold. (1: measurable reservoir threshold) (2: units)"),
+                           thresholdString, unitString)
+         case .valid(let value):
+-            let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: value)
++            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: value)
+             return reservoirVolumeFormatter.string(from: quantity) ?? ""
+         }
+     }
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ExpirationReminderPickerView.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ExpirationReminderPickerView.swift
+index e137876..47d6064 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ExpirationReminderPickerView.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ExpirationReminderPickerView.swift
+@@ -10,7 +10,7 @@
+ import SwiftUI
+ import LoopKit
+ import LoopKitUI
+-import HealthKit
++import LoopAlgorithm
+ 
+ 
+ struct ExpirationReminderPickerView: View {
+@@ -23,7 +23,7 @@ struct ExpirationReminderPickerView: View {
+     
+     @State var showingHourPicker: Bool = false
+     
+-    var expirationDefaultFormatter = QuantityFormatter(for: .hour())
++    var expirationDefaultFormatter = QuantityFormatter(for: .hour)
+     
+     var expirationDefaultString: String {
+         return expirationReminderHourString(expirationReminderDefault.wrappedValue)
+@@ -45,16 +45,21 @@ struct ExpirationReminderPickerView: View {
+                 }
+             }
+             if showingHourPicker {
+-                ResizeablePicker(selection: expirationReminderDefault,
+-                                 data: Array(Self.expirationReminderHoursAllowed),
+-                                 formatter: { expirationReminderHourString($0) })
++                Picker(selection: expirationReminderDefault) {
++                    ForEach(Array(Self.expirationReminderHoursAllowed), id: \.self) { value in
++                        Text(expirationReminderHourString(value))
++                    }
++                } label: {
++                    EmptyView()
++                }
++                .pickerStyle(.wheel)
+             }
+         }
+     }
+     
+     private func expirationReminderHourString(_ value: Int) -> String {
+         if value > 0 {
+-            return expirationDefaultFormatter.string(from: HKQuantity(unit: .hour(), doubleValue: Double(value)))!
++            return expirationDefaultFormatter.string(from: LoopQuantity(unit: .hour, doubleValue: Double(value)))!
+         } else {
+             return LocalizedString("No Reminder", comment: "Value text for no expiration reminder")
+         }
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/LowReservoirView.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/LowReservoirView.swift
+index 0c125c7..2286e6a 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/LowReservoirView.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/LowReservoirView.swift
+@@ -10,7 +10,6 @@
+ import SwiftUI
+ import LoopKitUI
+ import LoopKit
+-import HealthKit
+ 
+ struct LowReservoirView: View {
+     private var reservoirLevel: Double // current reservoir level
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ManualTempBasalEntryView.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ManualTempBasalEntryView.swift
+index baa489b..b3ac4a4 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ManualTempBasalEntryView.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/ManualTempBasalEntryView.swift
+@@ -10,7 +10,7 @@
+ import SwiftUI
+ import LoopKitUI
+ import LoopKit
+-import HealthKit
++import LoopAlgorithm
+ 
+ 
+ struct ManualTempBasalEntryView: View {
+@@ -53,7 +53,7 @@ struct ManualTempBasalEntryView: View {
+     }
+ 
+     private static let durationFormatter: QuantityFormatter = {
+-        let quantityFormatter = QuantityFormatter(for: .hour())
++        let quantityFormatter = QuantityFormatter(for: .hour)
+         quantityFormatter.numberFormatter.minimumFractionDigits = 1
+         quantityFormatter.numberFormatter.maximumFractionDigits = 1
+         quantityFormatter.unitStyle = .long
+@@ -61,16 +61,16 @@ struct ManualTempBasalEntryView: View {
+     }()
+ 
+     private var durationUnitsLabel: some View {
+-        Text(QuantityFormatter(for: .hour()).localizedUnitStringWithPlurality())
++        Text(QuantityFormatter(for: .hour).localizedUnitStringWithPlurality())
+             .foregroundColor(Color(.secondaryLabel))
+     }
+ 
+     func formatRate(_ rate: Double) -> String {
+-        return ManualTempBasalEntryView.rateFormatter.string(from: HKQuantity(unit: .internationalUnitsPerHour, doubleValue: rate)) ?? ""
++        return ManualTempBasalEntryView.rateFormatter.string(from: LoopQuantity(unit: .internationalUnitsPerHour, doubleValue: rate)) ?? ""
+     }
+ 
+     func formatDuration(_ duration: TimeInterval) -> String {
+-        return ManualTempBasalEntryView.durationFormatter.string(from: HKQuantity(unit: .hour(), doubleValue: duration.hours)) ?? ""
++        return ManualTempBasalEntryView.durationFormatter.string(from: LoopQuantity(unit: .hour, doubleValue: duration.hours)) ?? ""
+     }
+ 
+     var body: some View {
+@@ -83,12 +83,23 @@ struct ManualTempBasalEntryView: View {
+                         Text(String(format: LocalizedString("%1$@ for %2$@", comment: "Summary string for temporary basal rate configuration page"), formatRate(rateEntered), formatDuration(durationEntered)))
+                     }
+                     HStack {
+-                        ResizeablePicker(selection: $rateEntered,
+-                                         data: allowedRates,
+-                                         formatter: { formatRate($0) })
+-                        ResizeablePicker(selection: $durationEntered,
+-                                         data: Pod.supportedTempBasalDurations,
+-                                         formatter: { formatDuration($0) })
++                        Picker(selection: $rateEntered) {
++                            ForEach(allowedRates, id: \.self) { value in
++                                Text(formatRate(value))
++                            }
++                        } label: {
++                            EmptyView()
++                        }
++                        .pickerStyle(.wheel)
++
++                        Picker(selection: $durationEntered) {
++                            ForEach(Pod.supportedTempBasalDurations, id: \.self) { value in
++                                Text(formatDuration(value))
++                            }
++                        } label: {
++                            EmptyView()
++                        }
++                        .pickerStyle(.wheel)
+                     }
+                     .frame(maxHeight: 162.0)
+                     .alert(isPresented: $showingMissingConfigAlert, content: { missingConfigAlert })
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/NotificationSettingsView.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/NotificationSettingsView.swift
+index f339f9e..1956730 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/NotificationSettingsView.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/NotificationSettingsView.swift
+@@ -10,7 +10,7 @@
+ import SwiftUI
+ import LoopKit
+ import LoopKitUI
+-import HealthKit
++import LoopAlgorithm
+ 
+ 
+ struct NotificationSettingsView: View {
+@@ -39,7 +39,7 @@ struct NotificationSettingsView: View {
+ 
+     var onSaveLowReservoirDefault: ((_ selectedValue: Int, _ completion: @escaping (_ error: Error?) -> Void) -> Void)?
+ 
+-    var insulinQuantityFormatter = QuantityFormatter(for: .internationalUnit())
++    var insulinQuantityFormatter = QuantityFormatter(for: .internationalUnit)
+ 
+     var body: some View {
+         RoundedCardScrollView {
+diff --git a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/OmniSettingsView.swift b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/OmniSettingsView.swift
+index 7af03c5..0bc35dd 100644
+--- a/OmnipodKit/OmnipodKit/PumpManagerUI/Views/OmniSettingsView.swift
++++ b/OmnipodKit/OmnipodKit/PumpManagerUI/Views/OmniSettingsView.swift
+@@ -11,7 +11,6 @@ import SwiftUI
+ import LoopKit
+ import LoopKitUI
+ import RileyLinkBLEKit
+-import HealthKit
+ 
+ 
+ struct OmniSettingsView: View  {
+@@ -209,7 +208,7 @@ struct OmniSettingsView: View  {
+         .sheet(isPresented: $showManualTempBasalOptions) {
+             ManualTempBasalEntryView(
+                 enactBasal: { rate, duration, completion in
+-                    viewModel.runTemporaryBasalProgram(unitsPerHour: rate, for: duration) { error in
++                    viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: rate, for: duration) { error in
+                         completion(error)
+                         if error == nil {
+                             showManualTempBasalOptions = false
+@@ -683,7 +682,7 @@ struct OmniSettingsView: View  {
+ 
+     func cancelManualBasal() {
+         cancelingTempBasal = true
+-        viewModel.runTemporaryBasalProgram(unitsPerHour: 0, for: 0) { error in
++        viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: 0, for: 0) { error in
+             cancelingTempBasal = false
+             if let error = error {
+                 self.viewModel.activeAlert = .cancelManualBasalError(error)

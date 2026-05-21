@@ -8,7 +8,8 @@ The OmnipodKit submodule must be added to the workspace for the OS-AID that will
 
 Included in the OmnipodKit repository is the patch to add the OmnipodKit pump manager to a fresh clone of [LoopWorkspace](https://github.com/LoopKit/LoopWorkspace/).
 
-* This patch is valid for either `main` or `dev` branches for LoopWorkspace.
+* This patch is valid for either `main` or `dev` branches for LoopWorkspace
+* There are additional instructions for the tidepool-sync/2026-05-11 updates that are being tested as Loop 3.15
 
 The commands below should be pasted into Terminal with the path at the top-of-a-buildable LoopWorkspace directory.
 
@@ -23,6 +24,20 @@ git submodule add https://github.com/loopandlearn/OmnipodKit
 git apply OmnipodKit/patches/add_omnipodkit_to_LoopWorkspace.patch
 git add .
 git commit -am "add submodule OmnipodKit"
+```
+
+If you are starting with Loop version **3.14.x** or earlier, the next step is to build:
+
+```
+xed .
+```
+
+If you started with Loop version **3.15.0** or later, you must apply one more patch before building:
+
+```
+git apply OmnipodKit/patches/update_omipodkit_for_LoopWorkspace_tidepool-sync-2026.patch
+git add .
+git commit -am "update submodule OmnipodKit to pump manager design for tidepool-sync/2026-05-11"
 xed .
 ```
 
