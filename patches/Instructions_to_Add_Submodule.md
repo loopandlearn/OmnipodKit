@@ -35,7 +35,7 @@ xed .
 If you started with Loop version **3.15.0** or later, you must apply one more patch before building:
 
 ```
-git apply OmnipodKit/patches/update_omipodkit_for_LoopWorkspace_tidepool-sync-2026.patch
+git apply OmnipodKit/patches/update_omnipodkit_for_LoopWorkspace_tidepool-sync-2026.patch
 git add .
 git commit -am "update submodule OmnipodKit to pump manager design for tidepool-sync/2026-05-11"
 xed .
