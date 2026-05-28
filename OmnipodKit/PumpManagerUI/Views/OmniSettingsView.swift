@@ -582,6 +582,15 @@ struct OmniSettingsView: View  {
                 }
             }
 
+            if self.viewModel.podType.isO5 {
+                Section() {
+                    NavigationLink(destination: PodCertificatesView(hasActivePod: !viewModel.noPod)) {
+                        FrameworkLocalText("Pod Certificate", comment: "Text for pod certificate navigation link in OmniSettingsView")
+                            .foregroundColor(Color.primary)
+                    }
+                }
+            }
+
             Section() {
                 let localizedPodDiagnosticsStr = LocalizedString("Pod Diagnostics", comment: "Title for the Pod Diagnostic row and page")
                 NavigationLink(destination: PodDiagnosticsView(
