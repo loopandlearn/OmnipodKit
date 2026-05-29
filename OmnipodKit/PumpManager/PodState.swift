@@ -687,9 +687,9 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
                         // Without a saved signingKey as well as the needed certificate for pdmId,
                         // this pod will not be able to do any insulin, cancel, or deactivation commands.
                         // This should only occur for an artificially created testing situation.
-                        log.default("@@@ initializion failed for 0x%08X, continuing in limited mode...", controllerId)
+                        log.default("@@@ initializion failed for 0x%08llX, continuing in limited mode...", controllerId)
                     } else {
-                        log.default("@@@ PodState signingKey initialized for 0x%08X", controllerId)
+                        log.default("@@@ PodState signingKey initialized for 0x%08llX", controllerId)
                     }
                 }
             }
@@ -761,7 +761,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
     public var debugDescription: String {
         let retVal = [
             "### PodState",
-            "* address: \(String(format: "%08X", address))",
+            "* address: \(String(format: "%08llX", address))",
             "* bleIdentifier: \(optionalString(bleIdentifier))",
             "* activatedAt: \(optionalString(activatedAt))",
             "* expiresAt: \(optionalString(expiresAt))",

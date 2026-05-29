@@ -32,7 +32,7 @@ enum ErrorResponseCode: UInt8, CustomStringConvertible {
         if let known = ErrorResponseCode(rawValue: code) {
             return known.description
         }
-        return String(format: "Unknown error code %u (0x%02X)", code, code)
+        return String(format: "Unknown error code %llu (0x%02llX)", code, code)
     }
 }
 

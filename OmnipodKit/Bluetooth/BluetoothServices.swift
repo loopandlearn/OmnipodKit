@@ -41,7 +41,7 @@ enum dashOmnipodCharacteristicUUID: String, CBUUIDRawValue {
 // The o5OmnipodServiceUUID advertisement changes when paired to include the pdmId
 func o5ServiceAdvertisementUUID(_ pdmId: UInt32) -> CBUUID {
     // See o5OmnipodServiceUUID.advertisement for the initial value
-    let uuidString = String(format: "CE1F923D-C539-48EA-7300-0A%08X00", pdmId)
+    let uuidString = String(format: "CE1F923D-C539-48EA-7300-0A%08llX00", pdmId)
     return CBUUID(string: uuidString)
 }
 

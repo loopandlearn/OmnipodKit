@@ -133,7 +133,7 @@ class SessionEstablisher {
 
         // Store the identifier from the pod's message (we must echo it back)
         identifier = challengeMsg.identifier
-        log.default("SECONDARY: Received pod challenge with identifier=%{public}d, %{public}d attributes",
+        log.default("SECONDARY: Received pod challenge with identifier=%{public}lld, %{public}lld attributes",
                      identifier, challengeMsg.attributes.count)
 
         // Step 2: Extract RAND, AUTN, and pod's IV from the challenge

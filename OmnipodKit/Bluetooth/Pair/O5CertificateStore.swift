@@ -63,7 +63,7 @@ class O5CertificateStore {
 
         loadOptionalO5Data()
         guard let data = O5RegistrationData.get(controllerId) else {
-            log.debug("@@@ O5CertificateStore has no data for 0x%08X", controllerId)
+            log.debug("@@@ O5CertificateStore has no data for 0x%08llX", controllerId)
             throw PodCommsError.noCertificateFound
         }
 
@@ -79,7 +79,7 @@ class O5CertificateStore {
             throw PodCommsError.noCertificateFound
         }
 
-        log.bleDebug("O5CertificateStore initialized for 0x%08X", registration.controllerId)
+        log.bleDebug("O5CertificateStore initialized for 0x%08llX", registration.controllerId)
     }
 
     // MARK: - Signing (Secondary Key)

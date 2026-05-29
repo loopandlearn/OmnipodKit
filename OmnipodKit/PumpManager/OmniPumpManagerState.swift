@@ -236,14 +236,14 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             if podType.isO5, let myId = controllerId, myId != 0 {
                 // Verify that the O5CertificateStore contains info for myId
                 if O5CertificateStore.contains(myId) {
-                    log.default("@@@ Verified controller id 0x%08X has O5 certificate", myId)
+                    log.default("@@@ Verified controller id 0x%08llX has O5 certificate", myId)
                 } else if podState == nil {
                     // With no pod, just pick a new available controllerId to use
                     let newId = O5CertificateStore.pickControllerId
                     controllerId = newId
                     if newId != 0 {
                         podId = newId + 1
-                        log.default("@@@ Switching O5 ids for certificate for 0x%08X", newId)
+                        log.default("@@@ Switching O5 ids for certificate for 0x%08llX", newId)
                     } else {
                         // There are no O5Certificates for any pdmId.
                         // Since we don't have a podState, just force a new
@@ -435,8 +435,8 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             ].joined(separator: "\n")
         } else {
             retVal += [
-                "* controllerId: \(String(format: "%08X", controllerId))",
-                "* podId: \(String(format: "%08X", podId))",
+                "* controllerId: \(String(format: "%08llX", controllerId))",
+                "* podId: \(String(format: "%08llX", podId))",
             ].joined(separator: "\n")
         }
         retVal += [

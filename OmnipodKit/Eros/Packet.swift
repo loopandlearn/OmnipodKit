@@ -86,7 +86,7 @@ struct Packet {
 
 extension Packet: CustomDebugStringConvertible {
     var debugDescription: String {
-        let sequenceNumStr = String(format: "%02d", sequenceNum)
+        let sequenceNumStr = String(format: "%02lld", sequenceNum)
         return "Packet(\(Data(bigEndian: address).hexadecimalString) packetType:\(packetType) seq:\(sequenceNumStr) data:\(data.hexadecimalString))"
     }
 }

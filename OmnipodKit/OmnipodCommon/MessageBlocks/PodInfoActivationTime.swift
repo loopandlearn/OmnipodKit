@@ -44,11 +44,11 @@ func activationTimeString(podInfoActivationTime: PodInfoActivationTime) -> Strin
     var result: [String] = []
 
     // activation time info
-    result.append(String(format: "Year:   %u", podInfoActivationTime.year))
-    result.append(String(format: "Month:  %u", podInfoActivationTime.month))
-    result.append(String(format: "Day:    %u", podInfoActivationTime.day))
-    result.append(String(format: "Hour:   %u", podInfoActivationTime.hour))
-    result.append(String(format: "Minute: %u", podInfoActivationTime.minute))
+    result.append(String(format: "Year:   %lld", podInfoActivationTime.year))
+    result.append(String(format: "Month:  %lld", podInfoActivationTime.month))
+    result.append(String(format: "Day:    %lld", podInfoActivationTime.day))
+    result.append(String(format: "Hour:   %lld", podInfoActivationTime.hour))
+    result.append(String(format: "Minute: %lld", podInfoActivationTime.minute))
 
     // pod fault info
     result.append(String(format: "\nFault Time: %@", podInfoActivationTime.faultTime.timeIntervalStr))

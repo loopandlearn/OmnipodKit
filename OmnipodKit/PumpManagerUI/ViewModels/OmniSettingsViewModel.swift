@@ -455,7 +455,7 @@ class OmniSettingsViewModel: ObservableObject {
             case .occluded, .occlusionCheckStartup1, .occlusionCheckStartup2, .occlusionCheckTimeouts1, .occlusionCheckTimeouts2, .occlusionCheckTimeouts3, .occlusionCheckPulseIssue, .occlusionCheckBolusProblem, .occlusionCheckAboveThreshold, .occlusionCheckValueTooHigh:
                 return LocalizedString("Pod Occlusion", comment: "Error message for reservoir view when pod occlusion checks failed")
             default:
-                return String(format: LocalizedString("Pod Fault %1$03d", comment: "Error message for reservoir view during general pod fault: (1: fault code value)"), status.faultEventCode.rawValue)
+                return String(format: LocalizedString("Pod Fault %1$03lld", comment: "Error message for reservoir view during general pod fault: (1: fault code value)"), status.faultEventCode.rawValue)
             }
         case .active:
             if isPodDataStale {

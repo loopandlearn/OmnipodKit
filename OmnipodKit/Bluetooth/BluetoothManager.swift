@@ -122,7 +122,7 @@ class BluetoothManager: NSObject {
     func setUuidPdmId(_ pdmId: UInt32?) {
         managerQueue.async {
             if let pdmId = pdmId, pdmId != 0 {
-                self.log.bleDebug("Setting uuidPdmId to 0x%x", pdmId)
+                self.log.bleDebug("Setting uuidPdmId to 0x%llx", pdmId)
                 self.uuidPdmId = pdmId
             } else {
                 self.uuidPdmId = nil
@@ -400,7 +400,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
         log.debug("%{public}@: %{public}@, %{public}@", #function, peripheral, advertisementData)
 
         if let mfgData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
-            log.default("[SCAN] ManufacturerData: %{public}@ (%{public}d bytes)", mfgData.hexadecimalString, mfgData.count)
+            log.default("[SCAN] ManufacturerData: %{public}@ (%{public}lld bytes)", mfgData.hexadecimalString, mfgData.count)
         }
 
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {

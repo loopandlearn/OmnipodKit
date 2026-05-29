@@ -219,7 +219,7 @@ class BlePodMessageTransport: MessageTransport {
         messageLogger?.didSend(dataToSend)
 
         let sendMessage = try getCmdMessage(cmd: message)
-        log.bleDebug("[transport] send phase=write msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d",
+        log.bleDebug("[transport] send phase=write msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld",
                     msgSeq, nonceSeq, messageNumber)
 
         let writeResult = manager.sendMessagePacket(sendMessage)
@@ -227,12 +227,12 @@ class BlePodMessageTransport: MessageTransport {
         case .sentWithAcknowledgment:
             break;
         case .sentWithError(let error):
-            log.error("[transport] failed phase=write-ack msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d error=%{public}@",
+            log.error("[transport] failed phase=write-ack msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld error=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: error))
             messageLogger?.didError("Unacknowledged message. seq:\(message.sequenceNum), error = \(error)")
             throw PodCommsError.unacknowledgedMessage(sequenceNumber: message.sequenceNum, error: error)
         case .unsentWithError(let error):
-            log.error("[transport] failed phase=write msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d error=%{public}@",
+            log.error("[transport] failed phase=write msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld error=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: error))
             throw PodCommsError.commsError(error: error)
         }
@@ -242,7 +242,7 @@ class BlePodMessageTransport: MessageTransport {
             incrementMessageNumber() // bump the 4-bit Omnipod Message number
             return response
         } catch {
-            log.error("[transport] failed phase=read/ack msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d error=%{public}@",
+            log.error("[transport] failed phase=read/ack msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld error=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: error))
             messageLogger?.didError("Unacknowledged message. seq:\(message.sequenceNum), error = \(error)")
             throw PodCommsError.unacknowledgedMessage(sequenceNumber: message.sequenceNum, error: error)
@@ -294,7 +294,7 @@ class BlePodMessageTransport: MessageTransport {
         }
 
         let signingInput = encrypted.asData(forEncryption: false).prefix(16) + encrypted.payload
-        log.bleDebug("signing input (%{public}d bytes): AAD=%{public}@ payload=%{public}d bytes",
+        log.bleDebug("signing input (%{public}lld bytes): AAD=%{public}@ payload=%{public}lld bytes",
                   signingInput.count, signingInput.prefix(16).hexadecimalString, encrypted.payload.count)
 
         let signed = try signingKey.signature(for: signingInput)
@@ -312,11 +312,11 @@ class BlePodMessageTransport: MessageTransport {
     private func readAndAckResponse() throws -> Message {
         guard let enDecrypt = self.enDecrypt else { throw PodCommsError.podNotConnected }
 
-        log.bleDebug("[transport] receive phase=read msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d",
+        log.bleDebug("[transport] receive phase=read msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld",
                     msgSeq, nonceSeq, messageNumber)
         let readResponse = try manager.readMessagePacket()
         guard let readMessage = readResponse else {
-            log.error("[transport] failed phase=read-empty msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d",
+            log.error("[transport] failed phase=read-empty msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld",
                       msgSeq, nonceSeq, messageNumber)
             throw PodProtocolError.messageIOException("Could not read response")
         }
@@ -326,7 +326,7 @@ class BlePodMessageTransport: MessageTransport {
         do {
             decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
         } catch {
-            log.error("[transport] failed phase=decrypt msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d error=%{public}@",
+            log.error("[transport] failed phase=decrypt msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld error=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: error))
             throw error
         }
@@ -335,7 +335,7 @@ class BlePodMessageTransport: MessageTransport {
         do {
             response = try parseResponse(decrypted: decrypted)
         } catch {
-            log.error("[transport] failed phase=parse msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d error=%{public}@",
+            log.error("[transport] failed phase=parse msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld error=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: error))
             throw error
         }
@@ -345,20 +345,20 @@ class BlePodMessageTransport: MessageTransport {
         let ack = try getAck(response: decrypted)
         let ackResult = manager.sendMessagePacket(ack)
         guard case .sentWithAcknowledgment = ackResult else {
-            log.error("[transport] failed phase=ack-write msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d ackResult=%{public}@",
+            log.error("[transport] failed phase=ack-write msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld ackResult=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: ackResult))
             throw PodProtocolError.messageIOException("Could not write $msgType: \(ackResult)")
         }
 
         // verify that the Omnipod message # matches the expected value
         guard response.sequenceNum == messageNumber else {
-            log.error("[transport] failed phase=message-number-validation expected=%{public}d received=%{public}d msgSeq=%{public}d nonceSeq=%{public}d",
+            log.error("[transport] failed phase=message-number-validation expected=%{public}lld received=%{public}lld msgSeq=%{public}lld nonceSeq=%{public}lld",
                       messageNumber, response.sequenceNum, msgSeq, nonceSeq)
             throw MessageError.invalidSequence
         }
 
         BlePodMessageTransport.lastSuccessfulExchangeTime = Date()
-        log.bleDebug("[transport] exchange success msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d",
+        log.bleDebug("[transport] exchange success msgSeq=%{public}lld nonceSeq=%{public}lld messageNumber=%{public}lld",
                     msgSeq, nonceSeq, messageNumber)
 
         return response
@@ -451,7 +451,7 @@ class BlePodMessageTransport: MessageTransport {
         incrementNonceSeq()
         let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
 
-        log.default("O5 SendRaw(Hex): %{public}@ (%{public}d bytes)", rawData.hexadecimalString, rawData.count)
+        log.default("O5 SendRaw(Hex): %{public}@ (%{public}lld bytes)", rawData.hexadecimalString, rawData.count)
         messageLogger?.didSend(rawData)
 
         let writeResult = manager.sendMessagePacket(encrypted)
@@ -488,7 +488,7 @@ class BlePodMessageTransport: MessageTransport {
             }
         }
 
-        log.default("O5 RecvRaw(Hex): %{public}@ (%{public}d bytes)", responseData.hexadecimalString, responseData.count)
+        log.default("O5 RecvRaw(Hex): %{public}@ (%{public}lld bytes)", responseData.hexadecimalString, responseData.count)
         messageLogger?.didReceive(responseData)
 
         // Send ACK
@@ -539,7 +539,7 @@ class BlePodMessageTransport: MessageTransport {
         incrementNonceSeq()
         let encrypted = try enDecrypt.encrypt(msg, nonceSeq)
 
-        log.default("O5 AID Send (%{public}d bytes wrapped): %{public}@",
+        log.default("O5 AID Send (%{public}lld bytes wrapped): %{public}@",
                      wrappedPayload.count, wrappedPayload.hexadecimalString)
         messageLogger?.didSend(wrappedPayload)
 
@@ -574,7 +574,7 @@ class BlePodMessageTransport: MessageTransport {
         }
         let responseData = decrypted.payload.suffix(from: prefixData.count)
 
-        log.default("O5 AID Recv (%{public}d bytes): %{public}@",
+        log.default("O5 AID Recv (%{public}lld bytes): %{public}@",
                      responseData.count, responseData.hexadecimalString)
         messageLogger?.didReceive(responseData)
 

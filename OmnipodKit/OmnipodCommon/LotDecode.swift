@@ -74,13 +74,13 @@ func lotDecode(lot: UInt32) -> LotDecode {
         dateMMDD = "0000"    }
 
     let line = Int((lot >> 4) & mask(3))
-    let batch = String(format: "%X", lot & mask(4))
+    let batch = String(format: "%llX", lot & mask(4))
 
     let readableText = "\(prefix)\(productCode)\(locationCode)\(dateMMDD)\(dateYY)\(line)\(batch)"
 
     return LotDecode(
         lot: lot,
-        lotHex: String(format: "0x%08X", lot),
+        lotHex: String(format: "0x%08llX", lot),
         prefix: prefix,
         productNum: productNum,
         productCode: productCode,

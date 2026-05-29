@@ -217,7 +217,7 @@ extension PeripheralManager {
         dispatchPrecondition(condition: .onQueue(queue))
         guard central?.state == .poweredOn && peripheral.state == .connected else {
             self.log.info("runCommand guard failed - bluetooth not running or peripheral not connected: peripheral %@", peripheral)
-            self.log.info("runCommand guard failed - not ready: peripheral=%{public}@ centralState=%{public}@ peripheralState=%{public}@ queueDepth=%{public}d commandConditions=%{public}@",
+            self.log.info("runCommand guard failed - not ready: peripheral=%{public}@ centralState=%{public}@ peripheralState=%{public}@ queueDepth=%{public}lld commandConditions=%{public}@",
                           peripheral,
                           central.map { String(describing: $0.state) } ?? "nil",
                           String(describing: peripheral.state),
@@ -256,7 +256,7 @@ extension PeripheralManager {
         guard signaled else {
             self.log.info("runCommand lock timeout reached - not signalled")
             let characteristicsReady = peripheral.getCommandCharacteristic(profile: profile) != nil && peripheral.getDataCharacteristic(profile: profile) != nil
-            self.log.error("runCommand timeout - not signalled: timeout=%{public}.3f pendingConditions=%{public}@ characteristicsReady=%{public}@ queueDepth=%{public}d centralState=%{public}@ peripheralState=%{public}@",
+            self.log.error("runCommand timeout - not signalled: timeout=%{public}.3f pendingConditions=%{public}@ characteristicsReady=%{public}@ queueDepth=%{public}lld centralState=%{public}@ peripheralState=%{public}@",
                            timeout,
                            String(describing: commandConditions),
                            String(describing: characteristicsReady),
@@ -337,10 +337,10 @@ extension PeripheralManager {
     /// - Throws: PeripheralManagerError
     func writeValue(_ value: Data, for characteristic: CBCharacteristic, type: CBCharacteristicWriteType, timeout: TimeInterval) throws {
         if type == .withoutResponse {
-            log.bleDebug("[BLE RAW] WRITE %{public}@ type=withoutResponse canSend=%{public}@ (%{public}d bytes): %{public}@",
+            log.bleDebug("[BLE RAW] WRITE %{public}@ type=withoutResponse canSend=%{public}@ (%{public}lld bytes): %{public}@",
                         characteristic.uuid.uuidString, String(describing: peripheral.canSendWriteWithoutResponse), value.count, value.hexadecimalString)
         } else {
-            log.bleDebug("[BLE RAW] WRITE %{public}@ type=withResponse (%{public}d bytes): %{public}@",
+            log.bleDebug("[BLE RAW] WRITE %{public}@ type=withResponse (%{public}lld bytes): %{public}@",
                         characteristic.uuid.uuidString, value.count, value.hexadecimalString)
         }
         try runCommand(timeout: timeout) {
@@ -505,11 +505,11 @@ extension PeripheralManager {
     func clearCommsQueues() {
         queueLock.lock()
         if cmdQueue.count > 0 {
-            self.log.default("Removing %{public}d leftover elements from command queue", cmdQueue.count)
+            self.log.default("Removing %{public}lld leftover elements from command queue", cmdQueue.count)
             cmdQueue.removeAll()
         }
         if dataQueue.count > 0 {
-            self.log.default("Removing %{public}d leftover elements from data queue", dataQueue.count)
+            self.log.default("Removing %{public}lld leftover elements from data queue", dataQueue.count)
             dataQueue.removeAll()
         }
         queueLock.unlock()
@@ -535,7 +535,7 @@ extension PeripheralManager {
             /// completeConfiguration() polls until the maximumWriteValueLength settles before sending any protocol messages.
             /// For O5 withoutResponse, any writes exceeding maximumWriteValueLength are silently truncated — NOT fragmented.
             let maximumWriteValueLength = peripheral.maximumWriteValueLength(for: .withoutResponse)
-            self.log.bleDebug("PeripheralManager - didConnect - maximumWriteValueLength: %{public}d, packetMaxPayloadSize: %{public}d", maximumWriteValueLength, profile.packetLayout.maxPayloadSize)
+            self.log.bleDebug("PeripheralManager - didConnect - maximumWriteValueLength: %{public}lld, packetMaxPayloadSize: %{public}lld", maximumWriteValueLength, profile.packetLayout.maxPayloadSize)
 
             self.log.debug("PeripheralManager - didConnect - running assertConfiguration")
             assertConfiguration()

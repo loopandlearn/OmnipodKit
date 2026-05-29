@@ -273,7 +273,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     private func logDeviceCommunication(_ message: String, type: DeviceLogEntryType = .send) {
         let podAddress: String
         if let address = state.podState?.address {
-            podAddress = String(format: "%08X", address)
+            podAddress = String(format: "%08llX", address)
         } else {
             podAddress = "noPod   "
         }
@@ -491,7 +491,7 @@ extension OmniPumpManager {
                 hardwareVersion: String(state.podType.rawValue),
                 firmwareVersion: podState.firmwareVersion + " " + podState.iFirmwareVersion,
                 softwareVersion: String(OmnipodKitVersionNumber),
-                localIdentifier: String(format:"%04X", podState.address),
+                localIdentifier: String(format:"%04llX", podState.address),
                 udiDeviceIdentifier: nil
             )
         } else {
@@ -1006,7 +1006,7 @@ extension OmniPumpManager {
                 // nextIds() will verify any existing O5 ids and then (re)set the
                 // controllerId as needed and advance podId to the next in the rotation.
                 (state.controllerId, state.podId) = nextIds(podType: podType, controllerId: state.controllerId, podId: state.podId)
-                self.log.info("@@@ prepForNewPod: set controllerId to 0x%08X and podId to 0x%08X", state.controllerId, state.podId)
+                self.log.info("@@@ prepForNewPod: set controllerId to 0x%08llX and podId to 0x%08llX", state.controllerId, state.podId)
 
             default:
                 // Reset the id's so they will be initialized when the pod type is selected.
@@ -1414,7 +1414,7 @@ extension OmniPumpManager {
         let sleepTime:UInt32 = 2
 
         if !hasConnection {
-            self.log.debug("### Pod setup resume pod not connected, sleeping %d seconds", sleepTime)
+            self.log.debug("### Pod setup resume pod not connected, sleeping %llu seconds", sleepTime)
             sleep(sleepTime)
         }
 
@@ -1428,11 +1428,11 @@ extension OmniPumpManager {
             case .success(let session):
                 let status = try? session.getStatus(noSeqGetStatus: true)
                 if status == nil {
-                    self.log.debug("### Pod setup resume getStatus failed, sleeping %d seconds", sleepTime)
+                    self.log.debug("### Pod setup resume getStatus failed, sleeping %llu seconds", sleepTime)
                     sleep(sleepTime)
                 }
             case .failure(let error):
-                self.log.debug("### Pod setup resume session failure, sleeping %d seconds: %@", sleepTime, error.localizedDescription)
+                self.log.debug("### Pod setup resume session failure, sleeping %llu seconds: %@", sleepTime, error.localizedDescription)
                 sleep(sleepTime)
             }
         }
@@ -2582,7 +2582,7 @@ extension OmniPumpManager: PumpManager {
         let rate = roundToSupportedBasalRate(unitsPerHour: unitsPerHour)
 
         self.runSession(withName: "Enact Temp Basal") { (result) in
-            self.log.info("Enact temp basal %.03fU/hr for %ds", rate, Int(duration))
+            self.log.info("Enact temp basal %.03fU/hr for %llds", rate, Int(duration))
             let session: PodCommsSession
             switch result {
             case .success(let s):
@@ -2861,7 +2861,7 @@ extension OmniPumpManager: PumpManager {
                 let beepBlock = self.beepMessageBlock(beepType: .beep)
                 try session.configureAlerts([lowReservoirReminder], beepBlock: beepBlock)
                 self.lowReservoirReminderValue = supportedValue
-                self.log.default("Set Low Reservoir Reminder for current pod to %d U", value)
+                self.log.default("Set Low Reservoir Reminder for current pod to %lld U", value)
                 completion(nil)
             } catch {
                 completion(.communication(error))
@@ -2873,7 +2873,7 @@ extension OmniPumpManager: PumpManager {
     // Updates the default low reservior reminder value for future pods
     func updateLowReservoirDefaultReminder(_ value: Int, completion: @escaping (OmniPumpManagerError?) -> Void) {
         let supportedValue = min(max(0, Double(value)), Pod.maximumReservoirReading)
-        self.log.default("Set Default Low Reservoir Reminder to %d U", value)
+        self.log.default("Set Default Low Reservoir Reminder to %lld U", value)
         self.defaultLowReservoirReminderValue = supportedValue
         completion(nil)
     }

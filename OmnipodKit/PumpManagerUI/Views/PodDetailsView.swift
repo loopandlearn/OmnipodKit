@@ -72,7 +72,7 @@ struct PodDetailsView: View {
 
     var totalDeliveryText: String {
         if let delivery = podDetails.totalDelivery {
-            return String(format: LocalizedString("%g U", comment: "Format string for total delivery on pod details screen"), delivery)
+            return String(format: LocalizedString("%@ U", comment: "Format string for total delivery on pod details screen"), delivery.twoDecimals)
         } else {
             return LocalizedString("NA", comment: "String shown on pod details for total delivery when not available.")
         }
@@ -105,17 +105,17 @@ struct PodDetailsView: View {
             if let deviceName = podDetails.deviceName {
                 row(LocalizedString("Device Name", comment: "description label for device name pod details row"), value: deviceName)
             }
-            row(LocalizedString("Address", comment: "description label for address pod details row"), value: String(format: "0x%08X", podDetails.address))
+            row(LocalizedString("Address", comment: "description label for address pod details row"), value: String(format: "0x%08llX", podDetails.address))
             if podDetails.podType.isEros {
                 row(LocalizedString("Lot", comment: "description label for lot pod details row"),
-                    value: String(format: "L%05u", podDetails.lotNumber))
+                    value: String(format: "L%05llu", podDetails.lotNumber))
             } else {
                 row(LocalizedString("Lot", comment: "description label for lot pod details row"),
                     value: lotDecode(lot: podDetails.lotNumber).readableText)
                 row(LocalizedString("Lot Number", comment: "description label for lot number pod details row"),
                     value: String(describing: podDetails.lotNumber))
             }
-            row(LocalizedString("Sequence Number", comment: "description label for sequence number pod details row"), value: String(format: "%07d", podDetails.sequenceNumber))
+            row(LocalizedString("Sequence Number", comment: "description label for sequence number pod details row"), value: String(format: "%07llu", podDetails.sequenceNumber))
             row(LocalizedString("Firmware Version", comment: "description label for firmware version pod details row"), value: podDetails.firmwareVersion)
             row(LocalizedString("BLE Firmware Version", comment: "description label for ble firmware version pod details row"), value: podDetails.bleFirmwareVersion)
             row(LocalizedString("Total Delivery", comment: "description label for total delivery pod details row"), value: totalDeliveryText)
@@ -142,7 +142,7 @@ struct PodDetailsView: View {
                                 .fontWeight(.semibold)
                         }.padding(.vertical, 4)
                         let faultCode = fault.faultEventCode
-                        Text(String(format: LocalizedString("Internal Pod fault code %1$03d\n%2$@\nRef: %3$@\n", comment: "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"), faultCode.rawValue, faultCode.faultDescription, pdmRef))
+                        Text(String(format: LocalizedString("Internal Pod fault code %1$03lld\n%2$@\nRef: %3$@\n", comment: "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"), faultCode.rawValue, faultCode.faultDescription, pdmRef))
                             .fixedSize(horizontal: false, vertical: true)
                             .foregroundColor(.secondary)
                     }

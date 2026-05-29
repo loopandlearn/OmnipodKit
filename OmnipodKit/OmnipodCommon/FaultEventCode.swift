@@ -613,7 +613,7 @@ struct FaultEventCode: CustomStringConvertible, Equatable {
     }
 
     var description: String {
-        return String(format: "Fault Event Code 0x%02x: %@", rawValue, faultDescription)
+        return String(format: "Fault Event Code 0x%02llx: %@", rawValue, faultDescription)
     }
 
     var localizedDescription: String {
@@ -628,10 +628,10 @@ struct FaultEventCode: CustomStringConvertible, Equatable {
             case .occluded:
                 return LocalizedString("Occlusion detected", comment: "Description for Occlusion detected pod fault")
             default:
-                return String(format: LocalizedString("Internal pod fault %1$03d", comment: "The format string for Internal pod fault (1: The fault code value)"), rawValue)
+                return String(format: LocalizedString("Internal pod fault %1$03lld", comment: "The format string for Internal pod fault (1: The fault code value)"), rawValue)
             }
         } else {
-            return String(format: LocalizedString("Unknown pod fault %1$03d", comment: "The format string for Unknown pod fault (1: The fault code value)"), rawValue)
+            return String(format: LocalizedString("Unknown pod fault %1$03lld", comment: "The format string for Unknown pod fault (1: The fault code value)"), rawValue)
         }
     }
 
@@ -645,7 +645,7 @@ struct FaultEventCode: CustomStringConvertible, Equatable {
         case .exceededMaximumPodLife80Hrs:
             return LocalizedString("Pod Expired", comment: "The title for Pod Expired alarm notification")
         default:
-            return String(format: LocalizedString("Critical Pod Fault %1$03d", comment: "The title for AlarmCode.other notification: (1: fault code value)"), self.rawValue)
+            return String(format: LocalizedString("Critical Pod Fault %1$03lld", comment: "The title for AlarmCode.other notification: (1: fault code value)"), rawValue)
         }
     }
 

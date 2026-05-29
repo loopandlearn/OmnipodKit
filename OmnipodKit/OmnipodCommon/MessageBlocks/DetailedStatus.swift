@@ -161,7 +161,7 @@ struct DetailedStatus: PodInfo, Equatable {
         RR = UInt(self.reservoirLevel) // whole reservoir units, special 51.15 value used for > 50U will become 51 as needed
         FFF = UInt(faultEventCode.rawValue) // actual fault code value
 
-        return String(format: "%02d-%03d%02d-%03d%02d-%03d", TT, VVV, HH, III, RR, FFF)
+        return String(format: "%02llu-%03llu%02llu-%03llu%02llu-%03llu", TT, VVV, HH, III, RR, FFF)
     }
 
     // Returns an appropropriate Eros PDM style Ref string for the Detailed Status.
@@ -198,7 +198,7 @@ struct DetailedStatus: PodInfo, Equatable {
         III = UInt(totalInsulinDelivered) // whole units of insulin
         RR = UInt(self.reservoirLevel) // whole reservoir units, special 51.15 value used for > 50U will become 51 as needed
 
-        return String(format: "%02d-%03d%02d-%03d%02d-%03d", TT, VVV, HH, III, RR, FFF)
+        return String(format: "%02llu-%03llu%02llu-%03llu%02llu-%03llu", TT, VVV, HH, III, RR, FFF)
     }
 
     // Returns an appropropriate PDM style Ref string for DetailedStatus.
@@ -241,7 +241,7 @@ extension DetailedStatus: CustomDebugStringConvertible {
                 "* faultEventTimeSinceActivation: \(faultEventTimeSinceActivation?.timeIntervalStr ?? "NA")",
                 "* errorEventInfo: \(errorEventInfo?.description ?? "NA")",
                 "* previousPodProgressStatus: \(previousPodProgressStatus?.description ?? "NA")",
-                "* possibleFaultCallingAddress: \(possibleFaultCallingAddress != nil ? String(format: "0x%04x", possibleFaultCallingAddress!) : "NA")",
+                "* possibleFaultCallingAddress: \(possibleFaultCallingAddress != nil ? String(format: "0x%04llx", possibleFaultCallingAddress!) : "NA")",
                 "",
                 ].joined(separator: "\n")
         }
@@ -281,7 +281,7 @@ struct ErrorEventInfo: CustomStringConvertible, Equatable {
     }
 
     var description: String {
-        let hexString = String(format: "%02X", rawValue)
+        let hexString = String(format: "%02llX", rawValue)
         return [
             "rawValue: 0x\(hexString)",
             "insulinStateTableCorruption: \(insulinStateTableCorruption)",

@@ -71,7 +71,7 @@ struct LowReservoirView: View {
 
         if setDefault {
             self.title = "Low Reservoir Default"
-            self.prompt = String(format: LocalizedString("You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$d units).\n\nSet the default low reservoir alert level to configure when pairing a Pod.", comment: "Description text on LowReservoirView Default value (1: max value)"), self.maxValue)
+            self.prompt = String(format: LocalizedString("You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$lld units).\n\nSet the default low reservoir alert level to configure when pairing a Pod.", comment: "Description text on LowReservoirView Default value (1: max value)"), self.maxValue)
         } else {
             self.title = "Low Reservoir"
             self.prompt = String(format: LocalizedString("You can be optionally notified when the amount of insulin in the current Pod drops to a selected level below the current reservoir value of %1$@ units.\n\nSet the low reservoir alert level for the current Pod.", comment: "Description text on LowReservoirView for the current Pod (1: current reservoir value"), reservoirLevelString)

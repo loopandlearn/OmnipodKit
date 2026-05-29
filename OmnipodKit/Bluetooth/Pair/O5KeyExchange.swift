@@ -96,7 +96,7 @@ class O5KeyExchange {
         data.append(self.podPublic)
         data.append(withUnsafeBytes(of: UInt64(sharedSecret.count).bigEndian, { Data($0) }))
         data.append(sharedSecret)
-        log.info("  KDF input (%{public}d bytes): %{public}@", data.count, data.hexadecimalString)
+        log.info("  KDF input (%{public}lld bytes): %{public}@", data.count, data.hexadecimalString)
 
         let derivedKey = data.sha256()
         guard derivedKey.count == 32 else {
@@ -111,7 +111,7 @@ class O5KeyExchange {
 
     public func getSPSNonce(direction: Direction) -> Data {
         guard pdmNonce.count >= 6, podNonce.count >= 6 else {
-            log.error("Nonce too short for SPS nonce: pdmNonce=%{public}d bytes, podNonce=%{public}d bytes", pdmNonce.count, podNonce.count)
+            log.error("Nonce too short for SPS nonce: pdmNonce=%{public}lld bytes, podNonce=%{public}lld bytes", pdmNonce.count, podNonce.count)
             return Data() // will cause AES-CCM to fail with a clear error
         }
 
@@ -130,7 +130,7 @@ class O5KeyExchange {
             nonce.append(pdmSlice)
         }
         if nonce.count != O5KeyExchange.SPS_NONCE_SIZE {
-            log.error("SPS nonce size %{public}d != expected %{public}d", nonce.count, O5KeyExchange.SPS_NONCE_SIZE)
+            log.error("SPS nonce size %{public}lld != expected %{public}lld", nonce.count, O5KeyExchange.SPS_NONCE_SIZE)
         }
         return nonce
     }
@@ -157,7 +157,7 @@ class O5KeyExchange {
             nonce.replaceSubrange(0..<8, with: src)
         }
         if nonce.count != prevCount {
-            log.error("incrementNonce changed nonce size from %{public}d to %{public}d bytes!", prevCount, nonce.count)
+            log.error("incrementNonce changed nonce size from %{public}lld to %{public}lld bytes!", prevCount, nonce.count)
         }
     }
 
@@ -189,7 +189,7 @@ class O5KeyExchange {
         transcript.append(podNonce)
 
         if transcript.count != 171 {
-            log.error("Channel-binding transcript size mismatch: got %{public}d, expected 171", transcript.count)
+            log.error("Channel-binding transcript size mismatch: got %{public}lld, expected 171", transcript.count)
             let sizes = "FIRMWARE_ID: \(O5LTKExchanger.FIRMWARE_ID.count), pdmNonce: \(pdmNonce.count), pdmPublic: \(pdmPublic.count), podNonce: \(podNonce.count), podPublic: \(podPublic.count)"
             log.error("  %{public}@", sizes)
         }

@@ -87,12 +87,12 @@ struct PodType: CustomStringConvertible, Equatable {
         if let podType = podType {
             switch podType {
             case .productIdEros, .productIdDash, .productIdOmnipod5:
-                return String(format: "Product ID %d %@", rawValue, description)
+                return String(format: "Product ID %lld %@", rawValue, description)
             default:
                 break
             }
         }
-        return String(format: "Unknown Omnipod Product ID %d", rawValue)
+        return String(format: "Unknown Omnipod Product ID %lld", rawValue)
     }
 
     // DASH uses a blue tab while both Eros and 05 pods use a clear tab

@@ -600,7 +600,7 @@ func configuredAlertsString(configuredAlerts: [AlertSlot : PodAlert]) -> String 
         case .expirationReminder(_, let absAlertTime, _, _):
             return String(format: "%@ @ %@", description, absAlertTime.timeIntervalStr)
         case .lowReservoir(let unitTrigger, _):
-            return String(format: "%@ @ %dU", description, Int(unitTrigger))
+            return String(format: "%@ @ %lldU", description, Int(unitTrigger))
         case .podSuspendedReminder(_, let offset, let suspendTime, _, _):
             return String(format: "%@ ending @ %@ after %@", description, (offset + suspendTime).timeIntervalStr, suspendTime.timeIntervalStr)
         case .suspendTimeExpired(let offset, let suspendTime, _):

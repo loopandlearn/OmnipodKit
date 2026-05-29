@@ -65,7 +65,7 @@ extension PodCommsError: LocalizedError {
         case .unknownResponseType:
             return nil
         case .invalidAddress(address: let address, expectedAddress: let expectedAddress):
-            return String(format: LocalizedString("Invalid address 0x%x. Expected 0x%x", comment: "Error message for when unexpected address is received (1: received address) (2: expected address)"), address, expectedAddress)
+            return String(format: LocalizedString("Invalid address 0x%llx. Expected 0x%llx", comment: "Error message for when unexpected address is received (1: received address) (2: expected address)"), address, expectedAddress)
         case .noRileyLinkAvailable:
             return LocalizedString("No RileyLink available", comment: "Error message shown when no response from pod was received")
         case .podNotConnected:
@@ -92,7 +92,7 @@ extension PodCommsError: LocalizedError {
             return LocalizedString("Communication issue: Unacknowledged command pending.", comment: "Error message when command is rejected because an unacknowledged command is pending.")
         case .rejectedMessage(let errorCode):
             let codeDescription = ErrorResponseCode.descriptionFor(code: errorCode)
-            return String(format: LocalizedString("Command error %1$u: %2$@", comment: "Format string for invalid message error code (1: error code number) (2: error description)"), errorCode, codeDescription)
+            return String(format: LocalizedString("Command error %1$llu: %2$@", comment: "Format string for invalid message error code (1: error code number) (2: error description)"), errorCode, codeDescription)
         case .podChange:
             return LocalizedString("Unexpected pod change", comment: "Format string for unexpected pod change")
         case .activationTimeExceeded:
@@ -415,10 +415,10 @@ class PodCommsSession: MessageTransportDelegate {
                     throw PodCommsError.unexpectedResponse(response: responseType)
                 }
                 podState.resyncNonce(syncWord: nonceResyncKey, sentNonce: sentNonce, messageSequenceNum: Int(message.sequenceNum))
-                log.info("resyncNonce(syncWord: 0x%02x, sentNonce: 0x%04x, messageSequenceNum: %d) -> 0x%04x", nonceResyncKey, sentNonce, message.sequenceNum, podState.currentNonce)
+                log.info("resyncNonce(syncWord: 0x%02llx, sentNonce: 0x%04llx, messageSequenceNum: %lld) -> 0x%04llx", nonceResyncKey, sentNonce, message.sequenceNum, podState.currentNonce)
                 blocksToSend = blocksToSend.map({ (block) -> MessageBlock in
                     if var resyncableBlock = block as? NonceResyncableMessageBlock {
-                        log.info("Replaced old nonce 0x%04x with resync nonce 0x%04x", resyncableBlock.nonce, podState.currentNonce)
+                        log.info("Replaced old nonce 0x%04llx with resync nonce 0x%04llx", resyncableBlock.nonce, podState.currentNonce)
                         resyncableBlock.nonce = podState.currentNonce
                         return resyncableBlock
                     }
@@ -427,7 +427,7 @@ class PodCommsSession: MessageTransportDelegate {
                 podState.advanceToNextNonce()
                 break
             case .nonretryableError(let errorCode, let faultEventCode, let podProgress):
-                log.error("Command error: code %u, %{public}@, pod progress %{public}@", errorCode, String(describing: faultEventCode), String(describing: podProgress))
+                log.error("Command error: code %llu, %{public}@, pod progress %{public}@", errorCode, String(describing: faultEventCode), String(describing: podProgress))
                 throw PodCommsError.rejectedMessage(errorCode: errorCode)
             }
         }
@@ -713,7 +713,7 @@ class PodCommsSession: MessageTransportDelegate {
             return DeliveryCommandResult.success(statusResponse: statusResponse)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
             podState.unacknowledgedCommand = podState.unacknowledgedCommand?.commsFinished
-            log.error("Unacknowledged bolus: command seq = %d, error = %{public}@", seq, String(describing: error))
+            log.error("Unacknowledged bolus: command seq = %lld, error = %{public}@", seq, String(describing: error))
             return DeliveryCommandResult.unacknowledged(error: .commsError(error: error))
         } catch let error {
             podState.unacknowledgedCommand = nil
@@ -745,7 +745,7 @@ class PodCommsSession: MessageTransportDelegate {
             return DeliveryCommandResult.success(statusResponse: status)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
             podState.unacknowledgedCommand = podState.unacknowledgedCommand?.commsFinished
-            log.error("Unacknowledged temp basal: command seq = %d, error = %{public}@", seq, String(describing: error))
+            log.error("Unacknowledged temp basal: command seq = %lld, error = %{public}@", seq, String(describing: error))
             return DeliveryCommandResult.unacknowledged(error: .commsError(error: error))
         } catch let error {
             podState.unacknowledgedCommand = nil
@@ -823,7 +823,7 @@ class PodCommsSession: MessageTransportDelegate {
 
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
             podState.unacknowledgedCommand = podState.unacknowledgedCommand?.commsFinished
-            log.error("Unacknowledged suspend: command seq = %d, error = %{public}@", seq, String(describing: error))
+            log.error("Unacknowledged suspend: command seq = %lld, error = %{public}@", seq, String(describing: error))
             return .unacknowledged(error: .commsError(error: error))
         } catch let error {
             podState.unacknowledgedCommand = nil
@@ -874,7 +874,7 @@ class PodCommsSession: MessageTransportDelegate {
             return CancelDeliveryResult.success(statusResponse: status, canceledDose: canceledDose)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
             podState.unacknowledgedCommand = podState.unacknowledgedCommand?.commsFinished
-            log.debug("Unacknowledged stop program: command seq = %d", seq)
+            log.debug("Unacknowledged stop program: command seq = %lld", seq)
             return .unacknowledged(error: .commsError(error: error))
         } catch let error {
             podState.unacknowledgedCommand = nil
@@ -934,7 +934,7 @@ class PodCommsSession: MessageTransportDelegate {
             return status
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
             podState.unacknowledgedCommand = podState.unacknowledgedCommand?.commsFinished
-            log.error("Unacknowledged resume: command seq = %d, error = %{public}@", seq, String(describing: error))
+            log.error("Unacknowledged resume: command seq = %lld, error = %{public}@", seq, String(describing: error))
             throw error
         } catch let error {
             podState.unacknowledgedCommand = nil

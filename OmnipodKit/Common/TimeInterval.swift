@@ -85,13 +85,13 @@ extension TimeInterval {
         let iminutes = UInt(self / 60) % 60
         let iseconds = UInt(self) % 60
         if ihours != 0 {
-            str += String(format: "%uh", ihours)
+            str += String(format: "%lluh", ihours)
         }
         if iminutes != 0 {
-            str += String(format: "%um", iminutes)
+            str += String(format: "%llum", iminutes)
         }
         if iseconds != 0 || str.isEmpty {
-            str += String(format: "%us", iseconds)
+            str += String(format: "%llus", iseconds)
         }
         return str
     }

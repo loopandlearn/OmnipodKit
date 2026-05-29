@@ -132,7 +132,7 @@ class PodComms: CustomDebugStringConvertible {
     var debugDescription: String {
         var ret = "## PodComms\n"
         if myId != 0 || podId != 0 {
-            ret += "* myId: \(String(format: "%08X", myId))\n* podId: \(String(format: "%08X", podId))\n"
+            ret += "* myId: \(String(format: "%08llX", myId))\n* podId: \(String(format: "%08llX", podId))\n"
         }
         ret += "* delegate: \(String(describing: delegate != nil))\n"
         return ret

@@ -31,7 +31,7 @@ extension PodProtocolError: LocalizedError {
             return String(format: "Could not parse message: %1$@", message)
         case .incorrectPacketException(let payload, let location):
             let payloadStr = payload.hexadecimalString
-            return String(format: "Incorrect Packet Exception: %1$@ (location=%2$d)", payloadStr, location)
+            return String(format: "Incorrect Packet Exception: %1$@ (location=%2$lld)", payloadStr, location)
         case .invalidCrc(let payloadCrc, let computedCrc):
             return String(format: "Payload crc32 %1$@ does not match computed crc32 %2$@", payloadCrc.hexadecimalString, computedCrc.hexadecimalString)
         }

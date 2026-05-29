@@ -51,7 +51,7 @@ class ErosPodComms: PodComms {
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
         defer {
-            log.debug("erosSendPairMessage saving current transport packet #%d", erosPodMessageTransport.packetNumber)
+            log.debug("erosSendPairMessage saving current transport packet #%lld", erosPodMessageTransport.packetNumber)
             if self.podState != nil {
                 self.podState!.erosMessageTransportState = ErosMessageTransportState(packetNumber: erosPodMessageTransport.packetNumber, messageNumber: erosPodMessageTransport.messageNumber)
             } else {
@@ -75,7 +75,7 @@ class ErosPodComms: PodComms {
                     case .podAckedInsteadOfReturningResponse, .noResponse, .noResponseRL:
                         if didRetry == false {
                             didRetry = true
-                            log.debug("erosSendPairMessage to retry using updated packet #%d", erosPodMessageTransport.packetNumber)
+                            log.debug("erosSendPairMessage to retry using updated packet #%lld", erosPodMessageTransport.packetNumber)
                             continue // the transport packet # is already advanced for the retry
                         }
                     default:
@@ -101,14 +101,14 @@ class ErosPodComms: PodComms {
 
             guard config.address == address else {
                 log.error("erosSendPairMessage unexpected address return of %{public}@ instead of expected %{public}@",
-                  String(format: "08X", config.address), String(format: "%08X", address))
+                  String(format: "%08llX", config.address), String(format: "%08llX", address))
                 throw PodCommsError.invalidAddress(address: config.address, expectedAddress: address)
             }
 
             // If we previously had podState, verify that we are still dealing with the same pod
             if let podState = self.podState, (podState.lotNo != config.lot || podState.lotSeq != config.tid) {
                 // Have a new pod, could be a pod change w/o deactivation (or we're picking up some other pairing pod!)
-                log.error("Received pod response for [lot %u tid %u], expected [lot %u tid %u]", config.lot, config.tid, podState.lotNo, podState.lotSeq)
+                log.error("Received pod response for [lot %llu tid %llu], expected [lot %llu tid %llu]", config.lot, config.tid, podState.lotNo, podState.lotSeq)
                 throw PodCommsError.podChange
             }
 
@@ -116,7 +116,7 @@ class ErosPodComms: PodComms {
             let maxRssiAllowed = 59         // maximum RSSI limit allowed
             let minRssiAllowed = 30         // minimum RSSI limit allowed
             if let rssi = config.rssi, let gain = config.gain {
-                let rssiStr = String(format: "RSSI: %u.\nReceiver Low Gain: %u", rssi, gain)
+                let rssiStr = String(format: "RSSI: %llu.\nReceiver Low Gain: %llu", rssi, gain)
                 log.default("%@", rssiStr)
                 if diagnosePairingRssi {
                     throw PodCommsError.diagnosticMessage(str: rssiStr)
@@ -124,14 +124,14 @@ class ErosPodComms: PodComms {
 
                 rssiRetries -= 1
                 if rssi < minRssiAllowed {
-                    log.default("RSSI value %d is less than minimum allowed value of %d, %d retries left", rssi, minRssiAllowed, rssiRetries)
+                    log.default("RSSI value %lld is less than minimum allowed value of %lld, %lld retries left", rssi, minRssiAllowed, rssiRetries)
                     if rssiRetries > 0 {
                         continue
                     }
                     throw PodCommsError.rssiTooLow
                 }
                 if rssi > maxRssiAllowed {
-                    log.default("RSSI value %d is more than maximum allowed value of %d, %d retries left", rssi, maxRssiAllowed, rssiRetries)
+                    log.default("RSSI value %lld is more than maximum allowed value of %lld, %lld retries left", rssi, maxRssiAllowed, rssiRetries)
                     if rssiRetries > 0 {
                         continue
                     }
@@ -140,7 +140,7 @@ class ErosPodComms: PodComms {
             }
 
             if self.podState == nil {
-                log.default("Creating PodState for address %{public}@ [lot %u tid %u], packet #%d, message #%d", String(format: "%04X", config.address), config.lot, config.tid, erosPodMessageTransport.packetNumber, erosPodMessageTransport.messageNumber)
+                log.default("Creating PodState for address %{public}@ [lot %llu tid %llu], packet #%lld, message #%lld", String(format: "%04llX", config.address), config.lot, config.tid, erosPodMessageTransport.packetNumber, erosPodMessageTransport.messageNumber)
                 self.podState = PodState(
                     address: config.address,
                     firmwareVersion: String(describing: config.firmwareVersion),
@@ -219,7 +219,7 @@ class ErosPodComms: PodComms {
             messageNumber = 0
         }
 
-        log.debug("Attempting pairing with address %{public}@ using packet #%d", String(format: "%04X", address), packetNumber)
+        log.debug("Attempting pairing with address %{public}@ using packet #%lld", String(format: "%04llX", address), packetNumber)
         let messageTransportState = ErosMessageTransportState(packetNumber: packetNumber, messageNumber: messageNumber)
         let erosPodMessageTransport = ErosPodMessageTransport(session: commandSession, address: 0xffffffff, ackAddress: address, state: messageTransportState)
         erosPodMessageTransport.messageLogger = messageLogger

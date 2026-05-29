@@ -89,7 +89,7 @@ extension PeripheralManager {
 
             let splitter = PayloadSplitter(payload: message.asData(forEncryption: forEncryption), layout: profile.packetLayout)
             let packets = splitter.splitInPackets()
-            log.bleDebug("[sendMessagePacket] Split payload into %{public}d packet(s), total payload %{public}d bytes", packets.count, message.payload.count)
+            log.bleDebug("[sendMessagePacket] Split payload into %{public}lld packet(s), total payload %{public}lld bytes", packets.count, message.payload.count)
 
             for (index, packet) in packets.enumerated() {
                 // Consider starting the last packet send as the point at which the message may be received by the pod.
@@ -98,10 +98,10 @@ extension PeripheralManager {
                     didSend = true
                 }
                 let packetData = packet.toData(layout: profile.packetLayout)
-                log.bleDebug("[sendMessagePacket] Writing data packet %{public}d/%{public}d (%{public}d bytes)... peripheral state=%{public}@",
+                log.bleDebug("[sendMessagePacket] Writing data packet %{public}lld/%{public}lld (%{public}lld bytes)... peripheral state=%{public}@",
                             index + 1, packets.count, packetData.count, String(describing: peripheral.state))
                 try sendData(packetData, timeout: 5)
-                log.bleDebug("[sendMessagePacket] Data packet %{public}d/%{public}d written. Peeking for NACK...", index + 1, packets.count)
+                log.bleDebug("[sendMessagePacket] Data packet %{public}lld/%{public}lld written. Peeking for NACK...", index + 1, packets.count)
                 try self.peekForNack()
             }
 
@@ -145,33 +145,33 @@ extension PeripheralManager {
             log.bleDebug("[readMessagePacket] Waiting for first data packet (seq 0)... peripheral state=%{public}@",
                          String(describing: peripheral.state))
             let firstPacket = try waitForData(sequence: expected, timeout: 5)
-            log.bleDebug("[readMessagePacket] First data packet received (%{public}d bytes)", firstPacket.count)
+            log.bleDebug("[readMessagePacket] First data packet received (%{public}lld bytes)", firstPacket.count)
 
             let joiner = try PayloadJoiner(firstPacket: firstPacket, layout: profile.packetLayout)
             let totalFragments = joiner.fullFragments + (joiner.oneExtraPacket ? 1 : 0)
-            log.bleDebug("[readMessagePacket] Expecting %{public}d more fragment(s) (fullFragments=%{public}d, oneExtra=%{public}@)",
+            log.bleDebug("[readMessagePacket] Expecting %{public}lld more fragment(s) (fullFragments=%{public}lld, oneExtra=%{public}@)",
                         totalFragments, joiner.fullFragments, String(describing: joiner.oneExtraPacket))
 
             if joiner.fullFragments > 0 {
                 for i in 1...joiner.fullFragments {
                     expected += 1
-                    log.bleDebug("[readMessagePacket] Waiting for fragment %{public}d (seq %{public}d)... peripheral state=%{public}@",
+                    log.bleDebug("[readMessagePacket] Waiting for fragment %{public}lld (seq %{public}lld)... peripheral state=%{public}@",
                                 i, expected, String(describing: peripheral.state))
                     let packet = try waitForData(sequence: expected, timeout: 5)
-                    log.bleDebug("[readMessagePacket] Fragment %{public}d received (%{public}d bytes)", i, packet.count)
+                    log.bleDebug("[readMessagePacket] Fragment %{public}lld received (%{public}lld bytes)", i, packet.count)
                     try joiner.accumulate(packet: packet)
                 }
             }
             if joiner.oneExtraPacket {
                 expected += 1
-                log.bleDebug("[readMessagePacket] Waiting for extra fragment (seq %{public}d)... peripheral state=%{public}@",
+                log.bleDebug("[readMessagePacket] Waiting for extra fragment (seq %{public}lld)... peripheral state=%{public}@",
                             expected, String(describing: peripheral.state))
                 let packet = try waitForData(sequence: expected, timeout: 5)
-                log.bleDebug("[readMessagePacket] Extra fragment received (%{public}d bytes)", packet.count)
+                log.bleDebug("[readMessagePacket] Extra fragment received (%{public}lld bytes)", packet.count)
                 try joiner.accumulate(packet: packet)
             }
             let fullPayload = try joiner.finalize()
-            log.bleDebug("[readMessagePacket] All fragments received, total payload %{public}d bytes. Sending SUCCESS...", fullPayload.count)
+            log.bleDebug("[readMessagePacket] All fragments received, total payload %{public}lld bytes. Sending SUCCESS...", fullPayload.count)
             try  sendCommandType(PodCommand.SUCCESS)
             log.bleDebug("[readMessagePacket] SUCCESS sent. Parsing message...")
             packet = try MessagePacket.parse(payload: fullPayload)
@@ -259,7 +259,7 @@ extension PeripheralManager {
                 let value = cmdQueue.remove(at: 0)
 
                 if command.rawValue == value[0] {
-                    log.bleDebug("waitForCommand: got expected 0x%{public}02x, full data=%{public}@ (%{public}d bytes)",
+                    log.bleDebug("waitForCommand: got expected 0x%{public}02llx, full data=%{public}@ (%{public}lld bytes)",
                                 command.rawValue, value.hexadecimalString, value.count)
                     queueLock.unlock()
                     commandLock.unlock()
@@ -269,7 +269,7 @@ extension PeripheralManager {
                 // During O5 pairing, pod sends intermediate PAIR_STATUS (0x08) commands
                 // before SUCCESS. Log and continue waiting for the expected command.
                 if value[0] == PodCommand.PAIR_STATUS.rawValue {
-                    log.bleDebug("waitForCommand: skipping intermediate PAIR_STATUS (0x08), data=%{public}@, waiting for 0x%{public}02x",
+                    log.bleDebug("waitForCommand: skipping intermediate PAIR_STATUS (0x08), data=%{public}@, waiting for 0x%{public}02llx",
                                value.hexadecimalString, command.rawValue)
                     queueLock.unlock()
                     commandLock.unlock()
@@ -281,7 +281,7 @@ extension PeripheralManager {
                 }
 
                 // Unexpected command that isn't PAIR_STATUS
-                log.error("waitForCommand failed. rawValue != value[0] (%d != %d); data=%@", command.rawValue, value[0], value.hexadecimalString)
+                log.error("waitForCommand failed. rawValue != value[0] (%lld != %lld); data=%@", command.rawValue, value[0], value.hexadecimalString)
                 queueLock.unlock()
                 commandLock.unlock()
                 throw PeripheralManagerError.incorrectResponse
@@ -337,7 +337,7 @@ extension PeripheralManager {
             let data = dataQueue.remove(at: 0)
             
             if (data[0] != sequence) {
-                log.error("waitForData failed data[0] != sequence (%d != %d).", data[0], sequence)
+                log.error("waitForData failed data[0] != sequence (%lld != %lld).", data[0], sequence)
                 throw PeripheralManagerError.incorrectResponse
             }
             return data

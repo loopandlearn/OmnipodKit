@@ -166,7 +166,7 @@ class ErosPodMessageTransport: MessageTransport {
                 
                 do {
                     candidatePacket = try Packet(rfPacket: rfPacket)
-                    log.default("Received packet (%d): %@", rfPacket.rssi, rfPacket.data.hexadecimalString)
+                    log.default("Received packet (%lld): %@", rfPacket.rssi, rfPacket.data.hexadecimalString)
                 } catch PacketError.insufficientData {
                     log.default("Insufficient packet data: %@", rfPacket.data.hexadecimalString)
                     continue
@@ -176,7 +176,7 @@ class ErosPodMessageTransport: MessageTransport {
                 }
 
                 guard candidatePacket.address == packet.address || candidatePacket.address == 0xFFFFFFFF else {
-                    log.default("Packet address 0x%x does not match 0x%x", candidatePacket.address, packet.address)
+                    log.default("Packet address 0x%llx does not match 0x%llx", candidatePacket.address, packet.address)
                     continue
                 }
                 

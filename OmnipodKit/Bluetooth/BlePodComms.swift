@@ -138,7 +138,7 @@ class BlePodComms: PodComms {
         if let errorResponse = podMessageResponse.messageBlocks[0] as? ErrorResponse {
             switch errorResponse.errorResponseType {
             case .nonretryableError(let errorCode, let faultEventCode, let podProgress):
-                log.error("@@@ Pairing command error: code %u, %{public}@, pod progress %{public}@", errorCode, String(describing: faultEventCode), String(describing: podProgress))
+                log.error("@@@ Pairing command error: code %llu, %{public}@, pod progress %{public}@", errorCode, String(describing: faultEventCode), String(describing: podProgress))
                 if podState != nil, podState!.setupProgress != .podPaired {
                     log.info("@@@ bleSendPairMessage: setting podPaired to avoid duplicate SetupPod command attempts")
                     podState!.setupProgress = .podPaired
@@ -173,7 +173,7 @@ class BlePodComms: PodComms {
         let signingKey: Data?
 
         ids = Ids(myId: self.myId, podId: self.podId)
-        log.bleDebug("@@@ Calling LKExchanger for myId 0x%x podId 0x%x", ids.myIdAddr, ids.podIdAddr)
+        log.bleDebug("@@@ Calling LKExchanger for myId 0x%llx podId 0x%llx", ids.myIdAddr, ids.podIdAddr)
         switch podType {
         case dashType:
             let dashLTKExchanger = DashLTKExchanger(manager: manager, ids: ids)
@@ -191,7 +191,7 @@ class BlePodComms: PodComms {
         eapSeq = 1
 
         guard podId == response.address else {
-            log.error("@@@ podId 0x%x doesn't match response value!: %{public}@", podId, String(describing: response))
+            log.error("@@@ podId 0x%llx doesn't match response value!: %{public}@", podId, String(describing: response))
             throw PodCommsError.invalidAddress(address: response.address, expectedAddress: podId)
         }
 
@@ -269,7 +269,7 @@ class BlePodComms: PodComms {
             log.bleDebug("@@@ Received EAP SQN resynchronization: %@", keys.synchronizedEapSqn.data.hexadecimalString)
             if podState != nil {
                 let eapSeq = keys.synchronizedEapSqn.toInt()
-                log.bleDebug("@@@ Updating EAP SQN to: %d", eapSeq)
+                log.bleDebug("@@@ Updating EAP SQN to: %lld", eapSeq)
                 podState!.bleMessageTransportState.eapSeq = eapSeq
             }
             return nil
@@ -392,7 +392,7 @@ class BlePodComms: PodComms {
         do {
             let (payload, prefix) = O5AidCommands.TargetBgProfileCommand.payload()
             let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
-            log.bleDebug("@@@ O5 AID [3/9]: TargetBgProfileCommand response: %{public}d bytes", response.count)
+            log.bleDebug("@@@ O5 AID [3/9]: TargetBgProfileCommand response: %{public}lld bytes", response.count)
         } catch {
             log.error("@@@ O5 AID [3/9]: TargetBgProfileCommand failed: %{public}@", String(describing: error))
             throw error
@@ -424,15 +424,15 @@ class BlePodComms: PodComms {
 
         // Commands 6-8: Algorithm Insulin History (3 batches of 24 zero records)
         for batch in 1...3 {
-            log.bleDebug("@@@ O5 AID [%{public}d/9]: AlgorithmInsulinHistoryCommand batch %{public}d/3", batch + 5, batch)
+            log.bleDebug("@@@ O5 AID [%{public}lld/9]: AlgorithmInsulinHistoryCommand batch %{public}lld/3", batch + 5, batch)
             do {
                 let (payload, prefix) = O5AidCommands.AlgorithmInsulinHistoryCommand.payload()
                 let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
                 let responseStr = String(data: response, encoding: .utf8) ?? response.hexadecimalString
-                log.bleDebug("@@@ O5 AID [%{public}d/9]: AlgorithmInsulinHistory batch %{public}d/3 response: %{public}@",
+                log.bleDebug("@@@ O5 AID [%{public}lld/9]: AlgorithmInsulinHistory batch %{public}lld/3 response: %{public}@",
                              batch + 5, batch, responseStr)
             } catch {
-                log.error("@@@ O5 AID [%{public}d/9]: AlgorithmInsulinHistory batch %{public}d/3 failed: %{public}@",
+                log.error("@@@ O5 AID [%{public}lld/9]: AlgorithmInsulinHistory batch %{public}lld/3 failed: %{public}@",
                               batch + 5, batch, String(describing: error))
                 throw error
             }
@@ -450,12 +450,12 @@ class BlePodComms: PodComms {
                 if useGen1AidPodStatus {
                     let (payload, prefix) = O5AidCommands.AidPodStatusCommand.payload()
                     let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
-                    log.bleDebug("@@@ O5 AID [9/9]: AidPodStatusCommand (G3.11) response: %d bytes — %{public}@",
+                    log.bleDebug("@@@ O5 AID [9/9]: AidPodStatusCommand (G3.11) response: %lld bytes — %{public}@",
                              response.count, response.hexadecimalString)
                 } else {
                     let (payload, prefix) = O5AidCommands.UnifiedAidPodStatusCommand.payload()
                     let response = try transport.sendO5AidCommand(payload, responsePrefix: prefix)
-                    log.bleDebug("@@@ O5 AID [9/9]: UnifiedAidPodStatusCommand (G3.12) response: %d bytes — %{public}@",
+                    log.bleDebug("@@@ O5 AID [9/9]: UnifiedAidPodStatusCommand (G3.12) response: %lld bytes — %{public}@",
                              response.count, response.hexadecimalString)
                 }
             } catch {
@@ -511,7 +511,7 @@ class BlePodComms: PodComms {
         // these values in some persistent PodState and then make sure that everything properly works using these values.
         var errorStrings: [String] = []
         if versionResponse.podType.rawValue != self.podType.rawValue {
-            errorStrings.append(String(format: "Pod reported product ID %d doesn't match expected %d", versionResponse.podType.rawValue, self.podType.rawValue))
+            errorStrings.append(String(format: "Pod reported product ID %lld doesn't match expected %lld", versionResponse.podType.rawValue, self.podType.rawValue))
         }
         if let pulseSize = versionResponse.pulseSize, pulseSize != Pod.pulseSize  {
             errorStrings.append(String(format: "Pod reported pulse size of %.3fU different than expected %.3fU", pulseSize, Pod.pulseSize))
@@ -562,7 +562,7 @@ class BlePodComms: PodComms {
             return
         }
 
-        log.info("@@@ Attempting to pair and setup pod using myId 0x%X and podId 0x%X", myId, podId)
+        log.info("@@@ Attempting to pair and setup pod using myId 0x%llX and podId 0x%llX", myId, podId)
 
         manager.runSession(withName: "Pair and setup pod") { [weak self] in
             do {
@@ -718,14 +718,14 @@ extension BlePodComms: PeripheralManagerDelegate {
                 var attempts = 0
                 var maxWriteValue = manager.peripheral.maximumWriteValueLength(for: .withoutResponse)
                 while maxWriteValue < requiredMaxPayload && attempts < 10 {
-                    log.bleDebug("maximumWriteValueLength not yet settled (%{public}d < %{public}d), waiting... (attempt %{public}d/10)", maxWriteValue, requiredMaxPayload, attempts + 1)
+                    log.bleDebug("maximumWriteValueLength not yet settled (%{public}lld < %{public}lld), waiting... (attempt %{public}lld/10)", maxWriteValue, requiredMaxPayload, attempts + 1)
                     Thread.sleep(forTimeInterval: 0.2)
                     maxWriteValue = manager.peripheral.maximumWriteValueLength(for: .withoutResponse)
                     attempts += 1
                 }
-                log.bleDebug("maximumWriteValueLength settled after %{public}d polls: maximumWriteValueLength=%{public}d (required=%{public}d)", attempts, maxWriteValue, requiredMaxPayload)
+                log.bleDebug("maximumWriteValueLength settled after %{public}lld polls: maximumWriteValueLength=%{public}lld (required=%{public}lld)", attempts, maxWriteValue, requiredMaxPayload)
                 if maxWriteValue < requiredMaxPayload {
-                    log.error("WARNING: maximumWriteValueLength (%{public}d) below required minimum (%{public}d). Large writes may be truncated!", maxWriteValue, requiredMaxPayload)
+                    log.error("WARNING: maximumWriteValueLength (%{public}lld) below required minimum (%{public}lld). Large writes may be truncated!", maxWriteValue, requiredMaxPayload)
                 }
             }
 

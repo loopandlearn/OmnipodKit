@@ -121,7 +121,7 @@ private func podStatusString(status: DetailedStatus) -> String {
 
     result += String(format: LocalizedString("\nBolus Not Delivered: %1$@ U", comment: "The format string for Bolus Not Delivered: (1: bolus not delivered string)"), status.bolusNotDelivered.twoDecimals)
 
-    result += String(format: LocalizedString("\nPulse Count: %1$d", comment: "The format string for Pulse Count (1: pulse count)"), Int(round(status.totalInsulinDelivered / Pod.pulseSize)))
+    result += String(format: LocalizedString("\nPulse Count: %1$lld", comment: "The format string for Pulse Count (1: pulse count)"), Int(round(status.totalInsulinDelivered / Pod.pulseSize)))
 
     result += String(format: LocalizedString("\nReservoir Level: %1$@ U", comment: "The format string for Reservoir Level: (1: reservoir level string)"), status.reservoirLevel == Pod.reservoirLevelAboveThresholdMagicNumber ? "50+" : status.reservoirLevel.twoDecimals)
 
@@ -134,7 +134,7 @@ private func podStatusString(status: DetailedStatus) -> String {
 
     if status.faultEventCode.faultType != .noFaults {
         // report the additional fault related information in a separate section
-        result += String(format: LocalizedString("\n\n⚠️ Critical Pod Fault %1$03d (0x%2$02X)", comment: "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)"), status.faultEventCode.rawValue, status.faultEventCode.rawValue)
+        result += String(format: LocalizedString("\n\n⚠️ Critical Pod Fault %1$03lld (0x%2$02llX)", comment: "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)"), status.faultEventCode.rawValue, status.faultEventCode.rawValue)
         result += String(format: "\n%1$@", status.faultEventCode.faultDescription)
         if let faultEventTimeSinceActivation = status.faultEventTimeSinceActivation,
            let faultTimeStr = formatter.string(from: faultEventTimeSinceActivation)
@@ -142,7 +142,7 @@ private func podStatusString(status: DetailedStatus) -> String {
             result += String(format: LocalizedString("\nFault Time: %1$@", comment: "The format string for fault time: (1: fault time string)"), faultTimeStr)
         }
         if let errorEventInfo = status.errorEventInfo {
-            result += String(format: LocalizedString("\nFault Event Info: %1$03d (0x%2$02X),", comment: "The format string for fault event info: (1: fault event info)"), errorEventInfo.rawValue, errorEventInfo.rawValue)
+            result += String(format: LocalizedString("\nFault Event Info: %1$03lld (0x%2$02llX),", comment: "The format string for fault event info: (1: fault event info)"), errorEventInfo.rawValue, errorEventInfo.rawValue)
             result += String(format: LocalizedString("\n  Insulin State Table Corrupted: %@", comment: "The format string for insulin state table corrupted: (1: insulin state corrupted)"), String(describing: errorEventInfo.insulinStateTableCorruption))
             result += String(format: LocalizedString("\n  Occlusion Type: %1$@", comment: "The format string for occlusion type: (1: occlusion type)"), String(describing: errorEventInfo.occlusionType))
             result += String(format: LocalizedString("\n  Immediate Bolus In Progress: %1$@", comment: "The format string for immediate bolus in progress: (1: immediate bolus in progress)"), String(describing: errorEventInfo.immediateBolusInProgress))

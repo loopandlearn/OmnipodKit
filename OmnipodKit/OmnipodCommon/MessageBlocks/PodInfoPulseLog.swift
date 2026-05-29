@@ -95,7 +95,7 @@ func pulseLogString(pulseLogEntries: [UInt32], lastPulseNumber: Int) -> String {
     var index = pulseLogEntries.count - 1
     var pulseNumber = lastPulseNumber
     while index >= 0 {
-        result.append(String(format: "%04d:%@", pulseNumber, UInt32(pulseLogEntries[index]).binaryDescription))
+        result.append(String(format: "%04lld:%@", pulseNumber, UInt32(pulseLogEntries[index]).binaryDescription))
         index -= 1
         pulseNumber -= 1
     }
