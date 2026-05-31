@@ -159,9 +159,9 @@ class LocalizationTests: XCTestCase {
             return "[\(index + 1)/\(offenders.count)] \(Self.catalogDisplayPath):\(line)  locale=\(offender.locale)  key=\(key)"
         }
 
-        var message = "Found \(offenders.count) \(title) (see test console for full list):\n\n\(lines.joined(separator: "\n"))"
+        var message = "Found \(offenders.count) \(title) (location errors below):\n\n\(lines.joined(separator: "\n"))"
         if !listAll, offenders.count > 25 {
-            message += "\n\n…and \(offenders.count - 25) more in test console."
+            message += "\n\n…and \(offenders.count - 25) more location errors below."
         }
         return message
     }
