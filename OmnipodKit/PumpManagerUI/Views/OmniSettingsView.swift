@@ -424,14 +424,14 @@ struct OmniSettingsView: View  {
                     FrameworkLocalText("Activation", comment: "Label for Activation row")
                     Spacer()
                     Text(self.viewModel.activatedAtString)
-                        .foregroundColor(Color.secondary)
+                        .foregroundColor(Color.primary)
                 }
 
                 HStack {
                     FrameworkLocalText("Expiration", comment: "Label for Expiration row")
                     Spacer()
                     Text(self.viewModel.expiresAtString)
-                        .foregroundColor(Color.secondary)
+                        .foregroundColor(Color.primary)
                 }
 
                 HStack {
@@ -439,12 +439,12 @@ struct OmniSettingsView: View  {
                         FrameworkLocalText("Faulted", comment: "Label for Faulted row")
                         Spacer()
                         Text(self.viewModel.deliveryStoppedAtString)
-                            .foregroundColor(Color.secondary)
+                            .foregroundColor(Color.primary)
                     } else {
                         FrameworkLocalText("No Delivery", comment: "Label for No Delivery row")
                         Spacer()
                         Text(self.viewModel.noDeliveryAtString)
-                            .foregroundColor(Color.secondary)
+                            .foregroundColor(Color.primary)
                     }
                 }
 
@@ -578,6 +578,25 @@ struct OmniSettingsView: View  {
                     }
                     .actionSheet(isPresented: $showSyncTimeOptions) {
                         syncPumpTimeActionSheet
+                    }
+                }
+            }
+
+            if self.viewModel.podType.isDash {
+                Section() {
+                    let localizedPodKeepAliveStr = LocalizedString("Pod Keep Alive",
+                        comment: "Title for the pod keep alive row and page")
+                    NavigationLink(destination: PodKeepAliveView(title: localizedPodKeepAliveStr,
+                        initialValue: viewModel.podKeepAlivePreference,
+                        onChange: viewModel.setPodKeepAlive))
+                    {
+                        HStack {
+                            Text(localizedPodKeepAliveStr)
+                                .foregroundColor(Color.primary)
+                            Spacer()
+                            Text(viewModel.podKeepAlivePreference.title)
+                                .foregroundColor(Color.secondary)
+                        }
                     }
                 }
             }

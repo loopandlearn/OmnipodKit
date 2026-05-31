@@ -1,5 +1,5 @@
 //
-//  OptionaString.swift
+//  OptionalString.swift
 //  OmnipodKit
 //
 //  Created by Joe Moran 2/1/2025

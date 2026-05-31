@@ -44,6 +44,8 @@ class OmniSettingsViewModel: ObservableObject {
 
     @Published var silencePodPreference: SilencePodPreference
 
+    @Published var podKeepAlivePreference: PodKeepAlive
+
     @Published var silencePodEnd: Date?
 
     @Published var hasConnection: Bool // replaces both rileylinkConnected and isConnected
@@ -261,6 +263,7 @@ class OmniSettingsViewModel: ObservableObject {
         podCommState = pumpManager.podCommState
         beepPreference = pumpManager.beepPreference
         silencePodPreference = pumpManager.silencePod ? .enabled : .disabled
+        podKeepAlivePreference = Storage.shared.podKeepAlive.value
         silencePodEnd = pumpManager.silencePodEnd
         hasConnection = pumpManager.hasConnection
         insulinType = pumpManager.insulinType
@@ -416,6 +419,10 @@ class OmniSettingsViewModel: ObservableObject {
                 completion(error)
             }
         }
+    }
+
+    func setPodKeepAlive(_ podKeepAlivePreference: PodKeepAlive) {
+        self.podKeepAlivePreference = podKeepAlivePreference
     }
 
     func didChangeInsulinType(_ newType: InsulinType?) {

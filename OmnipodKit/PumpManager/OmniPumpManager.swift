@@ -134,6 +134,30 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 }
                 .store(in: &cancellables)
         }
+
+        if podType.isDash {
+            let nc = NotificationCenter.default
+            nc.addObserver(
+                self,
+                selector: #selector(appMovedToBackground),
+                name: UIApplication.didEnterBackgroundNotification,
+                object: nil
+            )
+            nc.addObserver(
+                self,
+                selector: #selector(appMovedToForeground),
+                name: UIApplication.willEnterForegroundNotification,
+                object: nil
+            )
+
+            // Needed setup if pod keep alives might be used
+            podKeepAliveSetup(refresh: refresh)
+        }
+    }
+
+    func refresh() {
+        // run in a separate thread?
+        getPodStatus(canOptimize: true) { _ in }
     }
 
     public required convenience init?(rawState: PumpManager.RawStateValue) {
@@ -354,6 +378,15 @@ public class OmniPumpManager: RileyLinkPumpManager {
         podStateObservers.forEach { (observer) in
             observer.podConnectionStateDidChange(isConnected: isConnected)
         }
+    }
+
+    private let backgroundTask = BackgroundTask()
+    @objc func appMovedToBackground() {
+        backgroundTask.startBackgroundTask(hasPod: state.podState != nil)
+    }
+
+    @objc func appMovedToForeground() {
+        backgroundTask.stopBackgroundTask()
     }
 
     typealias syncSilencePodStateFuncType = (_ silencePod: Bool, _ silencePodEnd: Date?) -> Void
@@ -1266,6 +1299,15 @@ extension OmniPumpManager {
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
 
+                            if self.usingInPlayPod == true && self.iPhoneWithPossibleInPlayIssues {
+                                if Storage.shared.podKeepAlive.value == .disabled {
+                                    // Enable the most conservative pod keep alive mode
+                                    // that should work through the for pod setup process.
+                                    self.log.debug("@@@ Enabling pod keep alives")
+                                    Storage.shared.podKeepAlive.value = .whenOpen
+                                }
+                            }
+
                             self.pumpDelegate.notify { (delegate) in
                                 delegate?.pumpManagerPumpWasReplaced(self)
                             }
@@ -1481,10 +1523,11 @@ extension OmniPumpManager {
         handleSilencePodEnd(session: session)
 
         // Next do the getStatus() call unless we can optimize and it
-        // has been less than a couple of minutes since the last response.
+        // has been less than optimizeInterval since the last response.
+        let optimizeInterval = TimeInterval(seconds: 120)
         let timeSinceLastResponse = -(self.state.podState?.podTimeUpdated ?? .distantPast).timeIntervalSinceNow
         let status: StatusResponse?
-        if canOptimize && timeSinceLastResponse < TimeInterval(minutes: 2) {
+        if canOptimize && timeSinceLastResponse < optimizeInterval {
             self.log.debug("### skipping getStatus() with last status %@ ago", timeSinceLastResponse.timeIntervalStr)
             status = nil
         } else {
@@ -1515,7 +1558,10 @@ extension OmniPumpManager {
     func getPodStatus(canOptimize: Bool = false,
                       completion: ((_ result: PumpManagerResult<StatusResponse?>) -> Void)? = nil)
     {
-        guard state.hasActivePod else {
+
+        // Don't use guard state.hasActivePod here as it prevents getPodStatus from working
+        // after the pod has been paired, but before the pod setup process has been completed.
+        guard state.podState?.setupProgress.isPaired == true, state.podState?.fault == nil else {
             completion?(.failure(PumpManagerError.configuration(OmniPumpManagerError.noPodPaired)))
             return
         }
@@ -2094,6 +2140,27 @@ extension OmniPumpManager {
             self.log.error("Configure alerts %{public}@ failed: %{public}@", String(describing: podAlerts), String(describing: error))
             completion(.communication(error))
         }
+    }
+
+    // Running on any iPhone 16 or an iPhone 17e which are known
+    // to have BLE reconnect issues with InPlay BLE DASH pods?
+    var iPhoneWithPossibleInPlayIssues: Bool {
+
+        let iPhoneModel = UIDevice.modelName
+        if iPhoneModel.contains("iPhone 16") || iPhoneModel == "iPhone 17e" {
+            return true
+        }
+
+        return false
+    }
+
+    // Using an InPlay BLE pod?
+    var usingInPlayPod: Bool? {
+
+        if let blePodComms = podComms as? BlePodComms, let deviceBLEName = blePodComms.manager?.peripheral.name {
+            return deviceBLEName == "InPlay BLE"
+        }
+        return nil // don't know -- maybe not paired yet
     }
 }
 
