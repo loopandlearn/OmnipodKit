@@ -12,256 +12,151 @@ import XCTest
 
 class LocalizationTests: XCTestCase {
 
-    private var catalogURL: URL {
-        LocalizationCatalogLoader.localizableXcstringsURL()
+    private static var catalog: LocalizationCatalogLoader.Snapshot!
+    private static var xcstringsValidation: XcstringsValidationResult!
+    private static var bundleTables: [BundleStringsTable]!
+
+    private var lineNumberCache: [String: Int] = [:]
+
+    /// e.g. `LoopWorkspace/OmnipodKit/Localization/Localizable.xcstrings`
+    private static var catalogDisplayPath: String!
+
+    override class func setUp() {
+        super.setUp()
+        do {
+            catalog = try LocalizationCatalogLoader.Snapshot.load(
+                from: LocalizationCatalogLoader.localizableXcstringsURL()
+            )
+            catalogDisplayPath = displayPath(relativeToLoopWorkspace: catalog.url)
+            xcstringsValidation = LocalizationPercentValidator.validateXcstrings(
+                entries: catalog.entries
+            )
+            bundleTables = LocalizationPercentValidator.loadStringsTables(
+                from: Bundle(for: OmniPumpManager.self)
+            )
+        } catch {
+            XCTFail("LocalizationTests setup failed: \(error)")
+        }
     }
 
-    private lazy var catalogKeyLineNumbers: [String: Int] = {
-        (try? LocalizationCatalogLoader.loadKeyLineNumbers(from: catalogURL)) ?? [:]
-    }()
+    private static func displayPath(relativeToLoopWorkspace url: URL) -> String {
+        let path = url.path
+        if let range = path.range(of: "/LoopWorkspace/") {
+            return "LoopWorkspace/" + path[range.upperBound...]
+        }
+        return "OmnipodKit/Localization/\(url.lastPathComponent)"
+    }
 
     // MARK: - Localizable.xcstrings (source catalog)
 
-    func testNoStrayPercent_inLocalizableXcstrings() throws {
-        let entries = try LocalizationCatalogLoader.loadEntries(from: catalogURL)
-        var offenders: [LocalizationPercentOffender] = []
-
-        for entry in entries {
-            offenders += LocalizationPercentValidator.strayPercentOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        }
-
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "string(s) with a single % although the value contains printf placeholders",
-                offenders: offenders
-            )
+    func testNoStrayPercent_inLocalizableXcstrings() {
+        assertXcstringsEmpty(
+            Self.xcstringsValidation.stray,
+            title: "string(s) with a single % although the value contains printf placeholders"
         )
     }
 
-    func testFormatSpecifiers_useAsciiConversionLetters_inLocalizableXcstrings() throws {
-        let entries = try LocalizationCatalogLoader.loadEntries(from: catalogURL)
-        var offenders: [LocalizationPercentOffender] = []
-
-        for entry in entries {
-            offenders += LocalizationPercentValidator.nonAsciiFormatSpecifierOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        }
-
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "string(s) with non-ASCII characters in a printf format specifier (conversion letters must be ASCII, e.g. use %1$03d not %1$03د)",
-                offenders: offenders
-            )
+    func testFormatSpecifiers_useAsciiConversionLetters_inLocalizableXcstrings() {
+        assertXcstringsEmpty(
+            Self.xcstringsValidation.nonAscii,
+            title: "string(s) with non-ASCII characters in a printf format specifier (conversion letters must be ASCII, e.g. use %1$03d not %1$03د)"
         )
     }
 
-    func testFormatStrings_doNotMixPositionalAndNonPositional_inLocalizableXcstrings() throws {
-        let entries = try LocalizationCatalogLoader.loadEntries(from: catalogURL)
-        var offenders: [LocalizationPercentOffender] = []
-
-        for entry in entries where entry.locale != "key" {
-            offenders += LocalizationPercentValidator.mixedPositionalFormatOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        }
-
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "localized value(s) mixing positional (`%1$@`) and non-positional (`%@`) specifiers in one format string (can crash `String(format:)`; e.g. use `%3$@` not `%@` after `%2$@`)",
-                offenders: offenders
-            )
+    func testFormatStrings_doNotMixPositionalAndNonPositional_inLocalizableXcstrings() {
+        assertXcstringsEmpty(
+            Self.xcstringsValidation.mixedPositional,
+            title: "localized value(s) mixing positional (`%1$@`) and non-positional (`%@`) specifiers in one format string (can crash `String(format:)`; e.g. use `%3$@` not `%@` after `%2$@`)"
         )
     }
 
-    func testFormatSpecifierPercentCount_matchesKey_inLocalizableXcstrings() throws {
-        let entries = try LocalizationCatalogLoader.loadEntries(from: catalogURL)
-        var offenders: [LocalizationPercentOffender] = []
-
-        for entry in entries {
-            offenders += LocalizationPercentValidator.mismatchedFormatSpecifierOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        }
-
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "localized value(s) with extra `%` before a format specifier from the source key (e.g. key %1$d vs value %%1$d; see OmnipodKit#65)",
-                offenders: offenders,
-                listAll: false
-            )
+    func testFormatSpecifierPercentCount_matchesKey_inLocalizableXcstrings() {
+        assertXcstringsEmpty(
+            Self.xcstringsValidation.mismatched,
+            title: "localized value(s) with extra `%` before a format specifier from the source key (e.g. key %1$d vs value %%1$d; see OmnipodKit#65)",
+            listAll: false
         )
     }
 
     // MARK: - Compiled OmnipodKit bundle (runtime tables)
 
     func testNoStrayPercent_inOmnipodKitBundle() {
-        let offenders = LocalizationPercentValidator.strayPercentOffendersInBundle(Bundle(for: OmniPumpManager.self))
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "compiled .strings with stray %",
-                offenders: offenders
-            )
+        let offenders = LocalizationPercentValidator.strayPercentOffenders(
+            inBundleTables: Self.bundleTables
         )
+        assertBundleEmpty(offenders, title: "compiled .strings with stray %")
     }
 
     func testFormatSpecifiers_useAsciiConversionLetters_inOmnipodKitBundle() {
-        let offenders = LocalizationPercentValidator.nonAsciiFormatSpecifierOffendersInBundle(
-            Bundle(for: OmniPumpManager.self)
+        let offenders = LocalizationPercentValidator.nonAsciiFormatSpecifierOffenders(
+            inBundleTables: Self.bundleTables
         )
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "compiled .strings with non-ASCII characters in a printf format specifier",
-                offenders: offenders
-            )
+        assertBundleEmpty(
+            offenders,
+            title: "compiled .strings with non-ASCII characters in a printf format specifier"
         )
     }
 
     func testFormatStrings_doNotMixPositionalAndNonPositional_inOmnipodKitBundle() {
-        let offenders = LocalizationPercentValidator.mixedPositionalFormatOffendersInBundle(
-            Bundle(for: OmniPumpManager.self)
+        let offenders = LocalizationPercentValidator.mixedPositionalFormatOffenders(
+            inBundleTables: Self.bundleTables
         )
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "compiled .strings mixing positional and non-positional format specifiers",
-                offenders: offenders
-            )
+        assertBundleEmpty(
+            offenders,
+            title: "compiled .strings mixing positional and non-positional format specifiers"
         )
     }
 
     func testFormatSpecifierPercentCount_matchesKey_inOmnipodKitBundle() {
-        let offenders = LocalizationPercentValidator.mismatchedFormatSpecifierOffendersInBundle(Bundle(for: OmniPumpManager.self))
-        XCTAssertTrue(
-            offenders.isEmpty,
-            formattedMessage(
-                title: "compiled .strings with extra `%` before a format specifier from the key",
-                offenders: offenders,
-                listAll: false
-            )
+        let offenders = LocalizationPercentValidator.mismatchedFormatSpecifierOffenders(
+            inBundleTables: Self.bundleTables
+        )
+        assertBundleEmpty(
+            offenders,
+            title: "compiled .strings with extra `%` before a format specifier from the key",
+            listAll: false
         )
     }
 
-    // MARK: - Full location report (fails with every issue + file:line)
+    // MARK: - Assertions
 
-    func testLocalizationIssueLocationsReport_inLocalizableXcstrings() throws {
-        let entries = try LocalizationCatalogLoader.loadEntries(from: catalogURL)
-        var sections: [String] = []
+    private func assertXcstringsEmpty(
+        _ offenders: [LocalizationPercentOffender],
+        title: String,
+        listAll: Bool = true
+    ) {
+        XCTAssertTrue(
+            offenders.isEmpty,
+            formattedMessage(title: title, offenders: offenders, listAll: listAll, useCatalogLines: true)
+        )
+    }
 
-        func collect(
-            _ name: String,
-            _ offenders: [LocalizationPercentOffender]
-        ) {
-            guard !offenders.isEmpty else { return }
-            sections.append(
-                formattedMessage(title: name, offenders: offenders, listAll: offenders.count <= 50)
-            )
-        }
-
-        collect("double-escaped format specifier (%% vs key %)", entries.flatMap { entry in
-            LocalizationPercentValidator.mismatchedFormatSpecifierOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        })
-
-        collect("non-ASCII conversion letter in format specifier", entries.flatMap { entry in
-            LocalizationPercentValidator.nonAsciiFormatSpecifierOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        })
-
-        collect("mixed positional + non-positional specifiers", entries.flatMap { entry in
-            guard entry.locale != "key" else { return [] as [LocalizationPercentOffender] }
-            return LocalizationPercentValidator.mixedPositionalFormatOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        })
-
-        collect("stray % in format string", entries.flatMap { entry in
-            LocalizationPercentValidator.strayPercentOffenders(
-                locale: entry.locale,
-                key: entry.key,
-                value: entry.value,
-                source: "Localizable.xcstrings"
-            )
-        })
-
-        guard !sections.isEmpty else { return }
-
-        XCTFail(
-            """
-            Localization/Localizable.xcstrings issue locations (\(sections.count) rule group(s)):
-
-            \(sections.joined(separator: "\n\n---\n\n"))
-            """
+    private func assertBundleEmpty(
+        _ offenders: [LocalizationPercentOffender],
+        title: String,
+        listAll: Bool = true
+    ) {
+        XCTAssertTrue(
+            offenders.isEmpty,
+            formattedMessage(title: title, offenders: offenders, listAll: listAll, useCatalogLines: true)
         )
     }
 
     // MARK: - Reporting
 
-    private static let catalogPath = "OmnipodKit/Localization/Localizable.xcstrings"
-
-    /// One line per issue in the test console (Xcode test log / `xcodebuild` stdout).
-    private func logOffendersToConsole(
-        _ offenders: [LocalizationPercentOffender],
-        rule: String
-    ) {
-        guard !offenders.isEmpty else { return }
-        print("\n--- Localization: \(rule) (\(offenders.count)) ---")
-        for offender in offenders {
-            let line = catalogKeyLineNumbers[offender.key].map(String.init) ?? "?"
-            let key = offender.key
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\n", with: "\\n")
-                .replacingOccurrences(of: "\t", with: "\\t")
-            print("\(Self.catalogPath):\(line)\tlocale=\(offender.locale)\tkey=\(key)")
-        }
-        print("--- end \(rule) ---\n")
-    }
-
     private func formattedMessage(
         title: String,
         offenders: [LocalizationPercentOffender],
-        listAll: Bool = true
+        listAll: Bool,
+        useCatalogLines: Bool
     ) -> String {
-        logOffendersToConsole(offenders, rule: title)
+        logOffendersToConsole(offenders, rule: title, useCatalogLines: useCatalogLines)
 
         let listed = listAll ? offenders : Array(offenders.prefix(25))
         let lines = listed.enumerated().map { index, offender in
-            let line = catalogKeyLineNumbers[offender.key].map { String($0) } ?? "?"
-            let key = offender.key
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\n", with: "\\n")
-            return "[\(index + 1)/\(offenders.count)] \(Self.catalogPath):\(line)  locale=\(offender.locale)  key=\(key)"
+            let line = lineNumber(for: offender.key, useCatalogLines: useCatalogLines) ?? "?"
+            let key = escapedKeyForDisplay(offender.key)
+            return "[\(index + 1)/\(offenders.count)] \(Self.catalogDisplayPath):\(line)  locale=\(offender.locale)  key=\(key)"
         }
 
         var message = "Found \(offenders.count) \(title) (see test console for full list):\n\n\(lines.joined(separator: "\n"))"
@@ -269,5 +164,32 @@ class LocalizationTests: XCTestCase {
             message += "\n\n…and \(offenders.count - 25) more in test console."
         }
         return message
+    }
+
+    private func logOffendersToConsole(
+        _ offenders: [LocalizationPercentOffender],
+        rule: String,
+        useCatalogLines: Bool
+    ) {
+        guard !offenders.isEmpty else { return }
+        print("\n--- Localization: \(rule) (\(offenders.count)) ---")
+        for offender in offenders {
+            let line = lineNumber(for: offender.key, useCatalogLines: useCatalogLines) ?? "?"
+            let key = escapedKeyForDisplay(offender.key)
+            print("\(Self.catalogDisplayPath):\(line)\tlocale=\(offender.locale)\tkey=\(key)")
+        }
+        print("--- end \(rule) ---\n")
+    }
+
+    private func lineNumber(for key: String, useCatalogLines: Bool) -> Int? {
+        guard useCatalogLines else { return nil }
+        return Self.catalog.lineNumber(for: key, lineCache: &lineNumberCache)
+    }
+
+    private func escapedKeyForDisplay(_ key: String) -> String {
+        key
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\t", with: "\\t")
     }
 }

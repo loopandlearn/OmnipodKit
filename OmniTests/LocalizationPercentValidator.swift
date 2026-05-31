@@ -16,7 +16,103 @@ struct LocalizationPercentOffender: Equatable {
     let source: String
 }
 
+struct BundleStringsTable {
+    let locale: String
+    let source: String
+    let table: [String: String]
+}
+
+struct XcstringsValidationResult {
+    var stray: [LocalizationPercentOffender] = []
+    var mismatched: [LocalizationPercentOffender] = []
+    var nonAscii: [LocalizationPercentOffender] = []
+    var mixedPositional: [LocalizationPercentOffender] = []
+}
+
 enum LocalizationPercentValidator {
+
+    private static let xcstringsSource = "Localizable.xcstrings"
+
+    // MARK: - Single-pass xcstrings scan
+
+    static func validateXcstrings(
+        entries: [LocalizationCatalogLoader.LocalizedStringEntry],
+        source: String = xcstringsSource
+    ) -> XcstringsValidationResult {
+        var result = XcstringsValidationResult()
+
+        for entry in entries {
+            result.stray += strayPercentOffenders(
+                locale: entry.locale,
+                key: entry.key,
+                value: entry.value,
+                source: source
+            )
+            result.mismatched += mismatchedFormatSpecifierOffenders(
+                locale: entry.locale,
+                key: entry.key,
+                value: entry.value,
+                source: source
+            )
+            result.nonAscii += nonAsciiFormatSpecifierOffenders(
+                locale: entry.locale,
+                key: entry.key,
+                value: entry.value,
+                source: source
+            )
+            if entry.locale != "key" {
+                result.mixedPositional += mixedPositionalFormatOffenders(
+                    locale: entry.locale,
+                    key: entry.key,
+                    value: entry.value,
+                    source: source
+                )
+            }
+        }
+
+        return result
+    }
+
+    // MARK: - Bundle .strings tables (load once per test class)
+
+    static func loadStringsTables(from bundle: Bundle) -> [BundleStringsTable] {
+        var tables: [BundleStringsTable] = []
+        for locale in bundle.localizations where locale != "Base" {
+            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
+                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
+
+            for case let file as String in files where file.hasSuffix(".strings") {
+                let path = (lproj as NSString).appendingPathComponent(file)
+                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
+                tables.append(BundleStringsTable(locale: locale, source: file, table: table))
+            }
+        }
+        return tables
+    }
+
+    static func strayPercentOffenders(inBundleTables tables: [BundleStringsTable]) -> [LocalizationPercentOffender] {
+        tables.flatMap { table in
+            strayPercentOffendersInStringsTable(locale: table.locale, table: table.table, source: table.source)
+        }
+    }
+
+    static func mismatchedFormatSpecifierOffenders(inBundleTables tables: [BundleStringsTable]) -> [LocalizationPercentOffender] {
+        tables.flatMap { table in
+            mismatchedFormatSpecifierOffendersInStringsTable(locale: table.locale, table: table.table, source: table.source)
+        }
+    }
+
+    static func nonAsciiFormatSpecifierOffenders(inBundleTables tables: [BundleStringsTable]) -> [LocalizationPercentOffender] {
+        tables.flatMap { table in
+            nonAsciiFormatSpecifierOffendersInStringsTable(locale: table.locale, table: table.table, source: table.source)
+        }
+    }
+
+    static func mixedPositionalFormatOffenders(inBundleTables tables: [BundleStringsTable]) -> [LocalizationPercentOffender] {
+        tables.flatMap { table in
+            mixedPositionalFormatOffendersInStringsTable(locale: table.locale, table: table.table, source: table.source)
+        }
+    }
 
     /// Matches placeholders like %@, %d, %1$@, %1$03d, %g.
     private static let placeholderPattern = "%[0-9]*\\$?[.,]?[0-9]*[a-zA-Z@]"
@@ -135,22 +231,7 @@ enum LocalizationPercentValidator {
     }
 
     static func strayPercentOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
-        var offenders: [LocalizationPercentOffender] = []
-        for locale in bundle.localizations where locale != "Base" {
-            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
-                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
-
-            for case let file as String in files where file.hasSuffix(".strings") {
-                let path = (lproj as NSString).appendingPathComponent(file)
-                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
-                offenders += strayPercentOffendersInStringsTable(
-                    locale: locale,
-                    table: table,
-                    source: file
-                )
-            }
-        }
-        return offenders
+        strayPercentOffenders(inBundleTables: loadStringsTables(from: bundle))
     }
 
     // MARK: - Format specifier % count (issue #65: %%1$d in catalog vs %1$d in key)
@@ -202,22 +283,7 @@ enum LocalizationPercentValidator {
     }
 
     static func mismatchedFormatSpecifierOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
-        var offenders: [LocalizationPercentOffender] = []
-        for locale in bundle.localizations where locale != "Base" {
-            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
-                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
-
-            for case let file as String in files where file.hasSuffix(".strings") {
-                let path = (lproj as NSString).appendingPathComponent(file)
-                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
-                offenders += mismatchedFormatSpecifierOffendersInStringsTable(
-                    locale: locale,
-                    table: table,
-                    source: file
-                )
-            }
-        }
-        return offenders
+        mismatchedFormatSpecifierOffenders(inBundleTables: loadStringsTables(from: bundle))
     }
 
     // MARK: - ASCII conversion letters (e.g. Arabic `د` in `%1$03د`)
@@ -248,22 +314,7 @@ enum LocalizationPercentValidator {
     }
 
     static func nonAsciiFormatSpecifierOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
-        var offenders: [LocalizationPercentOffender] = []
-        for locale in bundle.localizations where locale != "Base" {
-            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
-                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
-
-            for case let file as String in files where file.hasSuffix(".strings") {
-                let path = (lproj as NSString).appendingPathComponent(file)
-                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
-                offenders += nonAsciiFormatSpecifierOffendersInStringsTable(
-                    locale: locale,
-                    table: table,
-                    source: file
-                )
-            }
-        }
-        return offenders
+        nonAsciiFormatSpecifierOffenders(inBundleTables: loadStringsTables(from: bundle))
     }
 
     // MARK: - Mixed positional + non-positional (Arabic Previous Pod crash)
@@ -295,21 +346,6 @@ enum LocalizationPercentValidator {
     }
 
     static func mixedPositionalFormatOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
-        var offenders: [LocalizationPercentOffender] = []
-        for locale in bundle.localizations where locale != "Base" {
-            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
-                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
-
-            for case let file as String in files where file.hasSuffix(".strings") {
-                let path = (lproj as NSString).appendingPathComponent(file)
-                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
-                offenders += mixedPositionalFormatOffendersInStringsTable(
-                    locale: locale,
-                    table: table,
-                    source: file
-                )
-            }
-        }
-        return offenders
+        mixedPositionalFormatOffenders(inBundleTables: loadStringsTables(from: bundle))
     }
 }
