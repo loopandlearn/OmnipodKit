@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "\n\n⚠️ Critical Pod Fault %1$@ (%2$@)" : {
+      "comment" : "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)"
+    },
     "\n\n⚠️ Critical Pod Fault %1$03d (0x%2$02X)" : {
       "comment" : "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)",
       "extractionState" : "manual",
@@ -1297,6 +1300,9 @@
         }
       }
     },
+    "\nFault Event Info: %1$@ (%2$@)," : {
+      "comment" : "The format string for fault event info in decimal and hex: (1: fault event info for decimal display) (2: fault event info for hex display)"
+    },
     "\nFault Event Info: %1$03d (0x%2$02X)," : {
       "comment" : "The format string for fault event info: (1: fault event info)",
       "extractionState" : "manual",
@@ -1304,157 +1310,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nمعلومات حدث الخطأ: %%1$03d (0x%%2$02X),"
+            "value" : "\nمعلومات حدث الخطأ: %1$03d (0x%2$02X),"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformace o poruchové události: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformace o poruchové události: %1$03d (0x%2$02X),"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInfo om fejlhændelse: %%1$03d (0x%%2$02X),"
+            "value" : "\nInfo om fejlhændelse: %1$03d (0x%2$02X),"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nFehlerereignis-Info: %%1$03d (0x%%2$02X),"
+            "value" : "\nFehlerereignis-Info: %1$03d (0x%2$02X),"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nFault Event Info: %%1$03d (0x%%2$02X),"
+            "value" : "\nFault Event Info: %1$03d (0x%2$02X),"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformación del evento de fallo: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformación del evento de fallo: %1$03d (0x%2$02X),"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nVikatapahtuman tiedot: %%1$03d (0x%%2$02X),"
+            "value" : "\nVikatapahtuman tiedot: %1$03d (0x%2$02X),"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformations sur l'événement de défaut : %%1$03d (0x%%2$02X),"
+            "value" : "\nInformations sur l'événement de défaut : %1$03d (0x%2$02X),"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nמידע על אירוע תקלה: %%1$03d (0x%%2$02X),"
+            "value" : "\nמידע על אירוע תקלה: %1$03d (0x%2$02X),"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nHibaesemény információ: %%1$03d (0x%%2$02X),"
+            "value" : "\nHibaesemény információ: %1$03d (0x%2$02X),"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformazioni sull'evento di guasto: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformazioni sull'evento di guasto: %1$03d (0x%2$02X),"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\n障害イベント情報: %%1$03d (0x%%2$02X)、"
+            "value" : "\n障害イベント情報: %1$03d (0x%2$02X)、"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\n오류 이벤트 정보: %%1$03d(0x%%2$02X),"
+            "value" : "\n오류 이벤트 정보: %1$03d(0x%2$02X),"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInfo om feilhendelse: %%1$03d (0x%%2$02X),"
+            "value" : "\nInfo om feilhendelse: %1$03d (0x%2$02X),"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInfo over foutgebeurtenis: %%1$03d (0x%%2$02X),"
+            "value" : "\nInfo over foutgebeurtenis: %1$03d (0x%2$02X),"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformacje o zdarzeniu błędu: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformacje o zdarzeniu błędu: %1$03d (0x%2$02X),"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformação do evento de falha: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformação do evento de falha: %1$03d (0x%2$02X),"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInfo eveniment defecțiune: %%1$03d (0x%%2$02X),"
+            "value" : "\nInfo eveniment defecțiune: %1$03d (0x%2$02X),"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nИнформация о событии сбоя: %%1$03d (0x%%2$02X),"
+            "value" : "\nИнформация о событии сбоя: %1$03d (0x%2$02X),"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformácie o poruchovej udalosti: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformácie o poruchovej udalosti: %1$03d (0x%2$02X),"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInformacije o dogodku napake: %%1$03d (0x%%2$02X),"
+            "value" : "\nInformacije o dogodku napake: %1$03d (0x%2$02X),"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nInfo om felhändelse: %%1$03d (0x%%2$02X),"
+            "value" : "\nInfo om felhändelse: %1$03d (0x%2$02X),"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nHata Olay Bilgisi: %%1$03d (0x%%2$02X),"
+            "value" : "\nHata Olay Bilgisi: %1$03d (0x%2$02X),"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nІнформація про подію несправності: %%1$03d (0x%%2$02X),"
+            "value" : "\nІнформація про подію несправності: %1$03d (0x%2$02X),"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nThông tin sự kiện lỗi: %%1$03d (0x%%2$02X),"
+            "value" : "\nThông tin sự kiện lỗi: %1$03d (0x%2$02X),"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\n故障事件信息：%%1$03d (0x%%2$02X)、"
+            "value" : "\n故障事件信息：%1$03d (0x%2$02X)、"
           }
         }
       }
@@ -1945,6 +1951,9 @@
         }
       }
     },
+    "\nPulse Count: %1$@" : {
+      "comment" : "The format string for Pulse Count (1: pulse count)"
+    },
     "\nPulse Count: %1$d" : {
       "comment" : "The format string for Pulse Count (1: pulse count)",
       "extractionState" : "manual",
@@ -1952,157 +1961,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nعدد النبضات: %%1$d"
+            "value" : "\nعدد النبضات: %1$d"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nPočet pulzů: %%1$d"
+            "value" : "\nPočet pulzů: %1$d"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nAntal impulser: %%1$d"
+            "value" : "\nAntal impulser: %1$d"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nImpulszahl: %%1$d"
+            "value" : "\nImpulszahl: %1$d"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nPulse Count: %%1$d"
+            "value" : "\nPulse Count: %1$d"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nRecuento de pulsos: %%1$d"
+            "value" : "\nRecuento de pulsos: %1$d"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nPulssien määrä: %%1$d"
+            "value" : "\nPulssien määrä: %1$d"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nNombre d'impulsions : %%1$d"
+            "value" : "\nNombre d'impulsions : %1$d"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nספירת דופק: %%1$d"
+            "value" : "\nספירת דופק: %1$d"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nImpulzusszám: %%1$d"
+            "value" : "\nImpulzusszám: %1$d"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nConteggio impulsi: %%1$d"
+            "value" : "\nConteggio impulsi: %1$d"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nパルス数：%%1$d"
+            "value" : "\nパルス数：%1$d"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\n펄스 수 %%1$d"
+            "value" : "\n펄스 수 %1$d"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nAntall pulser: %%1$d"
+            "value" : "\nAntall pulser: %1$d"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nPulsteller: %%1$d"
+            "value" : "\nPulsteller: %1$d"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nLiczba impulsów: %%1$d"
+            "value" : "\nLiczba impulsów: %1$d"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nContagem de impulsos: %%1$d"
+            "value" : "\nContagem de impulsos: %1$d"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nNumăr de impulsuri: %%1$d"
+            "value" : "\nNumăr de impulsuri: %1$d"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nСчетчик импульсов: %%1$d"
+            "value" : "\nСчетчик импульсов: %1$d"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nPočet impulzov: %%1$d"
+            "value" : "\nPočet impulzov: %1$d"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nŠtevilo impulzov: %%1$d"
+            "value" : "\nŠtevilo impulzov: %1$d"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nAntal pulser: %%1$d"
+            "value" : "\nAntal pulser: %1$d"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nNabız Sayısı: %%1$d"
+            "value" : "\nNabız Sayısı: %1$d"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nПідрахунок пульсу: %%1$d"
+            "value" : "\nПідрахунок пульсу: %1$d"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\nSố xung: %%1$d"
+            "value" : "\nSố xung: %1$d"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\n脉冲计数：%%1$d"
+            "value" : "\n脉冲计数：%1$d"
           }
         }
       }
@@ -3575,6 +3584,9 @@
         }
       }
     },
+    "%@ U" : {
+      "comment" : "Format string for total delivery on pod details screen"
+    },
     "%@+ U" : {
       "comment" : "Format string for reservoir volume when above maximum reading. (1: The maximum reading)",
       "extractionState" : "manual",
@@ -5040,67 +5052,67 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g E"
+            "value" : "%g E"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g IE"
+            "value" : "%g IE"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "ja" : {
@@ -5112,85 +5124,85 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g E"
+            "value" : "%g E"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g E"
+            "value" : "%g E"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g/J"
+            "value" : "%g/J"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g Ед"
+            "value" : "%g Ед"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g j"
+            "value" : "%g j"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g E"
+            "value" : "%g E"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%gr Ü"
+            "value" : "%gr Ü"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%%g U"
+            "value" : "%g U"
           }
         }
       }
@@ -12645,6 +12657,9 @@
         }
       }
     },
+    "Command error %1$@: %2$@" : {
+      "comment" : "Format string for invalid message error code (1: error code number) (2: error description)"
+    },
     "Command error %1$u" : {
       "comment" : "Format string for invalid message error code (1: error code number)",
       "extractionState" : "manual",
@@ -12652,157 +12667,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "خطأ في الأمر %%1$u"
+            "value" : "خطأ في الأمر %1$u"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chyba příkazu %%1$u"
+            "value" : "Chyba příkazu %1$u"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofejl %%1$u"
+            "value" : "Kommandofejl %1$u"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Befehlsfehler %%1$u"
+            "value" : "Befehlsfehler %1$u"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u"
+            "value" : "Command error %1$u"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error de comando %%1$u"
+            "value" : "Error de comando %1$u"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Komentovirhe %%1$u"
+            "value" : "Komentovirhe %1$u"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur de commande %%1$u"
+            "value" : "Erreur de commande %1$u"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u"
+            "value" : "Command error %1$u"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u"
+            "value" : "Command error %1$u"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Errore di comando %%1$u"
+            "value" : "Errore di comando %1$u"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コマンドエラー %%1$u"
+            "value" : "コマンドエラー %1$u"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "명령 오류 %%1$u"
+            "value" : "명령 오류 %1$u"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofeil %%1$u"
+            "value" : "Kommandofeil %1$u"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opdrachtfout %%1$u"
+            "value" : "Opdrachtfout %1$u"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Błąd polecenia %%1$u"
+            "value" : "Błąd polecenia %1$u"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u"
+            "value" : "Command error %1$u"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eroare comandă %%1$u"
+            "value" : "Eroare comandă %1$u"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ошибка команды %%1$u"
+            "value" : "Ошибка команды %1$u"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chyba príkazu %%1$u"
+            "value" : "Chyba príkazu %1$u"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Napaka ukaza %%1$u"
+            "value" : "Napaka ukaza %1$u"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofel %%1$u"
+            "value" : "Kommandofel %1$u"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Komut hatası %%1$u"
+            "value" : "Komut hatası %1$u"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Помилка команди %%1$u"
+            "value" : "Помилка команди %1$u"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Câu lệnh lỗi %%1$u"
+            "value" : "Câu lệnh lỗi %1$u"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u"
+            "value" : "Command error %1$u"
           }
         }
       }
@@ -12814,157 +12829,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "خطأ في الأمر %%1$u: %@"
+            "value" : "خطأ في الأمر %1$u: %2$@"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chyba příkazu %%1$u: %2$@"
+            "value" : "Chyba příkazu %1$u: %2$@"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofejl %%1$u: %2$@."
+            "value" : "Kommandofejl %1$u: %2$@."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Befehlsfehler %%1$u: %2$@"
+            "value" : "Befehlsfehler %1$u: %2$@"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Command error %%1$u: %2$@"
+            "value" : "Command error %1$u: %2$@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error de comando %%1$u: %2$@"
+            "value" : "Error de comando %1$u: %2$@"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Komentovirhe %%1$u: %2$@"
+            "value" : "Komentovirhe %1$u: %2$@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur de commande %%1$u : %2$@"
+            "value" : "Erreur de commande %1$u : %2$@"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "שגיאת פקודה %%1$u: %2$@"
+            "value" : "שגיאת פקודה %1$u: %2$@"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Parancshiba %%1$u: %2$@"
+            "value" : "Parancshiba %1$u: %2$@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Errore di comando %%1$u: %2$@"
+            "value" : "Errore di comando %1$u: %2$@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コマンドエラー %%1$u：%@"
+            "value" : "コマンドエラー %1$u：%2$@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "명령 오류 %%1$u: %2$@"
+            "value" : "명령 오류 %1$u: %2$@"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofeil %%1$u: %2$@"
+            "value" : "Kommandofeil %1$u: %2$@"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opdrachtfout %%1$u: %2$@"
+            "value" : "Opdrachtfout %1$u: %2$@"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Błąd polecenia %%1$u: %2$@"
+            "value" : "Błąd polecenia %1$u: %2$@"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erro de comando %%1$u: %2$@"
+            "value" : "Erro de comando %1$u: %2$@"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eroare de comandă %%1$u: %2$@"
+            "value" : "Eroare de comandă %1$u: %2$@"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ошибка команды %%1$u: %2$@"
+            "value" : "Ошибка команды %1$u: %2$@"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chyba príkazu %%1$u: %2$@"
+            "value" : "Chyba príkazu %1$u: %2$@"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Napaka ukaza %%1$u: %2$@"
+            "value" : "Napaka ukaza %1$u: %2$@"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kommandofel %%1$u: %2$@."
+            "value" : "Kommandofel %1$u: %2$@."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Komut hatası %%1$u: %2$@"
+            "value" : "Komut hatası %1$u: %2$@"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Помилка команди %%1$u: %2$@"
+            "value" : "Помилка команди %1$u: %2$@"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi lệnh %%1$u: %2$@"
+            "value" : "Lỗi lệnh %1$u: %2$@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "命令错误 %%1$u：%2$@"
+            "value" : "命令错误 %1$u：%2$@"
           }
         }
       }
@@ -15079,6 +15094,9 @@
         }
       }
     },
+    "Critical Pod Fault %1$@" : {
+      "comment" : "The title for AlarmCode.other notification: (1: fault code value)"
+    },
     "Critical Pod Fault %1$03d" : {
       "comment" : "The title for AlarmCode.other notification: (1: fault code value)",
       "extractionState" : "manual",
@@ -15086,157 +15104,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "خطأ حرج في الحجرة الحرجة %%1$03د"
+            "value" : "خطأ حرج في الحجرة الحرجة %1$03د"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritická porucha modulu %%1$03d"
+            "value" : "Kritická porucha modulu %1$03d"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritisk pod-fejl %%1$03d"
+            "value" : "Kritisk pod-fejl %1$03d"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritischer Pod-Fehler %%1$03d"
+            "value" : "Kritischer Pod-Fehler %1$03d"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Critical Pod Fault %%1$03d"
+            "value" : "Critical Pod Fault %1$03d"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fallo Crítico Pod %%1$03d"
+            "value" : "Fallo Crítico Pod %1$03d"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kriittinen Pod-vika %%1$03d"
+            "value" : "Kriittinen Pod-vika %1$03d"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Défaut critique du pod %%1$03d"
+            "value" : "Défaut critique du pod %1$03d"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "תקלה קריטית בתרמיל %%1$03d"
+            "value" : "תקלה קריטית בתרמיל %1$03d"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritikus pod hiba %%1$03d"
+            "value" : "Kritikus pod hiba %1$03d"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guasto critico del Pod %%1$03d"
+            "value" : "Guasto critico del Pod %1$03d"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "クリティカル・ポッド・フォルト %%1$03d"
+            "value" : "クリティカル・ポッド・フォルト %1$03d"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "치명적인 포드 오류 %%1$03d"
+            "value" : "치명적인 포드 오류 %1$03d"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritisk Pod-feil %%1$03d"
+            "value" : "Kritisk Pod-feil %1$03d"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritieke Pod-fout %%1$03d"
+            "value" : "Kritieke Pod-fout %1$03d"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Krytyczny błąd modułu %%1$03d"
+            "value" : "Krytyczny błąd modułu %1$03d"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha crítica do módulo %%1$03d"
+            "value" : "Falha crítica do módulo %1$03d"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defecțiune critică Pod %%1$03d"
+            "value" : "Defecțiune critică Pod %1$03d"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Критическая неисправность бода %%1$03d"
+            "value" : "Критическая неисправность бода %1$03d"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritická porucha modulu %%1$03d"
+            "value" : "Kritická porucha modulu %1$03d"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritična napaka v podnožju %%1$03d"
+            "value" : "Kritična napaka v podnožju %1$03d"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritiskt Pod-fel %%1$03d"
+            "value" : "Kritiskt Pod-fel %1$03d"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritik Pod Hatası %%1$03d"
+            "value" : "Kritik Pod Hatası %1$03d"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Критична помилка модуля %%1$03d"
+            "value" : "Критична помилка модуля %1$03d"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi Pod nghiêm trọng %%1$03d"
+            "value" : "Lỗi Pod nghiêm trọng %1$03d"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关键 Pod 故障 %%1$03d"
+            "value" : "关键 Pod 故障 %1$03d"
           }
         }
       }
@@ -27406,6 +27424,9 @@
         }
       }
     },
+    "Internal pod fault %1$@" : {
+      "comment" : "The format string for Internal pod fault (1: The fault code value)"
+    },
     "Internal pod fault %1$03d" : {
       "comment" : "The format string for Internal pod fault (1: The fault code value)",
       "extractionState" : "manual",
@@ -27419,154 +27440,157 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interní chyba podu %%1$03d"
+            "value" : "Interní chyba podu %1$03d"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intern Pod-fejl %%1$03d"
+            "value" : "Intern Pod-fejl %1$03d"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interner Podfehler %%1$03d"
+            "value" : "Interner Podfehler %1$03d"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Internal pod fault %%1$03d"
+            "value" : "Internal pod fault %1$03d"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error pod interno %%1$03d"
+            "value" : "Error pod interno %1$03d"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sisäinen pumpun vika %%1$03d"
+            "value" : "Sisäinen pumpun vika %1$03d"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Code d'erreur interne du Pod %%1$03d"
+            "value" : "Code d'erreur interne du Pod %1$03d"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "תקלת פוד %%1$03d"
+            "value" : "תקלת פוד %1$03d"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Internal pod fault %%1$03d"
+            "value" : "Internal pod fault %1$03d"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guasto interno Pod %%1$03d"
+            "value" : "Guasto interno Pod %1$03d"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インターナルポッドエラー %%1$03d"
+            "value" : "インターナルポッドエラー %1$03d"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "내부 포드 오류 %%1$03d"
+            "value" : "내부 포드 오류 %1$03d"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intern pod-feil %%1$03d"
+            "value" : "Intern pod-feil %1$03d"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne podfout %%1$03d"
+            "value" : "Interne podfout %1$03d"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wewnętrzny błąd POD'a %%1$03d"
+            "value" : "Wewnętrzny błąd POD'a %1$03d"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha interna do pod %%1$03d"
+            "value" : "Falha interna do pod %1$03d"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defecțiune internă pompă %%1$03d"
+            "value" : "Defecțiune internă pompă %1$03d"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Внутренняя ошибка пода %%1$03d"
+            "value" : "Внутренняя ошибка пода %1$03d"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interná chyba podu %%1$03d"
+            "value" : "Interná chyba podu %1$03d"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notranja napaka modula %%1$03d"
+            "value" : "Notranja napaka modula %1$03d"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Internt podfel %%1$03d"
+            "value" : "Internt podfel %1$03d"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dahili pod hatası %%1$03d"
+            "value" : "Dahili pod hatası %1$03d"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Внутрішня помилка Pod %%1$03d"
+            "value" : "Внутрішня помилка Pod %1$03d"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi bên trong pod %%1$03d"
+            "value" : "Lỗi bên trong pod %1$03d"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod内部错误%%1$03d"
+            "value" : "Pod内部错误%1$03d"
           }
         }
       }
+    },
+    "Internal Pod fault code %1$@\n%2$@\nRef: %3$@\n" : {
+      "comment" : "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"
     },
     "Internal Pod fault code %1$03d\n%2$@\nRef: %3$@\n" : {
       "comment" : "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)",
@@ -27575,157 +27599,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "رمز خطأ القرنة الداخلية %%1$03d\n%2$@\nالمرجع: %@\n"
+            "value" : "رمز خطأ القرنة الداخلية %1$03d\n%2$@\nالمرجع: %3$@\n"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interní kód poruchy Pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Interní kód poruchy Pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intern Pod-fejlkode %%1$03d\n%2$@\nRef: %3$@.\n"
+            "value" : "Intern Pod-fejlkode %1$03d\n%2$@\nRef: %3$@.\n"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interner Pod-Fehlercode %%1$03d\n%2$@\nBetreff: %3$@\n"
+            "value" : "Interner Pod-Fehlercode %1$03d\n%2$@\nBetreff: %3$@\n"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Internal Pod fault code %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Internal Pod fault code %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Código de fallo interno del Pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Código de fallo interno del Pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Podin sisäinen vikakoodi %%1$03d\n%2$@\nViite: %3$@\n"
+            "value" : "Podin sisäinen vikakoodi %1$03d\n%2$@\nViite: %3$@\n"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Code d'erreur interne du pod %%1$03d\n%2$@\nRef : %3$@\n"
+            "value" : "Code d'erreur interne du pod %1$03d\n%2$@\nRef : %3$@\n"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "קוד תקלה בפוד פנימי%% 1$03d\n%2$@\nהתייחסות: %3$@\n"
+            "value" : "קוד תקלה בפוד פנימי% 1$03d\n%2$@\nהתייחסות: %3$@\n"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Belső pod hibakód %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Belső pod hibakód %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Codice errore interno Pod %%1$03d\n%2$@\nRif.: %3$@\n"
+            "value" : "Codice errore interno Pod %1$03d\n%2$@\nRif.: %3$@\n"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "内部ポッド障害コード %%1$03d\n%@\n参照: %3$@\n"
+            "value" : "内部ポッド障害コード %1$03d\n%2$@\n参照: %3$@\n"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "내부 파드 오류 코드 %%1$03d\n%2$@\n참조: %3$@\n"
+            "value" : "내부 파드 오류 코드 %1$03d\n%2$@\n참조: %3$@\n"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intern Pod-feilkode %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Intern Pod-feilkode %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne Pod-foutcode %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Interne Pod-foutcode %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kod błędu wewnętrznego pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Kod błędu wewnętrznego pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Código de falha interna do POD %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Código de falha interna do POD %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cod eroare internă Pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Cod eroare internă Pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Внутренний код неисправности подкачки %%1$03d\n%2$@\nСсылка: %3$@\n"
+            "value" : "Внутренний код неисправности подкачки %1$03d\n%2$@\nСсылка: %3$@\n"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interný kód poruchy Pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Interný kód poruchy Pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notranja koda napake Pod %%1$03d\n%2$@\nReferenca: %3$@\n"
+            "value" : "Notranja koda napake Pod %1$03d\n%2$@\nReferenca: %3$@\n"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Intern felkod för pod %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Intern felkod för pod %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dahili Pod hata kodu %%1$03d\n%2$@\nRef: %3$@\n"
+            "value" : "Dahili Pod hata kodu %1$03d\n%2$@\nRef: %3$@\n"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Код внутрішньої несправності модуля %%1$03d\n%2$@\nПосилання: %3$@\n"
+            "value" : "Код внутрішньої несправності модуля %1$03d\n%2$@\nПосилання: %3$@\n"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mã lỗi Pod nội bộ%% 1$03d\n%2$@\nTài liệu tham khảo: %3$@\n"
+            "value" : "Mã lỗi Pod nội bộ% 1$03d\n%2$@\nTài liệu tham khảo: %3$@\n"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod 内部故障代码 %%1$03d\n%2$@\n参考： %3$@\n"
+            "value" : "Pod 内部故障代码 %1$03d\n%2$@\n参考： %3$@\n"
           }
         }
       }
@@ -40053,157 +40077,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procenta = %%lf"
+            "value" : "Procenta = %lf"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procent = %%lf"
+            "value" : "Procent = %lf"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prozent = %%lf"
+            "value" : "Prozent = %lf"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Porcentaje = %%lf"
+            "value" : "Porcentaje = %lf"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pourcentage = %%lf"
+            "value" : "Pourcentage = %lf"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percentuale = %%lf"
+            "value" : "Percentuale = %lf"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パーセント = %%lf"
+            "value" : "パーセント = %lf"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "퍼센트 = %%lf"
+            "value" : "퍼센트 = %lf"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prosent = %%lf"
+            "value" : "Prosent = %lf"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procent = %%lf"
+            "value" : "Procent = %lf"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procent = %%lf"
+            "value" : "Procent = %lf"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procentaj = %%lf"
+            "value" : "Procentaj = %lf"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Процент = %%lf"
+            "value" : "Процент = %lf"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percentá = %%lf"
+            "value" : "Percentá = %lf"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Odstotek = %%lf"
+            "value" : "Odstotek = %lf"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procent = %%lf"
+            "value" : "Procent = %lf"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yüzde = %%lf"
+            "value" : "Yüzde = %lf"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Відсоток = %%lf"
+            "value" : "Відсоток = %lf"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Phần trăm = %%lf"
+            "value" : "Phần trăm = %lf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Percent = %%lf"
+            "value" : "Percent = %lf"
           }
         }
       }
@@ -42321,67 +42345,67 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يُرجى تحديد ما إذا كنت ترغب في التبديل من استخدام %%1@ كبسولات إلى نوع آخر من الكبسولات أو إلى نوع آخر من المضخات."
+            "value" : "يُرجى تحديد ما إذا كنت ترغب في التبديل من استخدام %1@ كبسولات إلى نوع آخر من الكبسولات أو إلى نوع آخر من المضخات."
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zvolte, zda chcete přejít z používání struků %%1@ na jiný typ struků nebo na jiný typ čerpadla."
+            "value" : "Zvolte, zda chcete přejít z používání struků %1@ na jiný typ struků nebo na jiný typ čerpadla."
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vælg, om du vil skifte fra at bruge %%1@-pods til en anden pod-type eller til en anden pumpetype."
+            "value" : "Vælg, om du vil skifte fra at bruge %1@-pods til en anden pod-type eller til en anden pumpetype."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bitte wählen Sie aus, ob Sie von der Verwendung von %%1@-Pods zu einem anderen Pod-Typ oder zu einem anderen Pumpentyp wechseln möchten."
+            "value" : "Bitte wählen Sie aus, ob Sie von der Verwendung von %1@-Pods zu einem anderen Pod-Typ oder zu einem anderen Pumpentyp wechseln möchten."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please select if you'd like to switch from using %%1@ pods to another pod type or to some other pump type."
+            "value" : "Please select if you'd like to switch from using %1@ pods to another pod type or to some other pump type."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por favor, seleccione si desea cambiar el uso de las vainas %%1@ a otro tipo de vaina o a otro tipo de bomba."
+            "value" : "Por favor, seleccione si desea cambiar el uso de las vainas %1@ a otro tipo de vaina o a otro tipo de bomba."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Valitse, haluatko vaihtaa %%1@-kapselien käytöstä toiseen kapselityyppiin tai johonkin muuhun pumpputyyppiin."
+            "value" : "Valitse, haluatko vaihtaa %1@-kapselien käytöstä toiseen kapselityyppiin tai johonkin muuhun pumpputyyppiin."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Veuillez sélectionner si vous souhaitez passer des dosettes %%1@ à un autre type de dosette ou à un autre type de pompe."
+            "value" : "Veuillez sélectionner si vous souhaitez passer des dosettes %1@ à un autre type de dosette ou à un autre type de pompe."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "אנא בחר אם ברצונך לעבור משימוש בתרמילים %%1@ לסוג תרמיל אחר או לסוג משאבה אחר."
+            "value" : "אנא בחר אם ברצונך לעבור משימוש בתרמילים %1@ לסוג תרמיל אחר או לסוג משאבה אחר."
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kérjük, válassza ki, hogy a %%1@ podok használatáról egy másik podtípusra vagy más szivattyútípusra szeretne-e váltani."
+            "value" : "Kérjük, válassza ki, hogy a %1@ podok használatáról egy másik podtípusra vagy más szivattyútípusra szeretne-e váltani."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selezionare se si desidera passare dall'uso delle cialde %%1@ a un altro tipo di cialde o a un altro tipo di pompa."
+            "value" : "Selezionare se si desidera passare dall'uso delle cialde %1@ a un altro tipo di cialde o a un altro tipo di pompa."
           }
         },
         "ja" : {
@@ -42399,79 +42423,79 @@
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Velg om du ønsker å bytte fra %%1@-puter til en annen type puter eller til en annen pumpetype."
+            "value" : "Velg om du ønsker å bytte fra %1@-puter til en annen type puter eller til en annen pumpetype."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecteer als u wilt overschakelen van het gebruik van %%1@ pods naar een ander podtype of naar een ander pomptype."
+            "value" : "Selecteer als u wilt overschakelen van het gebruik van %1@ pods naar een ander podtype of naar een ander pomptype."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wybierz, czy chcesz przełączyć się z korzystania ze strąków %%1@ na inny typ strąków lub na inny typ pompy."
+            "value" : "Wybierz, czy chcesz przełączyć się z korzystania ze strąków %1@ na inny typ strąków lub na inny typ pompy."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecione se pretende mudar da utilização de cápsulas %%1@ para outro tipo de cápsula ou para outro tipo de bomba."
+            "value" : "Selecione se pretende mudar da utilização de cápsulas %1@ para outro tipo de cápsula ou para outro tipo de bomba."
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vă rugăm să selectați dacă doriți să treceți de la utilizarea podurilor %%1@ la un alt tip de pod sau la un alt tip de pompă."
+            "value" : "Vă rugăm să selectați dacă doriți să treceți de la utilizarea podurilor %1@ la un alt tip de pod sau la un alt tip de pompă."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пожалуйста, выберите, хотите ли вы перейти с использования капсул %%1@ на другой тип капсул или на другой тип насоса."
+            "value" : "Пожалуйста, выберите, хотите ли вы перейти с использования капсул %1@ на другой тип капсул или на другой тип насоса."
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vyberte, či chcete prejsť z používania strukov %%1@ na iný typ strukov alebo na iný typ čerpadla."
+            "value" : "Vyberte, či chcete prejsť z používania strukov %1@ na iný typ strukov alebo na iný typ čerpadla."
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Izberite, ali želite preklopiti z uporabe %%1@ stroka na drugo vrsto stroka ali na drugo vrsto črpalke."
+            "value" : "Izberite, ali želite preklopiti z uporabe %1@ stroka na drugo vrsto stroka ali na drugo vrsto črpalke."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Välj om du vill byta från att använda %%1@ pods till en annan podtyp eller till någon annan pumptyp."
+            "value" : "Välj om du vill byta från att använda %1@ pods till en annan podtyp eller till någon annan pumptyp."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lütfen %%1@ kapsülleri kullanmaktan başka bir kapsül türüne veya başka bir pompa türüne geçmek isteyip istemediğinizi seçin."
+            "value" : "Lütfen %1@ kapsülleri kullanmaktan başka bir kapsül türüne veya başka bir pompa türüne geçmek isteyip istemediğinizi seçin."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Будь ласка, виберіть, чи хочете ви перейти з використання капсул %%1@ на інший тип капсул або на інший тип насоса."
+            "value" : "Будь ласка, виберіть, чи хочете ви перейти з використання капсул %1@ на інший тип капсул або на інший тип насоса."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vui lòng chọn nếu bạn muốn chuyển từ việc sử dụng %%1@ pods sang loại pod khác hoặc sang một số loại bơm khác."
+            "value" : "Vui lòng chọn nếu bạn muốn chuyển từ việc sử dụng %1@ pods sang loại pod khác hoặc sang một số loại bơm khác."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请选择是否要从使用 %%1@ 豆荚切换到其他豆荚类型或其他泵类型。"
+            "value" : "请选择是否要从使用 %1@ 豆荚切换到其他豆荚类型或其他泵类型。"
           }
         }
       }
@@ -43011,7 +43035,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Actif : %@"
+            "value" : "Pod Actif : %@"
           }
         },
         "he" : {
@@ -44909,6 +44933,9 @@
     "Pod Fault" : {
       "comment" : "Error message for reservoir view during unspecified pod fault"
     },
+    "Pod Fault %1$@" : {
+      "comment" : "Error message for reservoir view during general pod fault: (1: fault code value)"
+    },
     "Pod Fault %1$03d" : {
       "comment" : "Error message for reservoir view during general pod fault: (1: fault code value)",
       "extractionState" : "manual",
@@ -44916,157 +44943,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Porucha modulu %%1$03d"
+            "value" : "Porucha modulu %1$03d"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur du pod %%1$03d"
+            "value" : "Erreur du pod %1$03d"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guasto Pod %%1$03d"
+            "value" : "Guasto Pod %1$03d"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポッド障害 %%1$03d"
+            "value" : "ポッド障害 %1$03d"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "포드 오류 %%1$03d"
+            "value" : "포드 오류 %1$03d"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod-feil %%1$03d"
+            "value" : "Pod-feil %1$03d"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod fout: %%1$03d"
+            "value" : "Pod fout: %1$03d"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eroare pompă %%1$03d"
+            "value" : "Eroare pompă %1$03d"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Napaka v podnožju %%1$03d"
+            "value" : "Napaka v podnožju %1$03d"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Poddfel: %%1$03d"
+            "value" : "Poddfel: %1$03d"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod lỗi: %%1$03d"
+            "value" : "Pod lỗi: %1$03d"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Fault %%1$03d"
+            "value" : "Pod Fault %1$03d"
           }
         }
       }
@@ -66653,157 +66680,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تنبيه جراب غير متوقع #%%1@!"
+            "value" : "تنبيه جراب غير متوقع #%1@!"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neočekávané upozornění na pod #%%1@!"
+            "value" : "Neočekávané upozornění na pod #%1@!"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uventet pod-alarm #%%1@!"
+            "value" : "Uventet pod-alarm #%1@!"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unerwarteter Pod-Alarm #%%1@!"
+            "value" : "Unerwarteter Pod-Alarm #%1@!"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unexpected Pod Alert #%%1@!"
+            "value" : "Unexpected Pod Alert #%1@!"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¡Alerta de vaina inesperada #%%1@!"
+            "value" : "¡Alerta de vaina inesperada #%1@!"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Odottamaton pod-hälytys #%%1@!"
+            "value" : "Odottamaton pod-hälytys #%1@!"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alerte au pod inattendu #%%1@ !"
+            "value" : "Alerte au pod inattendu #%1@ !"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "התראת תרמיל בלתי צפויה #%%1@!"
+            "value" : "התראת תרמיל בלתי צפויה #%1@!"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Váratlan pod riasztás #%%1@!"
+            "value" : "Váratlan pod riasztás #%1@!"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allarme Pod inatteso #%%1@!"
+            "value" : "Allarme Pod inatteso #%1@!"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "予期せぬポッド・アラート#%%1@！"
+            "value" : "予期せぬポッド・アラート#%1@！"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "예기치 않은 파드 경고 #%%1@!"
+            "value" : "예기치 않은 파드 경고 #%1@!"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uventet Pod Alert #%%1@!"
+            "value" : "Uventet Pod Alert #%1@!"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onverwachte pod waarschuwing #%%1@!"
+            "value" : "Onverwachte pod waarschuwing #%1@!"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nieoczekiwany Pod Alert #%%1@!"
+            "value" : "Nieoczekiwany Pod Alert #%1@!"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alerta de pod inesperado #%%1@!"
+            "value" : "Alerta de pod inesperado #%1@!"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alertă neașteptată în capsulă #%%1@!"
+            "value" : "Alertă neașteptată în capsulă #%1@!"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Неожиданный сигнал тревоги #%%1@!"
+            "value" : "Неожиданный сигнал тревоги #%1@!"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neočakávané upozornenie na pod #%%1@!"
+            "value" : "Neočakávané upozornenie na pod #%1@!"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nepričakovano opozorilo za pod #%%1@!"
+            "value" : "Nepričakovano opozorilo za pod #%1@!"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oväntad pod-varning #%%1@!"
+            "value" : "Oväntad pod-varning #%1@!"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beklenmedik Bölme Uyarısı #%%1@!"
+            "value" : "Beklenmedik Bölme Uyarısı #%1@!"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Несподіване сповіщення про несподіваний під #%%1@!"
+            "value" : "Несподіване сповіщення про несподіваний під #%1@!"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cảnh báo Pod bất ngờ #%%1@!"
+            "value" : "Cảnh báo Pod bất ngờ #%1@!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "意外 Pod 警报 #%%1@！"
+            "value" : "意外 Pod 警报 #%1@！"
           }
         }
       }
@@ -67780,6 +67807,9 @@
         }
       }
     },
+    "Unknown pod fault %1$@" : {
+      "comment" : "The format string for Unknown pod fault (1: The fault code value)"
+    },
     "Unknown pod fault %1$03d" : {
       "comment" : "The format string for Unknown pod fault (1: The fault code value)",
       "extractionState" : "manual",
@@ -67793,145 +67823,145 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neznámá chyba podu %%1$03d"
+            "value" : "Neznámá chyba podu %1$03d"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ukendt Podfejl %%1$03d"
+            "value" : "Ukendt Podfejl %1$03d"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unbekannter Podfehler %%1$03d"
+            "value" : "Unbekannter Podfehler %1$03d"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown pod fault %%1$03d"
+            "value" : "Unknown pod fault %1$03d"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fallo de pod desconocido %%1$03d"
+            "value" : "Fallo de pod desconocido %1$03d"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tuntematon pumppuvirhe %%1$03d"
+            "value" : "Tuntematon pumppuvirhe %1$03d"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erreur de Pod inconnue %%1$03d"
+            "value" : "Erreur de Pod inconnue %1$03d"
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "תקלת פוד לא ידועה %%1$03d"
+            "value" : "תקלת פוד לא ידועה %1$03d"
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unknown pod fault %%1$03d"
+            "value" : "Unknown pod fault %1$03d"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guasto Pod sconosciuto %%1$03d"
+            "value" : "Guasto Pod sconosciuto %1$03d"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不明なポッド障害 %%1$03d"
+            "value" : "不明なポッド障害 %1$03d"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "알 수 없는 포드 오류 %%1$03d"
+            "value" : "알 수 없는 포드 오류 %1$03d"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ukjent pod-feil %%1$03d"
+            "value" : "Ukjent pod-feil %1$03d"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onbekende podfout %%1$03d"
+            "value" : "Onbekende podfout %1$03d"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nieznany błąd POD'a %%1$03d"
+            "value" : "Nieznany błąd POD'a %1$03d"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falha desconhecida do pod %%1$03d"
+            "value" : "Falha desconhecida do pod %1$03d"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Defecțiune pompă neidentificată %%1$03d"
+            "value" : "Defecțiune pompă neidentificată %1$03d"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Неизвестная неисправность Omnipod %%1$03d"
+            "value" : "Неизвестная неисправность Omnipod %1$03d"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neznáma chyba podu %%1$03d"
+            "value" : "Neznáma chyba podu %1$03d"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neznana napaka v podih %%1$03d"
+            "value" : "Neznana napaka v podih %1$03d"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Okänt podfel %%1$03d"
+            "value" : "Okänt podfel %1$03d"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bilinmeyen pod hatası %%1$03d"
+            "value" : "Bilinmeyen pod hatası %1$03d"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Невідома несправність Pod %%1$03d"
+            "value" : "Невідома несправність Pod %1$03d"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi không xác định của pod %%1$03d"
+            "value" : "Lỗi không xác định của pod %1$03d"
           }
         },
         "zh-Hans" : {
@@ -69730,6 +69760,9 @@
         }
       }
     },
+    "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$@ units).\n\nSet the default low reservoir alert level to configure when pairing a Pod." : {
+      "comment" : "Description text on LowReservoirView Default value (1: max value)"
+    },
     "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$d units).\n\nSet the default low reservoir alert level to configure when pairing a Pod." : {
       "comment" : "Description text on LowReservoirView Default value (1: max value)",
       "extractionState" : "manual",
@@ -69737,157 +69770,157 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يمكن إخطارك اختياريًا عندما تصل كمية الأنسولين المتبقية في الخزان إلى مستوى محدد (1 - %%1$d وحدة).\n\nقم بتعيين مستوى تنبيه انخفاض الخزان الافتراضي لتكوينه عند إقران جراب."
+            "value" : "يمكن إخطارك اختياريًا عندما تصل كمية الأنسولين المتبقية في الخزان إلى مستوى محدد (1 - %1$d وحدة).\n\nقم بتعيين مستوى تنبيه انخفاض الخزان الافتراضي لتكوينه عند إقران جراب."
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Volitelně můžete být upozorněni, když množství inzulínu zbývající v zásobníku dosáhne zvolené úrovně (1 - %%1$d jednotek).\n\nNastavte výchozí úroveň upozornění na nízkou hladinu zásobníku, která se má nakonfigurovat při párování zařízení Pod."
+            "value" : "Volitelně můžete být upozorněni, když množství inzulínu zbývající v zásobníku dosáhne zvolené úrovně (1 - %1$d jednotek).\n\nNastavte výchozí úroveň upozornění na nízkou hladinu zásobníku, která se má nakonfigurovat při párování zařízení Pod."
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Du kan vælge at få besked, når den resterende mængde insulin i beholderen når et valgt niveau (1 - %%1$d enheder).\n\nIndstil standardniveauet for advarsel om lav reservoirmængde, der skal konfigureres ved parring af en Pod."
+            "value" : "Du kan vælge at få besked, når den resterende mængde insulin i beholderen når et valgt niveau (1 - %1$d enheder).\n\nIndstil standardniveauet for advarsel om lav reservoirmængde, der skal konfigureres ved parring af en Pod."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sie können sich optional benachrichtigen lassen, wenn die im Reservoir verbleibende Insulinmenge einen bestimmten Wert erreicht (1 - %%1$d Einheiten).\n\nLegen Sie die Standardwarnstufe für einen niedrigen Füllstand des Reservoirs fest, die beim Koppeln eines Pods konfiguriert werden soll."
+            "value" : "Sie können sich optional benachrichtigen lassen, wenn die im Reservoir verbleibende Insulinmenge einen bestimmten Wert erreicht (1 - %1$d Einheiten).\n\nLegen Sie die Standardwarnstufe für einen niedrigen Füllstand des Reservoirs fest, die beim Koppeln eines Pods konfiguriert werden soll."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %%1$d units).\n\nSet the default low reservoir alert level to configure when pairing a Pod."
+            "value" : "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$d units).\n\nSet the default low reservoir alert level to configure when pairing a Pod."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opcionalmente, puede recibir una notificación cuando la cantidad de insulina restante en el depósito alcance un nivel seleccionado (1 - %%1$d unidades).\n\nEstablezca el nivel de alerta de depósito bajo predeterminado que se configurará al emparejar un Pod."
+            "value" : "Opcionalmente, puede recibir una notificación cuando la cantidad de insulina restante en el depósito alcance un nivel seleccionado (1 - %1$d unidades).\n\nEstablezca el nivel de alerta de depósito bajo predeterminado que se configurará al emparejar un Pod."
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voit saada valinnaisesti ilmoituksen, kun säiliössä jäljellä olevan insuliinin määrä saavuttaa valitun tason (1 - %%1$d yksikköä).\n\nMääritä oletusarvoisen alhaisen säiliön hälytystason määrittäminen, kun Pod yhdistetään."
+            "value" : "Voit saada valinnaisesti ilmoituksen, kun säiliössä jäljellä olevan insuliinin määrä saavuttaa valitun tason (1 - %1$d yksikköä).\n\nMääritä oletusarvoisen alhaisen säiliön hälytystason määrittäminen, kun Pod yhdistetään."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vous pouvez éventuellement être averti lorsque la quantité d'insuline restant dans le réservoir atteint un niveau sélectionné (1 - %%1$d unités).\n\nDéfinissez le niveau d'alerte de réservoir bas par défaut à configurer lors de l'appairage d'un Pod."
+            "value" : "Vous pouvez éventuellement être averti lorsque la quantité d'insuline restant dans le réservoir atteint un niveau sélectionné (1 - %1$d unités).\n\nDéfinissez le niveau d'alerte de réservoir bas par défaut à configurer lors de l'appairage d'un Pod."
           }
         },
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ניתן לקבל הודעה אופציונלית כאשר כמות האינסולין שנותרה במאגר מגיעה לרמה שנבחרה (1 - %%1$d יחידות).\n\nהגדר את רמת התראת המאגר הנמוכה המוגדרת כברירת מחדל לתצורה בעת זיווג תרמיל."
+            "value" : "ניתן לקבל הודעה אופציונלית כאשר כמות האינסולין שנותרה במאגר מגיעה לרמה שנבחרה (1 - %1$d יחידות).\n\nהגדר את רמת התראת המאגר הנמוכה המוגדרת כברירת מחדל לתצורה בעת זיווג תרמיל."
           }
         },
         "hu" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opcionálisan értesítést kaphat, ha a tartályban maradt inzulin mennyisége eléri a kiválasztott szintet (1 - %%1$d egység).\n\nÁllítsa be a Pod párosításakor konfigurálandó alapértelmezett alacsony tartály riasztási szintet."
+            "value" : "Opcionálisan értesítést kaphat, ha a tartályban maradt inzulin mennyisége eléri a kiválasztott szintet (1 - %1$d egység).\n\nÁllítsa be a Pod párosításakor konfigurálandó alapértelmezett alacsony tartály riasztási szintet."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "È possibile ricevere una notifica opzionale quando la quantità di insulina rimanente nel serbatoio raggiunge un livello selezionato (1 - %%1$d unità).\n\nImpostare il livello predefinito di avviso di serbatoio basso da configurare quando si associa un Pod."
+            "value" : "È possibile ricevere una notifica opzionale quando la quantità di insulina rimanente nel serbatoio raggiunge un livello selezionato (1 - %1$d unità).\n\nImpostare il livello predefinito di avviso di serbatoio basso da configurare quando si associa un Pod."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバー内のインスリン残量が選択したレベル（1～%%1$d 単位）に達したら、オプションで通知することができます。\n\nポッドをペアリングするときに設定するリザーバ残量低下警告のデフォルトレベルを設定します。"
+            "value" : "リザーバー内のインスリン残量が選択したレベル（1～%1$d 単位）に達したら、オプションで通知することができます。\n\nポッドをペアリングするときに設定するリザーバ残量低下警告のデフォルトレベルを設定します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "저장소에 남아 있는 인슐린의 양이 선택한 수준(1 - %%1$d 단위)에 도달하면 선택적으로 알림을 받을 수 있습니다.\n\n파드를 페어링할 때 구성할 기본 저장소 부족 알림 수준을 설정합니다."
+            "value" : "저장소에 남아 있는 인슐린의 양이 선택한 수준(1 - %1$d 단위)에 도달하면 선택적으로 알림을 받을 수 있습니다.\n\n파드를 페어링할 때 구성할 기본 저장소 부족 알림 수준을 설정합니다."
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Du kan velge å bli varslet når den gjenværende insulinmengden i beholderen når et valgt nivå (1 - %%1$d enheter).\n\nAngi standard varslingsnivå for lavt reservoar som skal konfigureres ved sammenkobling av en Pod."
+            "value" : "Du kan velge å bli varslet når den gjenværende insulinmengden i beholderen når et valgt nivå (1 - %1$d enheter).\n\nAngi standard varslingsnivå for lavt reservoar som skal konfigureres ved sammenkobling av en Pod."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %%1$d eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat u wilt configureren wanneer u een Pod koppelt."
+            "value" : "U kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %1$d eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat u wilt configureren wanneer u een Pod koppelt."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Użytkownik może być opcjonalnie powiadamiany, gdy ilość insuliny pozostała w zbiorniku osiągnie wybrany poziom (1 - %%1$d jednostek).\n\nUstaw domyślny poziom alertu niskiego poziomu w zbiorniku, aby skonfigurować go podczas parowania stacji Pod."
+            "value" : "Użytkownik może być opcjonalnie powiadamiany, gdy ilość insuliny pozostała w zbiorniku osiągnie wybrany poziom (1 - %1$d jednostek).\n\nUstaw domyślny poziom alertu niskiego poziomu w zbiorniku, aby skonfigurować go podczas parowania stacji Pod."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opcionalmente, pode ser notificado quando a quantidade de insulina restante no reservatório atingir um nível selecionado (1 - %%1$d unidades).\n\nDefina o nível de alerta de reservatório baixo predefinido a configurar quando emparelhar um Pod."
+            "value" : "Opcionalmente, pode ser notificado quando a quantidade de insulina restante no reservatório atingir um nível selecionado (1 - %1$d unidades).\n\nDefina o nível de alerta de reservatório baixo predefinido a configurar quando emparelhar um Pod."
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opțional, puteți fi notificat atunci când cantitatea de insulină rămasă în rezervor atinge un nivel selectat (1 - %%1$d unități).\n\nSetați nivelul implicit de alertă de nivel scăzut al rezervorului pentru a-l configura atunci când asociați un pod."
+            "value" : "Opțional, puteți fi notificat atunci când cantitatea de insulină rămasă în rezervor atinge un nivel selectat (1 - %1$d unități).\n\nSetați nivelul implicit de alertă de nivel scăzut al rezervorului pentru a-l configura atunci când asociați un pod."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "При желании вы можете получить уведомление, когда количество инсулина, оставшегося в резервуаре, достигнет выбранного уровня (1 - %%1$d единиц).\n\nУстановите уровень оповещения о низком уровне резервуара по умолчанию, чтобы настроить его при сопряжении с Pod."
+            "value" : "При желании вы можете получить уведомление, когда количество инсулина, оставшегося в резервуаре, достигнет выбранного уровня (1 - %1$d единиц).\n\nУстановите уровень оповещения о низком уровне резервуара по умолчанию, чтобы настроить его при сопряжении с Pod."
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Môžete byť voliteľne upozornení, keď množstvo inzulínu zostávajúce v zásobníku dosiahne zvolenú úroveň (1 - %%1$d jednotiek).\n\nNastavte predvolenú úroveň upozornenia na nízky zásobník, ktorú chcete nakonfigurovať pri párovaní zariadenia Pod."
+            "value" : "Môžete byť voliteľne upozornení, keď množstvo inzulínu zostávajúce v zásobníku dosiahne zvolenú úroveň (1 - %1$d jednotiek).\n\nNastavte predvolenú úroveň upozornenia na nízky zásobník, ktorú chcete nakonfigurovať pri párovaní zariadenia Pod."
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Po želji ste lahko obveščeni, ko količina preostalega insulina v rezervoarju doseže izbrano raven (1 - %%1$d enot).\n\nNastavite privzeto raven opozorila o nizki količini rezervoarja, ki jo nastavite pri seznanjanju s podom."
+            "value" : "Po želji ste lahko obveščeni, ko količina preostalega insulina v rezervoarju doseže izbrano raven (1 - %1$d enot).\n\nNastavite privzeto raven opozorila o nizki količini rezervoarja, ki jo nastavite pri seznanjanju s podom."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Du kan välja att få ett meddelande när mängden insulin som finns kvar i behållaren når en vald nivå (1 - %%1$d enheter).\n\nStäll in standardvarningsnivån för låg reservoar som ska konfigureras när du kopplar ihop en Pod."
+            "value" : "Du kan välja att få ett meddelande när mängden insulin som finns kvar i behållaren når en vald nivå (1 - %1$d enheter).\n\nStäll in standardvarningsnivån för låg reservoar som ska konfigureras när du kopplar ihop en Pod."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rezervuarda kalan insülin miktarı seçilen bir seviyeye (1 - %%1$d birim) ulaştığında isteğe bağlı olarak bilgilendirilebilirsiniz.\n\nBir Pod eşleştirilirken yapılandırılacak varsayılan düşük rezervuar uyarı seviyesini ayarlayın."
+            "value" : "Rezervuarda kalan insülin miktarı seçilen bir seviyeye (1 - %1$d birim) ulaştığında isteğe bağlı olarak bilgilendirilebilirsiniz.\n\nBir Pod eşleştirilirken yapılandırılacak varsayılan düşük rezervuar uyarı seviyesini ayarlayın."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "За бажанням ви можете отримати сповіщення, коли кількість інсуліну, що залишилася в резервуарі, досягне обраного рівня (1 - %%1$d одиниць).\n\nВстановіть рівень сповіщення про низький рівень заповнення резервуара за замовчуванням, щоб налаштувати його при підключенні до дошки."
+            "value" : "За бажанням ви можете отримати сповіщення, коли кількість інсуліну, що залишилася в резервуарі, досягне обраного рівня (1 - %1$d одиниць).\n\nВстановіть рівень сповіщення про низький рівень заповнення резервуара за замовчуванням, щоб налаштувати його при підключенні до дошки."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bạn có thể được thông báo tùy chọn khi lượng insulin còn lại trong bể chứa đạt đến mức đã chọn (1 - %%1$d đơn vị).\n\nĐặt mức cảnh báo hồ chứa thấp mặc định để định cấu hình khi ghép nối Pod."
+            "value" : "Bạn có thể được thông báo tùy chọn khi lượng insulin còn lại trong bể chứa đạt đến mức đã chọn (1 - %1$d đơn vị).\n\nĐặt mức cảnh báo hồ chứa thấp mặc định để định cấu hình khi ghép nối Pod."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当胰岛素储库中的胰岛素剩余量达到选定水平（1 - %%1$d）时，可选择向您发出通知。\n\n在配对胰岛素盒时，设置默认的低储量警报级别。"
+            "value" : "当胰岛素储库中的胰岛素剩余量达到选定水平（1 - %1$d）时，可选择向您发出通知。\n\n在配对胰岛素盒时，设置默认的低储量警报级别。"
           }
         }
       }
