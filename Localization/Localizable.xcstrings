@@ -12802,7 +12802,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "خطأ في الأمر %1$u: %@"
+            "value" : "خطأ في الأمر %1$u: %2$@"
           }
         },
         "cs" : {
@@ -12868,7 +12868,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コマンドエラー %1$u：%@"
+            "value" : "コマンドエラー %1$u：%2$@"
           }
         },
         "ko" : {
@@ -27544,7 +27544,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "رمز خطأ القرنة الداخلية %1$03d\n%2$@\nالمرجع: %@\n"
+            "value" : "رمز خطأ القرنة الداخلية %1$03d\n%2$@\nالمرجع: %3$@\n"
           }
         },
         "cs" : {
@@ -27610,7 +27610,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "内部ポッド障害コード %1$03d\n%@\n参照: %3$@\n"
+            "value" : "内部ポッド障害コード %1$03d\n%2$@\n参照: %3$@\n"
           }
         },
         "ko" : {
@@ -42972,7 +42972,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Actif : %@"
+            "value" : "Pod Actif : %@"
           }
         },
         "he" : {
