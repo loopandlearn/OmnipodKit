@@ -145,7 +145,8 @@ class DeactivatePodViewModel: ObservableObject, Identifiable {
                     text = String(format: "⚠️ %1$@\n", PodCommsError.activationTimeExceeded.errorDescription!)
                 } else {
                     // Display the fault code value, the fault description and the pdmRef string for other errors.
-                    text = String(format: "⚠️ %1$@ (0x%2$02X)\n%3$@\n", notificationString, faultEventCode.rawValue, faultEventCode.faultDescription)
+                    text = String(format: "⚠️ %1$@ (%2$@)\n%3$@\n", notificationString,
+                        String(format: "0x%02X", faultEventCode.rawValue), faultEventCode.faultDescription)
                     if let pdmRef = fault?.pdmRef {
                         text += LocalizedString("Ref: ", comment: "PDM Ref string line") + pdmRef + "\n\n"
                     }

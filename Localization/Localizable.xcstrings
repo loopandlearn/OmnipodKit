@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "\n\n⚠️ Critical Pod Fault %1$@ (%2$@)" : {
+      "comment" : "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)"
+    },
     "\n\n⚠️ Critical Pod Fault %1$03d (0x%2$02X)" : {
       "comment" : "The format string for fault code in decimal and hex: (1: fault code for decimal display) (2: fault code for hex display)",
       "extractionState" : "manual",
@@ -1297,6 +1300,9 @@
         }
       }
     },
+    "\nFault Event Info: %1$@ (%2$@)," : {
+      "comment" : "The format string for fault event info in decimal and hex: (1: fault event info for decimal display) (2: fault event info for hex display)"
+    },
     "\nFault Event Info: %1$03d (0x%2$02X)," : {
       "comment" : "The format string for fault event info: (1: fault event info)",
       "extractionState" : "manual",
@@ -1944,6 +1950,9 @@
           }
         }
       }
+    },
+    "\nPulse Count: %1$@" : {
+      "comment" : "The format string for Pulse Count (1: pulse count)"
     },
     "\nPulse Count: %1$d" : {
       "comment" : "The format string for Pulse Count (1: pulse count)",
@@ -3562,6 +3571,9 @@
           }
         }
       }
+    },
+    "%@ U" : {
+      "comment" : "Format string for total delivery on pod details screen"
     },
     "%@+ U" : {
       "comment" : "Format string for reservoir volume when above maximum reading. (1: The maximum reading)",
@@ -12633,6 +12645,9 @@
         }
       }
     },
+    "Command error %1$@: %2$@" : {
+      "comment" : "Format string for invalid message error code (1: error code number) (2: error description)"
+    },
     "Command error %1$u" : {
       "comment" : "Format string for invalid message error code (1: error code number)",
       "extractionState" : "manual",
@@ -15062,6 +15077,9 @@
           }
         }
       }
+    },
+    "Critical Pod Fault %1$@" : {
+      "comment" : "The title for AlarmCode.other notification: (1: fault code value)"
     },
     "Critical Pod Fault %1$03d" : {
       "comment" : "The title for AlarmCode.other notification: (1: fault code value)",
@@ -27375,6 +27393,9 @@
         }
       }
     },
+    "Internal pod fault %1$@" : {
+      "comment" : "The format string for Internal pod fault (1: The fault code value)"
+    },
     "Internal pod fault %1$03d" : {
       "comment" : "The format string for Internal pod fault (1: The fault code value)",
       "extractionState" : "manual",
@@ -27536,6 +27557,9 @@
           }
         }
       }
+    },
+    "Internal Pod fault code %1$@\n%2$@\nRef: %3$@\n" : {
+      "comment" : "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"
     },
     "Internal Pod fault code %1$03d\n%2$@\nRef: %3$@\n" : {
       "comment" : "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)",
@@ -44869,6 +44893,9 @@
     },
     "Pod Fault" : {
       "comment" : "Error message for reservoir view during unspecified pod fault"
+    },
+    "Pod Fault %1$@" : {
+      "comment" : "Error message for reservoir view during general pod fault: (1: fault code value)"
     },
     "Pod Fault %1$03d" : {
       "comment" : "Error message for reservoir view during general pod fault: (1: fault code value)",
@@ -67708,6 +67735,9 @@
         }
       }
     },
+    "Unknown pod fault %1$@" : {
+      "comment" : "The format string for Unknown pod fault (1: The fault code value)"
+    },
     "Unknown pod fault %1$03d" : {
       "comment" : "The format string for Unknown pod fault (1: The fault code value)",
       "extractionState" : "manual",
@@ -69651,6 +69681,9 @@
           }
         }
       }
+    },
+    "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$@ units).\n\nSet the default low reservoir alert level to configure when pairing a Pod." : {
+      "comment" : "Description text on LowReservoirView Default value (1: max value)"
     },
     "You can be optionally notified when the amount of insulin remaining in the reservoir reaches a selected level (1 - %1$d units).\n\nSet the default low reservoir alert level to configure when pairing a Pod." : {
       "comment" : "Description text on LowReservoirView Default value (1: max value)",

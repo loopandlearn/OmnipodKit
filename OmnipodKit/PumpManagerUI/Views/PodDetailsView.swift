@@ -72,7 +72,7 @@ struct PodDetailsView: View {
 
     var totalDeliveryText: String {
         if let delivery = podDetails.totalDelivery {
-            return String(format: LocalizedString("%g U", comment: "Format string for total delivery on pod details screen"), delivery)
+            return String(format: LocalizedString("%@ U", comment: "Format string for total delivery on pod details screen"), delivery.twoDecimals)
         } else {
             return LocalizedString("NA", comment: "String shown on pod details for total delivery when not available.")
         }
@@ -142,7 +142,9 @@ struct PodDetailsView: View {
                                 .fontWeight(.semibold)
                         }.padding(.vertical, 4)
                         let faultCode = fault.faultEventCode
-                        Text(String(format: LocalizedString("Internal Pod fault code %1$03d\n%2$@\nRef: %3$@\n", comment: "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"), faultCode.rawValue, faultCode.faultDescription, pdmRef))
+                        Text(String(format: LocalizedString("Internal Pod fault code %1$@\n%2$@\nRef: %3$@\n",
+                                comment: "The format string for the pod fault info: (1: fault code) (2: fault description) (3: pdm ref string)"),
+                                String(format: "%03u", faultCode.rawValue), faultCode.faultDescription, pdmRef))
                             .fixedSize(horizontal: false, vertical: true)
                             .foregroundColor(.secondary)
                     }

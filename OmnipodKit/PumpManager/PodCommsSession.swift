@@ -92,7 +92,9 @@ extension PodCommsError: LocalizedError {
             return LocalizedString("Communication issue: Unacknowledged command pending.", comment: "Error message when command is rejected because an unacknowledged command is pending.")
         case .rejectedMessage(let errorCode):
             let codeDescription = ErrorResponseCode.descriptionFor(code: errorCode)
-            return String(format: LocalizedString("Command error %1$u: %2$@", comment: "Format string for invalid message error code (1: error code number) (2: error description)"), errorCode, codeDescription)
+            return String(format: LocalizedString("Command error %1$@: %2$@",
+                                    comment: "Format string for invalid message error code (1: error code number) (2: error description)"),
+                                    String(describing: errorCode), codeDescription)
         case .podChange:
             return LocalizedString("Unexpected pod change", comment: "Format string for unexpected pod change")
         case .activationTimeExceeded:
