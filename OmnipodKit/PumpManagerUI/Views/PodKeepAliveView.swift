@@ -1113,7 +1113,7 @@ struct BLEDeviceSelectionView: View {
                         VStack(alignment: .leading) {
                             Text(device.name ?? "Unknown")
 
-                            Text("RSSI: \(device.rssi) dBm")
+                            Text(String(format: "RSSI: %u dBm", device.rssi))
                                 .foregroundColor(.secondary)
                                 .font(.footnote)
 
