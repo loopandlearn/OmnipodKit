@@ -16,12 +16,13 @@ class PayloadSplitterTest: XCTestCase {
         let f2 = "01,04,bc,20,1f,f6,3d,00,01,a5,ff,ff,ff,fe,08,20,2e,a8,50,30".replacingOccurrences(of:",", with:"")
         let payload = Data(hexadecimalString: "54,57,10,23,03,00,00,c0,ff,ff,ff,fe,08,20,2e,a8,50,30,3d,00,01,a5".replacingOccurrences(of:",", with:""))!
 
-        let splitter = PayloadSplitter(payload: payload)
+        let layout = OmniTestFixtures.dashBlePacketLayout
+        let splitter = PayloadSplitter(payload: payload, layout: layout)
         let packets = splitter.splitInPackets()
 
         assert(packets.count == 2)
-        assert(f1 == packets[0].toData().hexadecimalString)
-        let p2 = packets[1].toData().hexadecimalString
+        assert(f1 == packets[0].toData(layout: layout).hexadecimalString)
+        let p2 = packets[1].toData(layout: layout).hexadecimalString
         assert(p2.count >= 10)
 
         assert(f2.substring(startIndex:0, toIndex:20) == p2.substring(startIndex: 0, toIndex: 20))

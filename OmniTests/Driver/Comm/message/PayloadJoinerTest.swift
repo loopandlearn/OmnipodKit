@@ -18,7 +18,8 @@ class PayloadJoinerTest: XCTestCase {
         let f2 = Data(hexadecimalString: "01,04,bc,20,1f,f6,3d,00,01,a5,ff,ff,ff,fe,08,20,2e,a8,50,30".replacingOccurrences(of: ",", with: ""))!
         
         let payload = "54,57,10,23,03,00,00,c0,ff,ff,ff,fe,08,20,2e,a8,50,30,3d,00,01,a5".replacingOccurrences(of: ",", with: "")
-        let joiner = try! PayloadJoiner(firstPacket: f1)
+        let layout = OmniTestFixtures.dashBlePacketLayout
+        let joiner = try! PayloadJoiner(firstPacket: f1, layout: layout)
         try! joiner.accumulate(packet: f2)
         let actual = try! joiner.finalize()
         assert(payload == actual.hexadecimalString)
