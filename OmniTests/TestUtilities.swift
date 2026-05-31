@@ -12,6 +12,8 @@
 enum OmniTestFixtures {
     /// BLE packet layout for Omnipod DASH tests ported from OmniBLE.
     static let dashBlePacketLayout = BlePodProfile.omnipodDash.packetLayout
+    /// BLE packet layout for Omnipod 5 (244-byte MTU).
+    static let o5BlePacketLayout = BlePodProfile.omnipod5.packetLayout
 }
 
 extension String {
