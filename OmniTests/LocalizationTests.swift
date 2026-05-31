@@ -19,7 +19,7 @@ class LocalizationTests: XCTestCase {
     private var lineNumberCache: [String: Int] = [:]
 
     /// e.g. `LoopWorkspace/OmnipodKit/Localization/Localizable.xcstrings`
-    private static var catalogDisplayPath: String!
+    private static var catalogDisplayPath = "OmnipodKit/Localization/Localizable.xcstrings"
 
     override class func setUp() {
         super.setUp()
@@ -154,9 +154,9 @@ class LocalizationTests: XCTestCase {
 
         let listed = listAll ? offenders : Array(offenders.prefix(25))
         let lines = listed.enumerated().map { index, offender in
-            let line = lineNumber(for: offender.key, useCatalogLines: useCatalogLines) ?? "?"
+            let location = catalogLocation(for: offender.key, useCatalogLines: useCatalogLines)
             let key = escapedKeyForDisplay(offender.key)
-            return "[\(index + 1)/\(offenders.count)] \(Self.catalogDisplayPath):\(line)  locale=\(offender.locale)  key=\(key)"
+            return "[\(index + 1)/\(offenders.count)] \(location)  locale=\(offender.locale)  key=\(key)"
         }
 
         var message = "Found \(offenders.count) \(title) (location errors below):\n\n\(lines.joined(separator: "\n"))"
@@ -174,9 +174,9 @@ class LocalizationTests: XCTestCase {
         guard !offenders.isEmpty else { return }
         print("\n--- Localization: \(rule) (\(offenders.count)) ---")
         for offender in offenders {
-            let line = lineNumber(for: offender.key, useCatalogLines: useCatalogLines) ?? "?"
+            let location = catalogLocation(for: offender.key, useCatalogLines: useCatalogLines)
             let key = escapedKeyForDisplay(offender.key)
-            print("\(Self.catalogDisplayPath):\(line)\tlocale=\(offender.locale)\tkey=\(key)")
+            print("\(location)\tlocale=\(offender.locale)\tkey=\(key)")
         }
         print("--- end \(rule) ---\n")
     }
@@ -184,6 +184,11 @@ class LocalizationTests: XCTestCase {
     private func lineNumber(for key: String, useCatalogLines: Bool) -> Int? {
         guard useCatalogLines else { return nil }
         return Self.catalog.lineNumber(for: key, lineCache: &lineNumberCache)
+    }
+
+    private func catalogLocation(for key: String, useCatalogLines: Bool) -> String {
+        let line = lineNumber(for: key, useCatalogLines: useCatalogLines).map(String.init) ?? "?"
+        return "\(Self.catalogDisplayPath):\(line)"
     }
 
     private func escapedKeyForDisplay(_ key: String) -> String {
