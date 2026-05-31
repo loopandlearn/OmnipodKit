@@ -29,6 +29,70 @@ enum LocalizationPercentValidator {
     private static let escapedPercentRegex = try! NSRegularExpression(pattern: escapedPercentPattern)
     private static let percentRegex = try! NSRegularExpression(pattern: percentPattern)
     private static let formatTokenRegex = try! NSRegularExpression(pattern: formatTokenPattern)
+    /// Flags a format token whose width/precision/conversion run contains a non-ASCII character (e.g. `%1$03د`).
+    private static let nonAsciiFormatSpecifierPattern = #"(?:%+)(?:\d+\$)?([0-9.]*)([^\x00-\x7F])"#
+    private static let nonAsciiFormatSpecifierRegex = try! NSRegularExpression(pattern: nonAsciiFormatSpecifierPattern)
+
+    private static let conversionCharacters = CharacterSet(charactersIn: "@diouxXeEfFgGaAcspn")
+
+    private enum ParsedFormatSpecifier {
+        case positional
+        case nonPositional
+    }
+
+    /// Unescape catalog `%%` so analysis matches compiled/runtime format strings.
+    private static func normalizedForFormatAnalysis(_ string: String) -> String {
+        string.replacingOccurrences(of: "%%", with: "%")
+    }
+
+    /// Walks printf tokens, skipping `%%` escapes.
+    private static func parsedFormatSpecifiers(in string: String) -> [ParsedFormatSpecifier] {
+        var specs: [ParsedFormatSpecifier] = []
+        var index = string.startIndex
+
+        while index < string.endIndex {
+            guard string[index] == "%" else {
+                index = string.index(after: index)
+                continue
+            }
+
+            let afterPercent = string.index(after: index)
+            if afterPercent < string.endIndex, string[afterPercent] == "%" {
+                index = string.index(after: afterPercent)
+                continue
+            }
+
+            var cursor = afterPercent
+            var isPositional = false
+
+            let digitStart = cursor
+            while cursor < string.endIndex, string[cursor].isNumber {
+                cursor = string.index(after: cursor)
+            }
+            if cursor < string.endIndex, string[cursor] == "$", digitStart < cursor {
+                isPositional = true
+                cursor = string.index(after: cursor)
+            }
+
+            while cursor < string.endIndex, string[cursor].isNumber || string[cursor] == "." {
+                cursor = string.index(after: cursor)
+            }
+            while cursor < string.endIndex, "hlLjzt".contains(string[cursor]) {
+                cursor = string.index(after: cursor)
+            }
+
+            if cursor < string.endIndex,
+               let scalar = string[cursor].unicodeScalars.first,
+               conversionCharacters.contains(scalar) {
+                specs.append(isPositional ? .positional : .nonPositional)
+                cursor = string.index(after: cursor)
+            }
+
+            index = cursor > afterPercent ? cursor : string.index(after: index)
+        }
+
+        return specs
+    }
 
     // MARK: - Trio-style stray %
 
@@ -147,6 +211,99 @@ enum LocalizationPercentValidator {
                 let path = (lproj as NSString).appendingPathComponent(file)
                 guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
                 offenders += mismatchedFormatSpecifierOffendersInStringsTable(
+                    locale: locale,
+                    table: table,
+                    source: file
+                )
+            }
+        }
+        return offenders
+    }
+
+    // MARK: - ASCII conversion letters (e.g. Arabic `د` in `%1$03د`)
+
+    static func nonAsciiFormatSpecifierOffenders(
+        locale: String,
+        key: String,
+        value: String,
+        source: String
+    ) -> [LocalizationPercentOffender] {
+        guard nonAsciiFormatSpecifierRegex.firstMatch(
+            in: value,
+            range: NSRange(location: 0, length: (value as NSString).length)
+        ) != nil else {
+            return []
+        }
+        return [LocalizationPercentOffender(locale: locale, key: key, value: value, source: source)]
+    }
+
+    static func nonAsciiFormatSpecifierOffendersInStringsTable(
+        locale: String,
+        table: [String: String],
+        source: String
+    ) -> [LocalizationPercentOffender] {
+        table.flatMap { key, value in
+            nonAsciiFormatSpecifierOffenders(locale: locale, key: key, value: value, source: source)
+        }
+    }
+
+    static func nonAsciiFormatSpecifierOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
+        var offenders: [LocalizationPercentOffender] = []
+        for locale in bundle.localizations where locale != "Base" {
+            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
+                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
+
+            for case let file as String in files where file.hasSuffix(".strings") {
+                let path = (lproj as NSString).appendingPathComponent(file)
+                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
+                offenders += nonAsciiFormatSpecifierOffendersInStringsTable(
+                    locale: locale,
+                    table: table,
+                    source: file
+                )
+            }
+        }
+        return offenders
+    }
+
+    // MARK: - Mixed positional + non-positional (Arabic Previous Pod crash)
+
+    /// `String(format:)` can crash when a format mixes `%1$…` with bare `%@` / `%d` (e.g. key `%3$@` translated as `%@`).
+    /// Values are analyzed after collapsing catalog `%%` → `%`.
+    static func mixedPositionalFormatOffenders(
+        locale: String,
+        key: String,
+        value: String,
+        source: String
+    ) -> [LocalizationPercentOffender] {
+        let specs = parsedFormatSpecifiers(in: normalizedForFormatAnalysis(value))
+        let hasPositional = specs.contains { if case .positional = $0 { return true }; return false }
+        let hasNonPositional = specs.contains { if case .nonPositional = $0 { return true }; return false }
+
+        guard hasPositional, hasNonPositional else { return [] }
+        return [LocalizationPercentOffender(locale: locale, key: key, value: value, source: source)]
+    }
+
+    static func mixedPositionalFormatOffendersInStringsTable(
+        locale: String,
+        table: [String: String],
+        source: String
+    ) -> [LocalizationPercentOffender] {
+        table.flatMap { key, value in
+            mixedPositionalFormatOffenders(locale: locale, key: key, value: value, source: source)
+        }
+    }
+
+    static func mixedPositionalFormatOffendersInBundle(_ bundle: Bundle) -> [LocalizationPercentOffender] {
+        var offenders: [LocalizationPercentOffender] = []
+        for locale in bundle.localizations where locale != "Base" {
+            guard let lproj = bundle.path(forResource: locale, ofType: "lproj"),
+                  let files = FileManager.default.enumerator(atPath: lproj) else { continue }
+
+            for case let file as String in files where file.hasSuffix(".strings") {
+                let path = (lproj as NSString).appendingPathComponent(file)
+                guard let table = NSDictionary(contentsOfFile: path) as? [String: String] else { continue }
+                offenders += mixedPositionalFormatOffendersInStringsTable(
                     locale: locale,
                     table: table,
                     source: file
