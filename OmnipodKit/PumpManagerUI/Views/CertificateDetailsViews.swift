@@ -26,8 +26,6 @@ struct CertificateDetailsView: View {
         var id: UInt32 { data.controllerId }
     }
 
-    //private let numCerts = O5RegistrationData.allValues.count
-
     @State private var rows: [Row] = []
     @State private var showingFileImporter = false
     @State private var importError: String?
