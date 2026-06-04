@@ -83,13 +83,19 @@ func nextIds(podType: PodType, controllerId: UInt32 = 0, podId: UInt32 = 0) -> (
             if controllerId != 0 {
                 print("@@@ Switched O5 controller id from \(controllerId) to \(myControllerId)")
             }
+            if myControllerId == 0  {
+                // Will be returning a controllerId of 0 for this condition
+                print("@@@ No available O5 controller ids")
+            }
         }
         // else a typical situation to keep the controllerId and rotate the podId
     }
 
     if controllerId == 0 {
-        // Return the newly created controllerId with a podId of one more
-        print("@@@ Created new controller id \(myControllerId)")
+        if myControllerId != 0 {
+            // Return the newly created controllerId with a podId of one more
+            print("@@@ Created new controller id \(myControllerId)")
+        }
         return (controllerId: myControllerId, podId: myControllerId + 1)
     }
 

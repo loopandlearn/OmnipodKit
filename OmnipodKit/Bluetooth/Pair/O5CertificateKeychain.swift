@@ -3,12 +3,12 @@
 //  OmnipodKit
 //
 //  Persists O5RegistrationData entries in the iOS Keychain so the user does
-//  not have to redo the O5 key fetch on every cold start.
+//  not have to redo the O5 key download on every cold start.
 //
 //  Note: the "forget pod" flow intentionally does NOT call into this module —
 //  these credentials are tied to the controller identity, not to any pod
 //  session, and must outlive pod un-pair. Removal happens only via the
-//  explicit "Forget Saved Certificate" UI in PodCertificatesView.
+//  explicit "Forget Saved Certificate" UI in CertificateDetailsView.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //

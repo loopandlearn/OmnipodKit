@@ -10,9 +10,9 @@ import CryptoSwift
 
 
 enum O5RegistrationSource: String {
-    case builtIn   // compiled into the binary via the optional O5Data symbol
-    case imported  // loaded from a user-supplied .o5keypair file
-    case fetched   // downloaded from the keypair API
+    case builtIn    // compiled into the binary via the optional O5Data symbol
+    case imported   // loaded from a user-supplied o5keypair file
+    case downloaded // downloaded from the keypair API
 }
 
 struct O5RegistrationData {
@@ -87,7 +87,7 @@ struct O5RegistrationData {
         return _registry.isEmpty
     }
 
-    /// Inverse of `fromJSON`. The shape matches the .o5keypair file format so that
+    /// Inverse of `fromJSON`. The shape matches the o5keypair file format so that
     /// persisted entries and imported files share a single representation.
     func toJSON() -> [String: Any] {
         return [
@@ -99,7 +99,7 @@ struct O5RegistrationData {
         ]
     }
 
-    /// Parse an O5RegistrationData from a JSON dictionary (e.g. from an .o5keypair file or API response).
+    /// Parse an O5RegistrationData from a JSON dictionary (e.g. from an o5keypair file or API response).
     static func fromJSON(_ json: [String: Any]) -> O5RegistrationData? {
         guard let controllerId = (json["controllerId"] as? NSNumber)?.uint32Value,
               let privateKeyHex = json["privateKey"] as? String,

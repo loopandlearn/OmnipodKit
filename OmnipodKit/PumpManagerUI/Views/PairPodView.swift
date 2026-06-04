@@ -92,18 +92,6 @@ struct PairPodView: View {
                     .zIndex(1)
                 }
 
-                if self.viewModel.error?.isMissingO5Certificate == true {
-                    Button(action: {
-                        self.viewModel.didRequestO5KeySetup?()
-                    }) {
-                        Text(LocalizedString("Retrieve Pod Certificate", comment: "Button text to navigate to O5 certificate download from a pair pod failure"))
-                            .actionButtonStyle(.primary)
-                    }
-                    .accessibility(identifier: "button_retrieve_pod_certificate")
-                    .disabled(self.viewModel.state.isProcessing)
-                    .zIndex(1)
-                }
-
                 if (self.viewModel.error?.recoverable == false) {
                     Button(action: {
                         self.viewModel.continueButtonTapped()

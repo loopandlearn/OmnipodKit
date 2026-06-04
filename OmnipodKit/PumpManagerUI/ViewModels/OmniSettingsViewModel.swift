@@ -562,6 +562,9 @@ class OmniSettingsViewModel: ObservableObject {
         return pumpManager.podType
     }
 
+    var controllerId: UInt32 {
+        return pumpManager.state.controllerId
+    }
 }
 
 

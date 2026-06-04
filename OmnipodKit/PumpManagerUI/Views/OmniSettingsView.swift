@@ -324,6 +324,12 @@ struct OmniSettingsView: View  {
                         Button(action: {
                             if self.viewModel.podType == unknownOmnipodType {
                                 self.viewModel.navigateTo?(.selectPodType)
+                            } else if self.viewModel.podType.isO5 &&
+                                !O5CertificateStore.contains(self.viewModel.controllerId)
+                            {
+                                // No longer have the needed certificate,
+                                // navigate to O5 Setup to download one now.
+                                self.viewModel.navigateTo?(.o5KeySetup)
                             } else {
                                 self.viewModel.navigateTo?(.pairAndPrime)
                             }
@@ -584,7 +590,13 @@ struct OmniSettingsView: View  {
 
             if self.viewModel.podType.isO5 {
                 Section() {
-                    NavigationLink(destination: PodCertificatesView(hasActivePod: !viewModel.noPod)) {
+                    let localizedCertificateDetailsStr = LocalizedString("Certificate Details",
+                        comment: "Text for Certificate Details row and page")
+                    NavigationLink(destination: CertificateDetailsView(
+                        title: localizedCertificateDetailsStr,
+                        hasActivePod: !viewModel.noPod,
+                        myId: viewModel.controllerId))
+                    {
                         FrameworkLocalText("Certificate Details", comment: "Text for certificate navigation link in OmniSettingsView")
                             .foregroundColor(Color.primary)
                     }

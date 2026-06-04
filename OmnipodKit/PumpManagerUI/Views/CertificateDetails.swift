@@ -1,11 +1,11 @@
 //
-//  PodCertificatesView.swift
+//  CertificateDetailsView.swift
 //  OmnipodKit
 //
 //  Shows the loaded O5 certificate(s). For the common single-cert case the
 //  detail content is rendered inline; with multiple certs we fall back to a
-//  list-of-rows with per-cert navigation. A "+" toolbar button imports a
-//  .o5keypair file directly into the registry and Keychain.
+//  list-of-rows with per-cert navigation. A "+" toolbar button imports an
+//  o5keypair file directly into the registry and Keychain.
 //
 //  Built-in certificates (compiled into the binary) are listed read-only —
 //  they cannot be forgotten without rebuilding the app.
@@ -18,7 +18,7 @@ import UniformTypeIdentifiers
 import LoopKit
 import LoopKitUI
 
-struct PodCertificatesView: View {
+struct CertificateDetailsView: View {
 
     private struct Row: Identifiable {
         let data: O5RegistrationData
@@ -26,13 +26,15 @@ struct PodCertificatesView: View {
         var id: UInt32 { data.controllerId }
     }
 
-    let hasActivePod: Bool
+    //private let numCerts = O5RegistrationData.allValues.count
 
     @State private var rows: [Row] = []
     @State private var showingFileImporter = false
     @State private var importError: String?
 
-    private let title = LocalizedString("Pod Certificate", comment: "navigation title for pod certificate view")
+    let title: String
+    let hasActivePod: Bool
+    let myId: UInt32
 
     var body: some View {
         List {
@@ -46,6 +48,7 @@ struct PodCertificatesView: View {
                     data: rows[0].data,
                     source: rows[0].source,
                     hasActivePod: hasActivePod,
+                    myId: myId,
                     onForgotten: { reload() }
                 )
             } else {
@@ -54,10 +57,13 @@ struct PodCertificatesView: View {
                         data: row.data,
                         source: row.source,
                         hasActivePod: hasActivePod,
+                        myId: myId,
                         onForgotten: { reload() }
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(String(format: "Controller 0x%08X", row.data.controllerId))
+                            // Mark an active certificate, only seen & relevant if there's more than one
+                            let isActiveStr = row.data.controllerId == myId ? "^" : ""
+                            Text(String(format: "Controller 0x%08X%@", row.data.controllerId, isActiveStr))
                                 .foregroundColor(.primary)
                             Text(label(for: row.source))
                                 .font(.caption)
@@ -79,7 +85,7 @@ struct PodCertificatesView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel(LocalizedString("Import .o5keypair file", comment: "Toolbar action to import an o5keypair file"))
+                .accessibilityLabel(LocalizedString("Import o5keypair file", comment: "Toolbar action to import an o5keypair file"))
             }
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.json, .item]) { result in
@@ -125,7 +131,7 @@ struct PodCertificatesView: View {
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let registrationData = O5RegistrationData.fromJSON(json)
             else {
-                importError = LocalizedString("The selected file is not a valid .o5keypair file.", comment: "Error when o5keypair file import fails")
+                importError = LocalizedString("The selected file is not a valid o5keypair file.", comment: "Error when o5keypair file import fails")
                 return
             }
             O5RegistrationData.install(registrationData, source: .imported)
@@ -140,8 +146,8 @@ struct PodCertificatesView: View {
     private func label(for source: O5RegistrationSource) -> String {
         switch source {
         case .builtIn:  return LocalizedString("Built-in (compiled into app)", comment: "O5 cert source: built-in")
-        case .imported: return LocalizedString("Imported (.o5keypair file)", comment: "O5 cert source: imported")
-        case .fetched:  return LocalizedString("Fetched (downloaded from API)", comment: "O5 cert source: fetched")
+        case .imported: return LocalizedString("Imported (o5keypair file)", comment: "O5 cert source: imported")
+        case .downloaded:  return LocalizedString("Downloaded (in O5 Setup)", comment: "O5 cert source: downloaded")
         }
     }
 }
@@ -151,6 +157,7 @@ struct PodCertificateDetailView: View {
     let data: O5RegistrationData
     let source: O5RegistrationSource
     let hasActivePod: Bool
+    let myId: UInt32
     let onForgotten: () -> Void
 
     @Environment(\.presentationMode) private var presentationMode
@@ -161,6 +168,7 @@ struct PodCertificateDetailView: View {
                 data: data,
                 source: source,
                 hasActivePod: hasActivePod,
+                myId: myId,
                 onForgotten: {
                     onForgotten()
                     presentationMode.wrappedValue.dismiss()
@@ -178,6 +186,7 @@ fileprivate func certificateContent(
     data: O5RegistrationData,
     source: O5RegistrationSource,
     hasActivePod: Bool,
+    myId: UInt32,
     onForgotten: @escaping () -> Void
 ) -> some View {
     Section {
@@ -190,6 +199,7 @@ fileprivate func certificateContent(
         Section {
             ForgetCertificateButton(
                 controllerId: data.controllerId,
+                myId: myId,
                 hasActivePod: hasActivePod,
                 onForgotten: onForgotten
             )
@@ -200,23 +210,37 @@ fileprivate func certificateContent(
 private struct ForgetCertificateButton: View {
 
     let controllerId: UInt32
+    let myId: UInt32
     let hasActivePod: Bool
     let onForgotten: () -> Void
 
     @State private var pendingForget = false
 
+    let ncerts = O5RegistrationData.allValues.count
+
     private var confirmMessage: String {
+        var activePodMessage = ""
+        var baseMessage = ""
         if hasActivePod {
-            return LocalizedString(
-                "Your current Omnipod 5 Pod session will not be affected, but you will be unable to pair with a new Omnipod 5 Pod until you reconnect to the Internet to download a new certificate.",
+            activePodMessage = LocalizedString("Your current Omnipod 5 Pod session will not be affected. ",
                 comment: "Confirmation message when forgetting a saved O5 certificate while a pod session is active"
             )
-        } else {
-            return LocalizedString(
-                "You will be unable to pair with an Omnipod 5 Pod until you reconnect to the Internet to download a new certificate.",
+        }
+        if ncerts == 1 {
+            baseMessage = LocalizedString("You will be unable to pair with a new Omnipod 5 Pod until you reconnect to the Internet to download a new certificate.",
+                comment: "Confirmation message when a new certificate will need to be downloaded"
+            )
+        } else if myId == controllerId {
+            baseMessage = LocalizedString("A new certificate will be used for the next Omnipod 5 Pod pairing.",
+                comment: "Confirmation message when a new certificate will be used"
+            )
+        } else if activePodMessage.isEmpty {
+            baseMessage = LocalizedString("This certificate will be permanently deleted.",
                 comment: "Confirmation message when forgetting a saved O5 certificate"
             )
         }
+
+        return activePodMessage + baseMessage
     }
 
     var body: some View {
@@ -256,7 +280,7 @@ fileprivate func dump(data: O5RegistrationData, source: O5RegistrationSource) ->
 fileprivate func sourceLabel(_ source: O5RegistrationSource) -> String {
     switch source {
     case .builtIn:  return "Built-in (compiled into app)"
-    case .imported: return "Imported (.o5keypair file)"
-    case .fetched:  return "Fetched (downloaded from API)"
+    case .imported: return "Imported (o5keypair file)"
+    case .downloaded:  return "Downloaded (in O5 Setup)"
     }
 }

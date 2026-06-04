@@ -178,8 +178,6 @@ class PairPodViewModel: ObservableObject, Identifiable {
     
     var didCancelSetup: (() -> Void)?
 
-    var didRequestO5KeySetup: (() -> Void)?
-
     var podPairer: PodPairer
 
     var autoRetryAttempted: Bool
@@ -292,18 +290,6 @@ enum OmniPairingError : LocalizedError {
         }
     }
  */
-
-    var isMissingO5Certificate: Bool {
-        switch self {
-        case .pumpManagerError(let error):
-            if case .configuration(let inner) = error,
-               let podCommsError = inner as? PodCommsError,
-               case .noCertificateFound = podCommsError {
-                return true
-            }
-            return false
-        }
-    }
 
     var recoverable: Bool {
         switch self {

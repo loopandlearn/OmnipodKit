@@ -230,7 +230,17 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             let viewModel = DeactivatePodViewModel(podDeactivator: pumpManager, podAttachedToBody: pumpManager.podAttachmentConfirmed, fault: pumpManager.state.podState?.fault)
 
             viewModel.didFinish = { [weak self] in
-                self?.stepFinished()
+                if self?.pumpManager.podType.isO5 == true &&
+                   !O5CertificateStore.contains(self?.pumpManager.state.controllerId ?? 0)
+                {
+                    // We no longer have the certificate for our controllerId.
+                    // Navagiate to select pod type to allow user to select a non O5 pod type
+                    // or to confirm/select O5 pod type and then go through the O5 Setup process again.
+                    self?.podType = unknownOmnipodType  // forces user to manually select the pod type
+                    self?.navigateTo(.selectPodType)
+                } else {
+                    self?.stepFinished()
+                }
             }
             viewModel.didCancel = { [weak self] in
                 self?.setupCanceled()
@@ -286,9 +296,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
             viewModel.didRequestDeactivation = { [weak self] in
                 self?.navigateTo(.deactivate)
-            }
-            viewModel.didRequestO5KeySetup = { [weak self] in
-                self?.navigateTo(.o5KeySetup)
             }
 
             let view = hostingController(rootView: PairPodView(viewModel: viewModel).onAppear(perform: {UIApplication.shared.isIdleTimerDisabled = true}), onDisappear: {UIApplication.shared.isIdleTimerDisabled = false})
@@ -419,7 +426,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
     }
 
     /// Resolves the virtual `.podTypeSelected` routing step (and intercepts direct
-    /// `.pairAndPrime` jumps that need an O5 key fetch first) into the concrete
+    /// `.pairAndPrime` jumps that need an O5 key download first) into the concrete
     /// next screen for the currently selected pod type. Other screens pass through.
     private func resolveRoutingStep(_ screen: OmniUIScreen) -> OmniUIScreen {
         // Hard guard: O5 always needs a cert before pair/prime can succeed.

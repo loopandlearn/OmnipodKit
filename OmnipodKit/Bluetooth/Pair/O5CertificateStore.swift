@@ -224,9 +224,9 @@ class O5CertificateStore {
 ///
 /// In ENABLE_O5 builds we surface the O5 flow unconditionally — the build is
 /// expected to ship with built-in registration data, or the user is expected
-/// to import / fetch a keypair as part of setup. In other builds we only
+/// to import / download a keypair as part of setup. In other builds we only
 /// consider O5 available if at least one registration record is currently
-/// loaded (built-in, imported, fetched, or restored from Keychain).
+/// loaded (built-in, imported, downloaded, or restored from Keychain).
 public func isOmnipod5Enabled() -> Bool {
     #if ENABLE_O5
     return true

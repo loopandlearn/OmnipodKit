@@ -29,7 +29,7 @@ struct O5KeySetupView: View {
             List {
                 Section {
                     if o5KeypairsNotAvailable {
-                        Text(LocalizedString("When you hit 'Continue,' a certificate will be downloaded and stored in order to pair with Omnipod 5 Pods.", comment: "Description when O5 keypairs are not available"))
+                        Text(LocalizedString("Tap ‘Continue’ to download a certificate to be stored in order to pair with Omnipod 5 Pods.", comment: "Description when O5 keypairs are not available"))
                         .padding(.vertical, 4)
                     } else {
                         HStack(spacing: 12) {
@@ -67,8 +67,8 @@ struct O5KeySetupView: View {
             NavigationView {
                 O5KeyFetchView(
                     onKeypairReceived: { registrationData in
-                        O5RegistrationData.install(registrationData, source: .fetched)
-                        try? O5CertificateKeychain.save(registrationData, source: .fetched)
+                        O5RegistrationData.install(registrationData, source: .downloaded)
+                        try? O5CertificateKeychain.save(registrationData, source: .downloaded)
                         o5KeypairsNotAvailable = false
                         showingFetchSheet = false
                     },
