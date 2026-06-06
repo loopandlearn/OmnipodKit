@@ -33,6 +33,7 @@ struct CertificateDetailsView: View {
     let title: String
     let hasActivePod: Bool
     let myId: UInt32
+    let refreshO5IdsFromCertStore: () -> Void
 
     var body: some View {
         List {
@@ -47,7 +48,8 @@ struct CertificateDetailsView: View {
                     source: rows[0].source,
                     hasActivePod: hasActivePod,
                     myId: myId,
-                    onForgotten: { reload() }
+                    onForgotten: { reload() },
+                    refreshO5IdsFromCertStore: refreshO5IdsFromCertStore
                 )
             } else {
                 ForEach(rows) { row in
@@ -56,7 +58,8 @@ struct CertificateDetailsView: View {
                         source: row.source,
                         hasActivePod: hasActivePod,
                         myId: myId,
-                        onForgotten: { reload() }
+                        onForgotten: { reload() },
+                        refreshO5IdsFromCertStore: refreshO5IdsFromCertStore
                     )) {
                         VStack(alignment: .leading, spacing: 4) {
                             // Mark an active certificate, only seen & relevant if there's more than one
@@ -136,6 +139,9 @@ struct CertificateDetailsView: View {
             try? O5CertificateKeychain.save(registrationData, source: .imported)
             importError = nil
             reload()
+            if myId == 0 {
+                refreshO5IdsFromCertStore() // pickup the new O5 certificate now
+            }
         case .failure(let error):
             importError = error.localizedDescription
         }
@@ -157,6 +163,7 @@ struct PodCertificateDetailView: View {
     let hasActivePod: Bool
     let myId: UInt32
     let onForgotten: () -> Void
+    let refreshO5IdsFromCertStore: () -> Void
 
     @Environment(\.presentationMode) private var presentationMode
 
@@ -170,7 +177,8 @@ struct PodCertificateDetailView: View {
                 onForgotten: {
                     onForgotten()
                     presentationMode.wrappedValue.dismiss()
-                }
+                },
+                refreshO5IdsFromCertStore: refreshO5IdsFromCertStore
             )
         }
         .insetGroupedListStyle()
@@ -185,7 +193,8 @@ fileprivate func certificateContent(
     source: O5RegistrationSource,
     hasActivePod: Bool,
     myId: UInt32,
-    onForgotten: @escaping () -> Void
+    onForgotten: @escaping () -> Void,
+    refreshO5IdsFromCertStore: @escaping () -> Void
 ) -> some View {
     Section {
         Text(dump(data: data, source: source))
@@ -199,7 +208,8 @@ fileprivate func certificateContent(
                 controllerId: data.controllerId,
                 myId: myId,
                 hasActivePod: hasActivePod,
-                onForgotten: onForgotten
+                onForgotten: onForgotten,
+                refreshO5IdsFromCertStore: refreshO5IdsFromCertStore
             )
         }
     }
@@ -211,6 +221,7 @@ private struct ForgetCertificateButton: View {
     let myId: UInt32
     let hasActivePod: Bool
     let onForgotten: () -> Void
+    let refreshO5IdsFromCertStore: () -> Void
 
     @State private var pendingForget = false
 
@@ -262,6 +273,11 @@ private struct ForgetCertificateButton: View {
     private func forget() {
         try? O5CertificateKeychain.delete(controllerId: controllerId)
         O5RegistrationData.remove(controllerId: controllerId)
+        if controllerId == myId {
+            // Just deleted the currently used certificate, so refresh to
+            // pickup another one immediately if pod not currently active.
+            refreshO5IdsFromCertStore()
+        }
         onForgotten()
     }
 }

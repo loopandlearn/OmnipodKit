@@ -327,9 +327,14 @@ struct OmniSettingsView: View  {
                             } else if self.viewModel.podType.isO5 &&
                                 !O5CertificateStore.contains(self.viewModel.controllerId)
                             {
-                                // No longer have the needed certificate,
-                                // navigate to O5 Setup to download one now.
-                                self.viewModel.navigateTo?(.o5KeySetup)
+                                if O5CertificateStore.isEmpty {
+                                    // No longer have any O5 Certificates,
+                                    // navigate to O5 Setup to download one.
+                                    self.viewModel.navigateTo?(.o5KeySetup)
+                                } else {
+                                    // Simply refresh to pick up another certificate
+                                    self.viewModel.refreshO5IdsFromCertStore()
+                                }
                             } else {
                                 self.viewModel.navigateTo?(.pairAndPrime)
                             }
@@ -595,7 +600,8 @@ struct OmniSettingsView: View  {
                     NavigationLink(destination: CertificateDetailsView(
                         title: localizedCertificateDetailsStr,
                         hasActivePod: !viewModel.noPod,
-                        myId: viewModel.controllerId))
+                        myId: viewModel.controllerId,
+                        refreshO5IdsFromCertStore: viewModel.refreshO5IdsFromCertStore))
                     {
                         FrameworkLocalText("Certificate Details", comment: "Text for certificate navigation link in OmniSettingsView")
                             .foregroundColor(Color.primary)
