@@ -10,7 +10,6 @@
 import SwiftUI
 import LoopKitUI
 import LoopKit
-import HealthKit
 
 struct LowReservoirView: View {
     private var reservoirLevel: Double // current reservoir level

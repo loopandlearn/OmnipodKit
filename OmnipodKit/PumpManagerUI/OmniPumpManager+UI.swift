@@ -67,7 +67,7 @@ public enum OmniStatusBadge: DeviceStatusBadge {
 // MARK: - PumpStatusIndicator
 extension OmniPumpManager {
     
-    public var pumpStatusHighlight: DeviceStatusHighlight? {
+    public var pumpStatusHighlight: PumpStatusHighlight? {
         return buildPumpStatusHighlight(for: state)
     }
 
