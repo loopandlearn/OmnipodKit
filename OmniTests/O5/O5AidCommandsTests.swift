@@ -46,7 +46,7 @@ class O5AidCommandsTests: XCTestCase {
     func testAlgorithmInsulinHistory() {
         let (payload, prefix) = O5AidCommands.AlgorithmInsulinHistoryCommand.payload()
         XCTAssertEqual(payload, O5CommLogFixtures.algorithmInsulinHistorySend)
-        XCTAssertEqual(prefix, "SE2.1=")
+        XCTAssertEqual(prefix, "ES2.1=")
         XCTAssertEqual(String(data: O5CommLogFixtures.insulinHistoryRecvBody, encoding: .utf8), "0")
     }
 
