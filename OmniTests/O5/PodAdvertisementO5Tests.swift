@@ -2,9 +2,6 @@
 //  PodAdvertisementO5Tests.swift
 //  OmniTests
 //
-//  O5 BLE advertisement parsing. UUID layout from PodAdvertisement source comments;
-//  no scan capture in DeviceLog — synthetic fixture only.
-//
 
 import XCTest
 import CoreBluetooth
@@ -25,7 +22,6 @@ class PodAdvertisementO5Tests: XCTestCase {
     }
 
     func testO5PdmIdDecoding() {
-        // Pre-pair advertisement embeds 0xFFFFFFFE at substring offset 26 (8 hex digits).
         let uuid = CBUUID(string: o5OmnipodServiceUUID.advertisement.rawValue)
         let ad = PodAdvertisement(advertisementData(serviceUUID: uuid), podType: omnipod5Type)
         XCTAssertNotNil(ad)
