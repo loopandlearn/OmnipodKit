@@ -50,19 +50,19 @@ class Milenage {
         self.auts = auts
         self.amf = amf
 
-        let cipher = try AES(key: k.bytes, blockMode: ECB(), padding: .noPadding)
+        let cipher = try AES(key: k.byteArray, blockMode: ECB(), padding: .noPadding)
 
         let random = OmniRandomByteGenerator()
         rand = randParam ?? random.nextBytes(length: Milenage.KEY_SIZE)
 
-        let opc = Data(try cipher.encrypt(Milenage.MILENAGE_OP.bytes)) ^ Milenage.MILENAGE_OP
-        let randOpcEncrypted = Data(try cipher.encrypt((rand ^ opc).bytes))
+        let opc = Data(try cipher.encrypt(Milenage.MILENAGE_OP.byteArray)) ^ Milenage.MILENAGE_OP
+        let randOpcEncrypted = Data(try cipher.encrypt((rand ^ opc).byteArray))
         let randOpcEncryptedxorOpc = randOpcEncrypted ^ opc
         var resAkInput = randOpcEncryptedxorOpc.subdata(in: 0..<Milenage.KEY_SIZE)
 
         resAkInput[15] = UInt8(Int(resAkInput[15]) ^ 1)
 
-        let resAk = Data(try cipher.encrypt(resAkInput.bytes)) ^ opc
+        let resAk = Data(try cipher.encrypt(resAkInput.byteArray)) ^ opc
 
         res = resAk.subdata(in: 8..<16)
         ak = resAk.subdata(in: 0..<6)
@@ -84,7 +84,7 @@ class Milenage {
             macAInput[(i + 8) % 16] = sqnAmfxorOpc[i]
         }
 
-        let macAFull = Data(try cipher.encrypt((Data(macAInput) ^ randOpcEncrypted).bytes)) ^ opc
+        let macAFull = Data(try cipher.encrypt((Data(macAInput) ^ randOpcEncrypted).byteArray)) ^ opc
         let macA = macAFull.subdata(in: 0..<8)
         macS = macAFull.subdata(in: 8..<16)
 

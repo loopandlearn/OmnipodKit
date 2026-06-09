@@ -994,7 +994,7 @@
 			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.4.1;
+				minimumVersion = 1.10.0;
 			};
 		};
 		D8F83FB32D1563B70005D165 /* XCRemoteSwiftPackageReference "SlideButton" */ = {

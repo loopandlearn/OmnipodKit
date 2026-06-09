@@ -253,7 +253,7 @@ class O5KeyExchange {
     }
 
     private func o5aesCmac(_ key: Data, _ data: Data) throws -> Data {
-        let mac = try CMAC(key: key.bytes)
-        return try Data(mac.authenticate(data.bytes))
+        let mac = try CMAC(key: key.byteArray)
+        return try Data(mac.authenticate(data.byteArray))
     }
 }
