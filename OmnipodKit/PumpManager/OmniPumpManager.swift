@@ -1014,6 +1014,15 @@ extension OmniPumpManager {
 
     // MARK: - Pod comms
 
+    /// Refresh the cached O5 controllerId / podId from the cert store after the
+    /// user has fetched or imported a new certificate. Only valid before a pod
+    /// session exists; rotating these mid-session would orphan a live pod since
+    /// the values are baked into the session keys derived at pairing time.
+    func refreshO5IdsFromCertStore() {
+        guard state.podType.isO5, state.podState == nil else { return }
+        prepForNewPod()
+    }
+
     private func prepForNewPod() {
 
         let podType = state.podType

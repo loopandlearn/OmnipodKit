@@ -582,7 +582,14 @@ struct OmniSettingsView: View  {
                 }
             }
 
-            if self.viewModel.podType.isDash {
+            if self.viewModel.podType.isO5 {
+                Section() {
+                    NavigationLink(destination: PodCertificatesView(hasActivePod: !viewModel.noPod)) {
+                        FrameworkLocalText("Certificate Details", comment: "Text for certificate navigation link in OmniSettingsView")
+                            .foregroundColor(Color.primary)
+                    }
+                }
+            } else if self.viewModel.podType.isDash {
                 Section() {
                     let localizedPodKeepAliveStr = LocalizedString("Pod Keep Alive",
                         comment: "Title for the pod keep alive row and page")

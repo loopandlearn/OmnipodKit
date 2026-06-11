@@ -96,6 +96,7 @@ struct PodDiagnosticsView: View  {
                 FrameworkLocalText("Pump Manager Details", comment: "Text for pump manager details navigation link")
                     .foregroundColor(Color.primary)
             }
+
         }
         .insetGroupedListStyle()
         .navigationTitle(title)

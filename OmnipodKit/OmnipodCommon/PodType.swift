@@ -47,7 +47,7 @@ struct PodType: CustomStringConvertible, Equatable {
         case .productIdDash:
             return LocalizedString("Omnipod DASH Pods have a blue needle tab with a 12-character LOT number typically starting with 'PD1'.", comment: "Description for Omnipod DASH pods")
         case .productIdOmnipod5:
-            return LocalizedString("Omnipod 5 Pods have a clear needle tab with a 12-character LOT number typically starting with 'PH1'. The Pod's \"SmartAdjust\" technology will not be used for closed loop control.", comment: "Description for Omnipod 5 pods")
+            return LocalizedString("Omnipod 5 Pods have a clear needle tab with a 12-character LOT number typically starting with 'PH1' or 'PR1'. The Pod's \"SmartAdjust\" technology will not be used for closed loop control.", comment: "Description for Omnipod 5 pods")
         default:
             return LocalizedString("Unknown Omnipod Pod Type", comment: "Description for an unknown Omnipod pod type")
         }
