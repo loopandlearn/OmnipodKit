@@ -27,9 +27,9 @@ class EnDecrypt {
         let header = msg.asData(forEncryption: false).subdata(in: 0..<16)
 
         let n = nonce.toData(sqn: nonceSeq, podReceiving: false)
-        let ccm = CCM(iv: n.bytes, tagLength: MAC_SIZE, messageLength: payload.count - MAC_SIZE, additionalAuthenticatedData: header.bytes)
-        let aes = try AES(key: ck.bytes, blockMode: ccm, padding: .noPadding)
-        let decryptedPayload = try aes.decrypt(payload.bytes)
+        let ccm = CCM(iv: Array(n), tagLength: MAC_SIZE, messageLength: payload.count - MAC_SIZE, additionalAuthenticatedData: Array(header))
+        let aes = try AES(key: Array(ck), blockMode: ccm, padding: .noPadding)
+        let decryptedPayload = try aes.decrypt(Array(payload))
         
         var msgCopy = msg
         msgCopy.payload = Data(decryptedPayload)
@@ -41,9 +41,9 @@ class EnDecrypt {
         let header = headerMessage.asData(forEncryption: true).subdata(in: 0..<16)
 
         let n = nonce.toData(sqn: nonceSeq, podReceiving: true)
-        let ccm = CCM(iv: n.bytes, tagLength: MAC_SIZE, messageLength: payload.count, additionalAuthenticatedData: header.bytes)
-        let aes = try AES(key: ck.bytes, blockMode: ccm, padding: .noPadding)
-        let encryptedPayload = try aes.encrypt(payload.bytes)
+        let ccm = CCM(iv: Array(n), tagLength: MAC_SIZE, messageLength: payload.count, additionalAuthenticatedData: Array(header))
+        let aes = try AES(key: Array(ck), blockMode: ccm, padding: .noPadding)
+        let encryptedPayload = try aes.encrypt(Array(payload))
 
         var msgCopy = headerMessage
         msgCopy.payload = Data(encryptedPayload)
