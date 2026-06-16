@@ -2623,9 +2623,17 @@ extension OmniPumpManager: PumpManager {
     }
 
     public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
-        guard unitsPerHour <= state.maxBasalRateUnitsPerHour else {
-            completion(.configuration(OmniPumpManagerError.invalidSetting))
-            return
+        // Clamp to the pump's configured max basal rate instead of rejecting the command.
+        // Rejecting delivered nothing *and* aborted the loop before the SMB could be enacted,
+        // so an above-limit temp basal request stopped *all* automated delivery (see #83).
+        // oref already limits requests to maxSafeBasal, so in normal operation this is a no-op.
+        let cappedUnitsPerHour = min(unitsPerHour, state.maxBasalRateUnitsPerHour)
+        if cappedUnitsPerHour < unitsPerHour {
+            // Surface the clamp so a stale/incorrect maxBasalRateUnitsPerHour is visible instead of
+            // silently throttling delivery. If this fires for an otherwise-normal request, the stored
+            // limit itself is suspect (see #83) rather than the request being too high.
+            self.log.error("enactTempBasal: requested %.3f U/hr exceeds maxBasalRateUnitsPerHour %.3f; clamping to %.3f U/hr",
+                           unitsPerHour, state.maxBasalRateUnitsPerHour, cappedUnitsPerHour)
         }
 
         guard self.hasActivePod, let podState = self.state.podState else {
@@ -2646,7 +2654,7 @@ extension OmniPumpManager: PumpManager {
         }
 
         // Round to nearest supported rate
-        let rate = roundToSupportedBasalRate(unitsPerHour: unitsPerHour)
+        let rate = roundToSupportedBasalRate(unitsPerHour: cappedUnitsPerHour)
 
         self.runSession(withName: "Enact Temp Basal") { (result) in
             self.log.info("Enact temp basal %.03fU/hr for %ds", rate, Int(duration))
@@ -2790,10 +2798,14 @@ extension OmniPumpManager: PumpManager {
             if let maxBasalRate = deliveryLimits.maximumBasalRate?.doubleValue(for: .internationalUnitsPerHour),
                let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit())
             {
+                // Log the written limits: enactTempBasal enforces maxBasalRateUnitsPerHour, so a
+                // wrong/stale value here silently breaks dosing with no other trace (see #83).
+                self.log.default("syncDeliveryLimits: maxBasalRate=%.3f U/hr, maxBolus=%.3f U", maxBasalRate, maxBolus)
                 state.maxBasalRateUnitsPerHour = maxBasalRate
                 state.maxBolusUnits = maxBolus
                 completion(.success(deliveryLimits))
             } else {
+                self.log.error("syncDeliveryLimits: missing maximumBasalRate/maximumBolus; rejecting with invalidSetting")
                 completion(.failure(OmniPumpManagerError.invalidSetting))
             }
         }
