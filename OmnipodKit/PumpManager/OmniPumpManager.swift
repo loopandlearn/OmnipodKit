@@ -1700,7 +1700,8 @@ extension OmniPumpManager {
         /// For now just disable this enforcement to match the previous behavior.
         //for entry in schedule.entries {
         //    guard entry.rate <= state.maxBasalRateUnitsPerHour else {
-        //        return .failure(PumpManagerError.configuration(OmniPumpManagerError.invalidSetting))
+        //        completion(PumpManagerError.configuration(OmniPumpManagerError.invalidSetting))
+        //        return
         //    }
         //}
 
@@ -2623,9 +2624,17 @@ extension OmniPumpManager: PumpManager {
     }
 
     public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
-        guard unitsPerHour <= state.maxBasalRateUnitsPerHour else {
-            completion(.configuration(OmniPumpManagerError.invalidSetting))
-            return
+
+        if unitsPerHour > state.maxBasalRateUnitsPerHour {
+            /// The app is trying to set a TBR above the configured max basal.
+            /// This might happen if the app isn't properly sync'ing its max
+            /// basal rate value to the Pump Manager in certain situations.
+            /// Rather than returning an invalidSetting error that will cause Trio
+            /// to get into a tizzy and stop looping, just log a debug message
+            /// to note this condition for debugging purposes and continue on.
+            //completion(.configuration(OmniPumpManagerError.invalidSetting))
+            log.error("@@@ enactTempBasal requested unitsPerHour %{public}@ exceeds configured maxBasal of %{public}@!",
+                      String(describing: unitsPerHour), String(describing: state.maxBasalRateUnitsPerHour))
         }
 
         guard self.hasActivePod, let podState = self.state.podState else {
@@ -2790,10 +2799,13 @@ extension OmniPumpManager: PumpManager {
             if let maxBasalRate = deliveryLimits.maximumBasalRate?.doubleValue(for: .internationalUnitsPerHour),
                let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit())
             {
+                log.debug("@@@ syncDeliveryLimits setting maxBasalRate to %{public}@ and maxBolus to %{public}@",
+                          String(describing: maxBasalRate), String(describing: maxBolus))
                 state.maxBasalRateUnitsPerHour = maxBasalRate
                 state.maxBolusUnits = maxBolus
                 completion(.success(deliveryLimits))
             } else {
+                log.error("@@@ syncDeliveryLimits failed with deliveryLimits of %{public}@", String(describing: deliveryLimits))
                 completion(.failure(OmniPumpManagerError.invalidSetting))
             }
         }
