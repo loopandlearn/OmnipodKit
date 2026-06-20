@@ -185,9 +185,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
                       String(describing: podState.podType))
             podType = podState.podType
         } else if rawValue["controllerId"] != nil {
-            log.error("[OmniPumpManagerState] init with rawValue has no podType, assuming dashType")
+            log.info("[OmniPumpManagerState] init with rawValue has no podType, using dashType")
             podType = dashType // OmniBLE
         } else {
+            log.info("[OmniPumpManagerState] init with rawValue has no podType and no controllerId, using erosType")
             podType = erosType // OmniKit
         }
 
@@ -212,10 +213,22 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             insulinType = InsulinType(rawValue: rawInsulinType)
         }
 
+        /// OmniKit/OmniBLE had a maximumTempBasalRate variable, but it was advertised to the user as a max basal rate.
+        /// OmnipodKit renamed this to a more appropriate maxBasalRateUnitsPerHour, even though OmnipodKit isn't currently
+        /// enforcing this for scheduled basal rates as Trio doesn't enforce this in its UI leading to confusing failures
+        /// with an out of range value during operations like saving a basal schedule, resuming, setting pump time, etc.
+        /// OmnipodKit is now also not enforcing this limit for temp basals rates to prevent various issues in Trio
+        /// when its Maximum Basal Rate value isn't properly sync'ed with the OmniPumpManagerState values.
         let maxBasalRateUnitsPerHour = rawValue["maxBasalRateUnitsPerHour"] as? Double ??
                                         rawValue["maximumTempBasalRate"] as? Double ?? Pod.maximumBasalUnitsPerHour
 
+        /// OmniKit/OmniBLE didn't had a maxBolusUnits state variable.  Default to the allowed maximum
+        /// bolus value if not present to match previous OmniKit/OmniBLE behavior that relies on the app
+        /// to do the only enforcement of the Therapy Setting bolus limit as was done in OmniKit/OmniBLE.
         let maxBolusUnits = rawValue["maxBolusUnits"] as? Double ?? Pod.maximumBolusUnits
+
+        log.debug("@@@ [OmniPumpManagerState] initializing maxBasalRateUnitsPerHour to %{public}@ and maxBolusUnits to %{public}@",
+                  String(describing: maxBasalRateUnitsPerHour), String(describing: maxBolusUnits))
 
         // Omnipod model specific values
         let rileyLinkConnectionManagerState: RileyLinkConnectionState?
