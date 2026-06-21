@@ -331,9 +331,9 @@ index 12857ac..0da35d7 100644
  
 -    public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
 +    public func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
-         guard unitsPerHour <= state.maxBasalRateUnitsPerHour else {
-             completion(.configuration(OmniPumpManagerError.invalidSetting))
-             return
+
+         if unitsPerHour > state.maxBasalRateUnitsPerHour {
+             /// The app is trying to set a TBR above the configured max basal.
 @@ -2661,7 +2679,7 @@ extension OmniPumpManager: PumpManager {
                  let scheduledRate = self.state.basalSchedule.currentRate(using: calendar, at: self.dateGenerator())
                  let isHighTemp = rate > scheduledRate
@@ -350,8 +350,8 @@ index 12857ac..0da35d7 100644
 -               let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit())
 +               let maxBolus = deliveryLimits.maximumBolus?.doubleValue(for: .internationalUnit)
              {
-                 state.maxBasalRateUnitsPerHour = maxBasalRate
-                 state.maxBolusUnits = maxBolus
+                 log.debug("@@@ syncDeliveryLimits setting maxBasalRate to %{public}@ and maxBolus to %{public}@",
+                           String(describing: maxBasalRate), String(describing: maxBolus))
 @@ -2861,16 +2879,16 @@ extension OmniPumpManager: PumpManager {
      func issueAlert(alert: PumpManagerAlert) {
          let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
