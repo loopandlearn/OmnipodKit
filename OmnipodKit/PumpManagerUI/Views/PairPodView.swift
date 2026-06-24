@@ -110,7 +110,6 @@ struct PairPodView: View {
         }
         .alert(isPresented: $cancelModalIsPresented) { cancelPairingModal }
 
-        .navigationTitle(String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), self.viewModel.podType.briefName))
         .navigationBarTitleDisplayMode(.automatic)
         .navigationBarBackButtonHidden(self.viewModel.backButtonHidden)
         .navigationBarItems(trailing: self.viewModel.state.navBarVisible ? cancelButton : nil)
