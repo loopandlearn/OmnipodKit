@@ -684,7 +684,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
                     let controllerId = controllerIdForPodId(podId: address)
                     self.signingKey = try? O5CertificateStore(controllerId: controllerId).signingKey.rawRepresentation
                     if self.signingKey == nil {
-                        // Without a saved signingKey as well as the needed certificate for pdmId,
+                        // Without a saved signingKey as well as the needed certificate for controllerId,
                         // this pod will not be able to do any insulin, cancel, or deactivation commands.
                         // This should only occur for an artificially created testing situation.
                         log.default("@@@ initializion failed for 0x%08X, continuing in limited mode...", controllerId)

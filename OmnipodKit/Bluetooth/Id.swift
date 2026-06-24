@@ -71,25 +71,22 @@ func nextIds(podType: PodType, controllerId: UInt32 = 0, podId: UInt32 = 0) -> (
     if podType.isDash {
         if controllerId == 0 {
             // Create a new semi-randomized base DASH controllerId
-            myControllerId = createControllerId(podType: podType)
+            myControllerId = createDashControllerId()
             basePodId = myControllerId // so nextPodId will be myControllerId + 1
         }
         // else a typical situation to keep the controllerId and rotate the podId
     } else {
         // For O5, the created controllerId must match a value in the O5 CertificateStore
         if controllerId == 0 || !O5CertificateStore.contains(controllerId) {
+            // Select a new controllerId, will be 0 if none currently available
             myControllerId = O5CertificateStore.pickControllerId
             basePodId = myControllerId // so nextPodId will be myControllerId + 1
-            if controllerId != 0 {
-                print("@@@ Switched O5 controller id from \(controllerId) to \(myControllerId)")
-            }
         }
         // else a typical situation to keep the controllerId and rotate the podId
     }
 
     if controllerId == 0 {
         // Return the newly created controllerId with a podId of one more
-        print("@@@ Created new controller id \(myControllerId)")
         return (controllerId: myControllerId, podId: myControllerId + 1)
     }
 
@@ -115,10 +112,9 @@ fileprivate func nextPodId(lastPodId: UInt32) -> UInt32 {
     return lastPodId + 1
 }
 
-/// Creates a base controllerId to be used directly (DASH) or as a fake
-/// controllerId base to be used as the base for the rotating podId's (O5).
+/// Creates a base controllerId to be used directly when controlling DASH pods.
 /// The top byte will be set for the given pod type, the bottom 2 bits will be
 /// clear for use with the cycling 3 podIds, while the other 22 bits are random.
-fileprivate func createControllerId(podType: PodType) -> UInt32 {
-    return (UInt32(podType.topIdByte) << 24) | ((arc4random() & 0x003FFFFF) << 2)
+fileprivate func createDashControllerId() -> UInt32 {
+    return (UInt32(dashType.topIdByte) << 24) | ((arc4random() & 0x003FFFFF) << 2)
 }

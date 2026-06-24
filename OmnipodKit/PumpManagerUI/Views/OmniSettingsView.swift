@@ -324,6 +324,17 @@ struct OmniSettingsView: View  {
                         Button(action: {
                             if self.viewModel.podType == unknownOmnipodType {
                                 self.viewModel.navigateTo?(.selectPodType)
+                            } else if self.viewModel.podType.isO5 &&
+                                !O5CertificateStore.contains(self.viewModel.controllerId)
+                            {
+                                if O5CertificateStore.isEmpty {
+                                    // No longer have any O5 Certificates,
+                                    // navigate to O5 Setup to download one.
+                                    self.viewModel.navigateTo?(.o5KeySetup)
+                                } else {
+                                    // Simply refresh to pick up another certificate
+                                    self.viewModel.refreshO5IdsFromCertStore()
+                                }
                             } else {
                                 self.viewModel.navigateTo?(.pairAndPrime)
                             }
@@ -583,7 +594,21 @@ struct OmniSettingsView: View  {
                 }
             }
 
-            if self.viewModel.podType.isDash {
+            if self.viewModel.podType.isO5 {
+                Section() {
+                    let localizedCertificateDetailsStr = LocalizedString("Certificate Details",
+                        comment: "Text for Certificate Details row and page")
+                    NavigationLink(destination: CertificateDetailsView(
+                        title: localizedCertificateDetailsStr,
+                        hasActivePod: !viewModel.noPod,
+                        myId: viewModel.controllerId,
+                        refreshO5IdsFromCertStore: viewModel.refreshO5IdsFromCertStore))
+                    {
+                        FrameworkLocalText("Certificate Details", comment: "Text for certificate navigation link in OmniSettingsView")
+                            .foregroundColor(Color.primary)
+                    }
+                }
+            } else if self.viewModel.podType.isDash {
                 Section() {
                     let localizedPodKeepAliveStr = LocalizedString("Pod Keep Alive",
                         comment: "Title for the pod keep alive row and page")
