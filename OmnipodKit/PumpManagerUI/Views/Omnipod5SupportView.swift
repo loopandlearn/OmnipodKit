@@ -29,9 +29,12 @@ struct Omnipod5SupportView: View {
     let refreshO5IdsFromCertStore: () -> Void
     let onCertStoreChanged: () -> Void
 
-    @Environment(\.appName) private var appName
     @Environment(\.guidanceColors) private var guidanceColors
     @Environment(\.presentationMode) private var presentationMode
+
+    // Resolve the host app name (Trio/Loop) directly from the bundle rather than
+    // the appName environment, which isn't injected on the settings nav path.
+    private var appName: String { Bundle.main.bundleDisplayName }
 
     @State private var certLoaded = !O5RegistrationData.isEmpty
     @State private var showingFetchSheet = false
@@ -244,12 +247,29 @@ struct Omnipod5SupportView: View {
     }
 
     private var deleteMessage: String {
+        let ncerts = O5RegistrationData.allValues.count
+        var activePodMessage = ""
+        var baseMessage = ""
         if hasActivePod {
-            return LocalizedString("Delete the saved Omnipod 5 certificate? Your current Omnipod 5 Pod session will not be affected.",
-                comment: "Confirmation message when deleting the saved O5 certificate while a pod session is active")
+            activePodMessage = LocalizedString("Your current Omnipod 5 Pod session will not be affected. ",
+                comment: "Confirmation message when forgetting a saved O5 certificate while a pod session is active"
+            )
         }
-        return LocalizedString("Delete the saved Omnipod 5 certificate?",
-            comment: "Confirmation message when deleting the saved O5 certificate")
+        if ncerts == 1 {
+            baseMessage = LocalizedString("You will be unable to pair with a new Omnipod 5 Pod until you reconnect to the Internet to download a new certificate.",
+                comment: "Confirmation message when a new certificate will need to be downloaded"
+            )
+        } else if O5RegistrationData.source(for: controllerId) != nil {
+            baseMessage = LocalizedString("A new certificate will be used for the next Omnipod 5 Pod pairing.",
+                comment: "Confirmation message when a new certificate will be used"
+            )
+        } else if activePodMessage.isEmpty {
+            baseMessage = LocalizedString("This certificate will be permanently deleted.",
+                comment: "Confirmation message when forgetting a saved O5 certificate"
+            )
+        }
+
+        return activePodMessage + baseMessage
     }
 
     private func sourceText(_ source: O5RegistrationSource) -> String {
