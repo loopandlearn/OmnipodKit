@@ -56,6 +56,9 @@ struct O5KeyFetchView: View {
                 }
             } else {
                 VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+
                     ProgressView(value: progressFraction)
                         .progressViewStyle(.linear)
                         .padding(.horizontal, 40)
