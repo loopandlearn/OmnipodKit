@@ -157,8 +157,11 @@ struct Omnipod5SupportView: View {
 
     @ToolbarContentBuilder
     private var overflowMenu: some ToolbarContent {
-        if menuHasOptions {
-            ToolbarItem(placement: .navigationBarTrailing) {
+        // The conditional lives inside the ToolbarItem's view builder (valid on
+        // iOS 15); a ToolbarContentBuilder `if` would require iOS 16. When there
+        // are no options the item renders empty, so no button appears.
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if menuHasOptions {
                 Menu {
                     if !certLoaded {
                         Button {
