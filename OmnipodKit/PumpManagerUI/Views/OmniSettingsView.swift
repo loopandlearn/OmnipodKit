@@ -539,7 +539,8 @@ struct OmniSettingsView: View  {
                     }
                 }
 
-                NavigationLink(destination: InsulinTypeSetting(initialValue: viewModel.insulinType, supportedInsulinTypes: supportedInsulinTypes, allowUnsetInsulinType: false, didChange: viewModel.didChangeInsulinType)) {
+                NavigationLink(destination: InsulinTypeSetting(initialValue: viewModel.insulinType, supportedInsulinTypes: supportedInsulinTypes, allowUnsetInsulinType: false, didChange: viewModel.didChangeInsulinType)
+                    .uikitNavigationTitle(LocalizedString("Insulin Type", comment: "navigation title for insulin type"), displayMode: .inline)) {
                     HStack {
                         FrameworkLocalText("Insulin Type", comment: "Text for insulin type navigation link")
                             .foregroundColor(Color.primary)

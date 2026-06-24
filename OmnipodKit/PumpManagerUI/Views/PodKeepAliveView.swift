@@ -42,7 +42,7 @@ struct PodKeepAliveView: View {
             self.forceRefresh.toggle()
         }
         .insetGroupedListStyle()
-        .navigationBarTitle(Text(title), displayMode: .automatic)
+        .uikitNavigationTitle(title)
     }
 
     // MARK: - Subviews / Computed Properties
