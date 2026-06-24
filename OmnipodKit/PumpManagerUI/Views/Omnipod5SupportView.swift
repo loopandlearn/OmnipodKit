@@ -131,7 +131,11 @@ struct Omnipod5SupportView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.largeTitle)
                 .foregroundColor(.green)
-            Text(loadedMessage)
+            Text(loadedIntro)
+                .multilineTextAlignment(.center)
+            Text(loadedDetail)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             if let source = activeSource {
                 Text(String(format: LocalizedString("Certificate source: %1$@", comment: "Secondary label showing where the O5 certificate came from (1: source)"), sourceText(source)))
@@ -216,18 +220,19 @@ struct Omnipod5SupportView: View {
 
     // MARK: - Messages
 
-    private var loadedMessage: String {
-        let intro = String(format: LocalizedString("%1$@ is able to connect to Omnipod 5 Pods.",
+    private var loadedIntro: String {
+        String(format: LocalizedString("%1$@ is able to connect to Omnipod 5 Pods.",
             comment: "Heading shown when a valid O5 certificate is loaded (1: app name)"), appName)
-        let detail: String
+    }
+
+    private var loadedDetail: String {
         if podType.isO5 {
-            detail = LocalizedString("You are currently configured to use Omnipod 5 Pods. To return to DASH or Eros, select ‘Change pod type’.",
+            return LocalizedString("You are currently configured to use Omnipod 5 Pods. To return to DASH or Eros, select ‘Change pod type’.",
                 comment: "Guidance shown when already configured for Omnipod 5")
         } else {
-            detail = String(format: LocalizedString("You are currently configured to use %1$@ Pods. You can pair an Omnipod 5 Pod by selecting ‘Change pod type’ on your next Pod change.",
+            return String(format: LocalizedString("You are currently configured to use %1$@ Pods. You can pair an Omnipod 5 Pod by selecting ‘Change pod type’ on your next Pod change.",
                 comment: "Guidance shown when configured for a non-O5 pod type (1: current pod type)"), podType.briefName)
         }
-        return intro + "\n\n" + detail
     }
 
     private var needsCertMessage: String {
