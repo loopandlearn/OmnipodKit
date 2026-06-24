@@ -65,17 +65,16 @@ struct Omnipod5SupportView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            List {
-                Section {
-                    if certLoaded {
-                        loadedContent
-                    } else {
-                        needsCertContent
-                    }
-                }
+        VStack {
+            Spacer()
+
+            if certLoaded {
+                loadedContent
+            } else {
+                needsCertContent
             }
-            .insetGroupedListStyle()
+
+            Spacer()
 
             if certLoaded {
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
@@ -128,31 +127,32 @@ struct Omnipod5SupportView: View {
 
     @ViewBuilder
     private var loadedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .font(.title2)
-                Text(loadedMessage)
-            }
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.largeTitle)
+                .foregroundColor(.green)
+            Text(loadedMessage)
+                .multilineTextAlignment(.center)
             if let source = activeSource {
                 Text(String(format: LocalizedString("Certificate source: %1$@", comment: "Secondary label showing where the O5 certificate came from (1: source)"), sourceText(source)))
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal)
     }
 
     @ViewBuilder
     private var needsCertContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle.fill")
+                .font(.largeTitle)
                 .foregroundColor(guidanceColors.warning)
-                .font(.title2)
             Text(needsCertMessage)
+                .multilineTextAlignment(.center)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal)
     }
 
     @ToolbarContentBuilder
