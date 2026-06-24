@@ -8,7 +8,7 @@
 //  Note: the "forget pod" flow intentionally does NOT call into this module —
 //  these credentials are tied to the controller identity, not to any pod
 //  session, and must outlive pod un-pair. Removal happens only via the
-//  explicit "Forget Saved Certificate" UI in CertificateDetailsView.
+//  explicit "Delete saved certificate" action in Omnipod5SupportView.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //

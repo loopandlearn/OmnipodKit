@@ -31,11 +31,6 @@ struct PodDiagnosticsView: View  {
     var podOk: Bool
     var noPod: Bool
 
-    // O5-only: surfaces the Certificate Details row when this is an Omnipod 5 pod.
-    var isO5: Bool
-    var controllerId: UInt32
-    var refreshO5IdsFromCertStore: () -> Void
-
     var body: some View {
         List {
             NavigationLink(destination: ReadPodStatusView(getDetailedStatus: diagnosticCommands.getDetailedStatus)) {
@@ -100,20 +95,6 @@ struct PodDiagnosticsView: View  {
             {
                 FrameworkLocalText("Pump Manager Details", comment: "Text for pump manager details navigation link")
                     .foregroundColor(Color.primary)
-            }
-
-            if isO5 {
-                let localizedCertificateDetailsStr = LocalizedString("Certificate Details",
-                    comment: "Text for Certificate Details row and page")
-                NavigationLink(destination: CertificateDetailsView(
-                    title: localizedCertificateDetailsStr,
-                    hasActivePod: !noPod,
-                    myId: controllerId,
-                    refreshO5IdsFromCertStore: refreshO5IdsFromCertStore))
-                {
-                    FrameworkLocalText("Certificate Details", comment: "Text for certificate navigation link in PodDiagnosticsView")
-                        .foregroundColor(Color.primary)
-                }
             }
 
         }
