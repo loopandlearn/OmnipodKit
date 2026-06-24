@@ -196,7 +196,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                  self?.setupCanceled()
             }
             let controller = hostingController(rootView: view)
-            controller.navigationItem.title = pumpManager.localizedTitle
+            controller.navigationItem.title = LocalizedString("RileyLink Setup", comment: "Navigation title for RileyLinkSetupView")
             return controller
 
         case .deactivate:
