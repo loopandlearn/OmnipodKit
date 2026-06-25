@@ -61,7 +61,6 @@ struct RileyLinkSetupView: View {
                 .padding([.bottom, .horizontal])
 
         }
-        .navigationTitle(LocalizedString("RileyLink Setup", comment: "Navigation title for RileyLinkSetupView"))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(LocalizedString("Cancel", comment: "Cancel button title"), action: {

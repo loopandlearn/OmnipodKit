@@ -114,8 +114,7 @@ struct SilencePodSelectionView: View {
             }
         }
         .insetGroupedListStyle()
-        .navigationTitle(LocalizedString("Silence Pod", comment: "navigation title for Silence Pod"))
-        .navigationBarTitleDisplayMode(.inline)
+        .uikitNavigationTitle(LocalizedString("Silence Pod", comment: "navigation title for Silence Pod"), displayMode: .inline)
         .alert(isPresented: $alertIsPresented, content: { alert(error: error) })
     }
 

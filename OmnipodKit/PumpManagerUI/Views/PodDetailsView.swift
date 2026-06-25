@@ -151,8 +151,7 @@ struct PodDetailsView: View {
                 }
             }
         }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.automatic)
+        .uikitNavigationTitle(title)
     }
 }
 

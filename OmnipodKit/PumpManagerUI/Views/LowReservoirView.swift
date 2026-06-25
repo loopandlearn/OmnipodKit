@@ -120,7 +120,6 @@ struct LowReservoirView: View {
                 }
             }
         }
-        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.automatic)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

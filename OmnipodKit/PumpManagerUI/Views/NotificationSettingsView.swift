@@ -106,7 +106,7 @@ struct NotificationSettingsView: View {
                 comment: "Description text for Critical Alerts section")
             )
         }
-        .navigationTitle(
+        .uikitNavigationTitle(
             LocalizedString("Notification Settings", comment: "navigation title for notification settings")
         )
     }

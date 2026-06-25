@@ -99,6 +99,6 @@ struct PodDiagnosticsView: View  {
 
         }
         .insetGroupedListStyle()
-        .navigationTitle(title)
+        .uikitNavigationTitle(title)
     }
 }
