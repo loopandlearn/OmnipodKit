@@ -170,10 +170,11 @@ class O5AppAttestService {
 
     // MARK: - Pre-flight checks
 
-    /// One-shot link-layer reachability check. Throws an offline-flavored
-    /// `O5AuthError` when the device has no usable path within `timeout`.
-    /// Cheap optimistic check — cannot detect captive portals or DNS
-    /// failures; those still surface as URLErrors from later HTTP requests.
+    /// One-shot link-layer reachability check followed by a DNS resolution of the
+    /// keymanager host. Throws an offline-flavored `O5AuthError` when the device has
+    /// no usable path, or a DNS-flavored one when the host can't be resolved, within
+    /// `timeout`. Still optimistic — cannot detect captive portals; those surface as
+    /// URLErrors from later HTTP requests.
     private func checkInternetConnection(timeout: TimeInterval = 2.0) async throws {
         let monitor = NWPathMonitor()
         defer { monitor.cancel() }
@@ -205,6 +206,61 @@ class O5AppAttestService {
                 recoverySuggestion: LocalizedString(
                     "Please connect to Wi-Fi or Cellular Data and try again.",
                     comment: "O5 fetch failure: offline at pre-flight, recovery suggestion"))
+        }
+
+        // Resolve the keymanager host so DNS failures surface here as a clear
+        // pre-flight error rather than an opaque URLError on the first HTTP call.
+        // Retry a couple of times (1s apart) to ride out transient resolver hiccups.
+        if let host = URL(string: o5KeyManagerBaseURL)?.host {
+            let maxAttempts = 3
+            var resolved = false
+            for attempt in 1...maxAttempts {
+                if await resolveHostname(host, timeout: timeout) {
+                    resolved = true
+                    break
+                }
+                if attempt < maxAttempts {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+            }
+            if !resolved {
+                throw O5AuthError(
+                    message: LocalizedString(
+                        "Couldn’t look up the key-management server.",
+                        comment: "O5 fetch failure: DNS resolution failed, primary line"),
+                    recoverySuggestion: LocalizedString(
+                        "Please check your Internet connection and try again.",
+                        comment: "O5 fetch failure: DNS resolution failed, recovery suggestion"))
+            }
+        }
+    }
+
+    /// Resolves `host` via `getaddrinfo` on a background queue, returning `true` on
+    /// success. Races the lookup against `timeout` so a hung resolver can't stall the
+    /// flow; a late-returning lookup simply no-ops against the already-resumed continuation.
+    private func resolveHostname(_ host: String, timeout: TimeInterval) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let queue = DispatchQueue(label: "org.nightscout.o5-dns")
+            var resumed = false
+            let resume: (Bool) -> Void = { value in
+                queue.async {
+                    guard !resumed else { return }
+                    resumed = true
+                    continuation.resume(returning: value)
+                }
+            }
+            DispatchQueue.global(qos: .userInitiated).async {
+                var hints = addrinfo()
+                hints.ai_family = AF_UNSPEC
+                hints.ai_socktype = SOCK_STREAM
+                var result: UnsafeMutablePointer<addrinfo>?
+                let status = getaddrinfo(host, nil, &hints, &result)
+                if let result = result { freeaddrinfo(result) }
+                resume(status == 0)
+            }
+            queue.asyncAfter(deadline: .now() + timeout) {
+                resume(false)
+            }
         }
     }
 

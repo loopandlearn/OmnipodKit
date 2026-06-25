@@ -26,7 +26,7 @@ protocol DiagnosticCommands {
 struct PodDiagnosticsView: View  {
 
     var title: String
-    
+
     var diagnosticCommands: DiagnosticCommands
     var podOk: Bool
     var noPod: Bool

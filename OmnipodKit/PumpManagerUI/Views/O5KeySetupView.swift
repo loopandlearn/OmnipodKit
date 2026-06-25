@@ -15,6 +15,7 @@ struct O5KeySetupView: View {
 
     @State private var o5KeypairsNotAvailable: Bool
     @State private var showingFetchSheet = false
+    @State private var hasAutoAdvanced = false
     private var didContinue: () -> Void
     private var didCancel: () -> Void
 
@@ -22,6 +23,14 @@ struct O5KeySetupView: View {
         self._o5KeypairsNotAvailable = State(initialValue: o5KeypairsNotAvailable)
         self.didContinue = didContinue
         self.didCancel = didCancel
+    }
+
+    private func performContinue() {
+        if o5KeypairsNotAvailable {
+            showingFetchSheet = true
+        } else {
+            didContinue()
+        }
     }
 
     var body: some View {
@@ -44,17 +53,18 @@ struct O5KeySetupView: View {
             }
             .insetGroupedListStyle()
 
-            Button(action: {
-                if o5KeypairsNotAvailable {
-                    showingFetchSheet = true
-                } else {
-                    didContinue()
-                }
-            }) {
+            Button(action: { performContinue() }) {
                 Text(LocalizedString("Continue", comment: "Text for Continue button on O5KeySetupView"))
                     .actionButtonStyle(.primary)
                     .padding()
             }
+        }
+        .onAppear {
+            // Auto-advance on first entry so the user doesn't have to tap Continue.
+            // The button stays available for re-attempts after cancelling the sheet.
+            guard !hasAutoAdvanced else { return }
+            hasAutoAdvanced = true
+            performContinue()
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
