@@ -10,9 +10,8 @@
 //  same App Attest download flow used by the pairing setup wizard.
 //
 //  The overflow ("…") menu offers "Load custom certificate" (only when no cert is
-//  loaded) and, when the O5_CERTIFICATE_DEBUG compilation flag is defined, "Delete
-//  saved certificate" for a deletable (non-built-in) cert. The menu is hidden
-//  entirely when it would have no options.
+//  loaded) and "Delete saved certificate" for a deletable (non-built-in) cert. The
+//  menu is hidden entirely when it would have no options.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
@@ -42,6 +41,7 @@ struct Omnipod5SupportView: View {
     @State private var showingFileImporter = false
     @State private var importError: String?
     @State private var pendingDelete = false
+    @State private var pendingDeleteFinalConfirm = false
 
     // Source of the certificate currently in use (active controllerId if known,
     // otherwise the first one in the registry).
@@ -62,9 +62,7 @@ struct Omnipod5SupportView: View {
 
     private var menuHasOptions: Bool {
         if !certLoaded { return true }       // "Load custom certificate"
-        #if O5_CERTIFICATE_DEBUG
         if isDeletable { return true }       // "Delete saved certificate"
-        #endif
         return false
     }
 
@@ -123,9 +121,20 @@ struct Omnipod5SupportView: View {
             titleVisibility: .visible
         ) {
             Button(LocalizedString("Delete saved certificate", comment: "Confirm destructive delete action"), role: .destructive) {
-                deleteCertificate()
+                pendingDeleteFinalConfirm = true
             }
             Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
+        }
+        .alert(
+            LocalizedString("Delete saved certificate", comment: "Title of the final O5 certificate delete confirmation alert"),
+            isPresented: $pendingDeleteFinalConfirm
+        ) {
+            Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
+            Button(LocalizedString("Continue", comment: "Confirm destructive delete action on the final confirmation alert"), role: .destructive) {
+                deleteCertificate()
+            }
+        } message: {
+            Text(finalDeleteMessage)
         }
     }
 
@@ -179,7 +188,6 @@ struct Omnipod5SupportView: View {
                             Label(LocalizedString("Load custom certificate", comment: "Menu action to import an o5keypair file"), systemImage: "square.and.arrow.down")
                         }
                     }
-                    #if O5_CERTIFICATE_DEBUG
                     if isDeletable {
                         Button(role: .destructive) {
                             pendingDelete = true
@@ -187,7 +195,6 @@ struct Omnipod5SupportView: View {
                             Label(LocalizedString("Delete saved certificate", comment: "Destructive menu action to remove the saved O5 certificate"), systemImage: "trash")
                         }
                     }
-                    #endif
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -271,6 +278,11 @@ struct Omnipod5SupportView: View {
         }
 
         return activePodMessage + baseMessage
+    }
+
+    private var finalDeleteMessage: String {
+        String(format: LocalizedString("You will NOT be able to connect to another Omnipod 5 Pod after deleting this certificate. Deleting the certificate is not needed if switching to DASH or Eros pods, or using another pump supported by %1$@. You will need an internet connection to use Omnipod 5 Pods in the future. Are you sure you want to continue?",
+            comment: "Final confirmation message shown before deleting the saved O5 certificate (1: app name)"), appName)
     }
 
     private func sourceText(_ source: O5RegistrationSource) -> String {
