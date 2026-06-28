@@ -1537,11 +1537,17 @@ extension OmniPumpManager {
         // Silence any pending acknowledged alerts
         silenceAcknowledgedAlerts()
 
-        // If we have new status, store the dosesForStorage which updates lastPumpDataReportDate
-        if status != nil {
-            session.dosesForStorage() { (doses) -> Bool in
-                return store(doses: doses, in: session)
-            }
+        // Flush finalized doses regardless of whether `getStatus` returned a
+        // status. A pod fault thrown by `getStatus` is swallowed by `try?`
+        // above (status becomes nil), but `send` will already have routed
+        // through `handlePodFault`, which cancels `unfinalizedBolus` and
+        // appends it to `podState.finalizedDoses`. Without this unconditional
+        // flush those cancelled doses sit in `finalizedDoses` until the next
+        // successful comms — meaning the host app keeps an unfinalized bolus
+        // entry in pump history (and its IOB integrator treats the full
+        // programmed amount as delivered).
+        session.dosesForStorage() { (doses) -> Bool in
+            return store(doses: doses, in: session)
         }
 
         // Finally, issue a heartbeat if needed
@@ -2599,16 +2605,25 @@ extension OmniPumpManager: PumpManager {
                 // when cancelling a bolus use the built-in type 6 beeeeeep to match PDM if confirmation beeps are enabled
                 let beepType: BeepType = self.beepPreference.shouldBeepForManualCommand && !self.silencePod ? .beeeeeep : .noBeepCancel
                 let result = session.cancelDelivery(deliveryType: .bolus, beepType: beepType)
+
+                // Flush finalized doses before deciding how to complete. When
+                // a pod fault interrupts the cancel, `send` inside
+                // `cancelDelivery` already routed through `handlePodFault`,
+                // which cancels `unfinalizedBolus` and appends it to
+                // `podState.finalizedDoses`. The `.certainFailure` /
+                // `.unacknowledged` arms below then throw without pushing the
+                // cancelled bolus to the host app, leaving the unfinalized
+                // bolus event in pump history forever.
+                session.dosesForStorage() { (doses) -> Bool in
+                     return self.store(doses: doses, in: session)
+                }
+
                 switch result {
                 case .certainFailure(let error):
                     throw error
                 case .unacknowledged(let error):
                     throw error
                 case .success(_, let canceledBolus):
-                    session.dosesForStorage() { (doses) -> Bool in
-                        return self.store(doses: doses, in: session)
-                    }
-
                     let canceledDoseEntry: DoseEntry? = canceledBolus != nil ? DoseEntry(canceledBolus!) : nil
                     completion(.success(canceledDoseEntry))
                 }
