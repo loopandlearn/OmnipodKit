@@ -10,7 +10,7 @@ import CryptoSwift
 
 
 enum O5RegistrationSource: String {
-    case builtIn    // compiled into the binary via the optional O5Data symbol
+    case compiled   // compiled into the binary via the optional O5Data symbol
     case imported   // loaded from a user-supplied o5keypair file
     case downloaded // downloaded from the keypair API
 }
@@ -85,6 +85,18 @@ struct O5RegistrationData {
         lock.lock()
         defer { lock.unlock() }
         return _registry.isEmpty
+    }
+
+    /// Returns the first deletable (i.e., not compiled in) entry
+    static var deletableCert: O5RegistrationData? {
+        lock.lock()
+        defer { lock.unlock() }
+        for source in _sources {
+            if source.value != .compiled {
+                return _registry[source.key]
+            }
+        }
+        return nil
     }
 
     /// Inverse of `fromJSON`. The shape matches the o5keypair file format so that

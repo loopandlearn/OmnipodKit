@@ -232,7 +232,7 @@ public func isOmnipod5Enabled() -> Bool {
 // MARK: - Runtime Installer
 
 /// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast.
-/// Any registry entries that appear as a result of the call are tagged with `.builtIn`.
+/// Any registry entries that appear as a result of the call are tagged with `.compiled`.
 fileprivate func loadOptionalO5Data() {
     // Use RTLD_DEFAULT (-2) to find the symbol if it was compiled into the binary
     guard let installSym = dlsym(
@@ -246,6 +246,6 @@ fileprivate func loadOptionalO5Data() {
     install()
     let after = Set(O5RegistrationData.allValues.map { $0.controllerId })
     for newId in after.subtracting(before) {
-        O5RegistrationData.markSource(newId, .builtIn)
+        O5RegistrationData.markSource(newId, .compiled)
     }
 }

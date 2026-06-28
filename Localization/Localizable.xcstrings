@@ -5349,6 +5349,9 @@
         }
       }
     },
+    "%1$@ is able to connect to Omnipod 5 Pods." : {
+      "comment" : "Heading shown when a valid O5 certificate is loaded (1: app name)"
+    },
     "%1$@ minutes" : {
       "comment" : "The format string for minutes (1: number of minutes string)",
       "extractionState" : "manual",
@@ -5510,6 +5513,9 @@
           }
         }
       }
+    },
+    "%1$@ needs to download and store a certificate from the Internet to connect to Omnipod 5 Pods." : {
+      "comment" : "Warning shown when no O5 certificate is loaded (1: app name)"
     },
     "%1$@ units remaining at %2$@" : {
       "comment" : "Accessibility format string for (1: localized volume)(2: time)",
@@ -11509,9 +11515,6 @@
         }
       }
     },
-    "Built-in (compiled into app)" : {
-      "comment" : "O5 cert source: built-in"
-    },
     "Cancel" : {
       "comment" : "Button title for cancelling confidence reminders edit\nButton title for cancelling low reservoir edit\nButton title for cancelling scheduled reminder date edit\nButton title for cancelling silence pod edit\nCancel button text in navigation bar on insert cannula screen\nCancel button text in navigation bar on pair pod UI\nCancel button title\nPairing interface navigation bar button text for cancel action",
       "extractionState" : "manual",
@@ -12160,8 +12163,11 @@
         }
       }
     },
-    "Certificate Details" : {
-      "comment" : "Text for Certificate Details row and page\nText for certificate navigation link in OmniSettingsView"
+    "Certificate ID: %1$@" : {
+      "comment" : "Certificate Id (1: certificate Id)"
+    },
+    "Certificate source: %1$@" : {
+      "comment" : "Secondary label showing where the O5 certificate came from (1: source)"
     },
     "Change Pod now. Insulin delivery will stop 8 hours after the Pod has expired or when no more insulin remains." : {
       "comment" : "The action string on pod status page when pod expired",
@@ -14440,6 +14446,9 @@
         }
       }
     },
+    "Compiled" : {
+      "comment" : "O5 cert source: compiled"
+    },
     "Confidence Reminders" : {
       "comment" : "Text for confidence reminders navigation link\nnavigation title for confidence reminders",
       "extractionState" : "manual",
@@ -16059,6 +16068,9 @@
           }
         }
       }
+    },
+    "Couldn’t look up the key-management server." : {
+      "comment" : "O5 fetch failure: DNS resolution failed, primary line"
     },
     "Critical Alerts" : {
       "comment" : "Title for critical alerts description",
@@ -18328,6 +18340,15 @@
         }
       }
     },
+    "Delete saved certificate" : {
+      "comment" : "Confirm destructive delete action"
+    },
+    "Delete saved certificate ID %1$@" : {
+      "comment" : "Title of the final O5 certificate delete confirmation alert (1: certificate ID)"
+    },
+    "Deleting the certificate is not needed to switch another pod or pump type. Are you sure you want to continue?" : {
+      "comment" : "Final confirmation message before deleting a saved O5 certificate"
+    },
     "Device Name" : {
       "comment" : "description label for device name pod details row",
       "extractionState" : "manual",
@@ -19462,7 +19483,7 @@
         }
       }
     },
-    "Downloaded (in O5 Setup)" : {
+    "Downloaded" : {
       "comment" : "O5 cert source: downloaded"
     },
     "Downloading certificate…" : {
@@ -26275,9 +26296,6 @@
         }
       }
     },
-    "Forget Saved Certificate" : {
-      "comment" : "Confirm destructive forget action\nDestructive button to remove a saved O5 certificate"
-    },
     "Generating App Attest key…" : {
       "comment" : "O5 fetch progress: generate key"
     },
@@ -26932,10 +26950,7 @@
     "Import Failed" : {
       "comment" : "Title of o5keypair import-failed alert"
     },
-    "Import o5keypair file" : {
-      "comment" : "Toolbar action to import an o5keypair file"
-    },
-    "Imported (o5keypair file)" : {
+    "Imported" : {
       "comment" : "O5 cert source: imported"
     },
     "Incorrect Response" : {
@@ -31636,6 +31651,9 @@
         }
       }
     },
+    "Load custom certificate" : {
+      "comment" : "Menu action to import an o5keypair file"
+    },
     "Lot" : {
       "comment" : "description label for lot pod details row",
       "extractionState" : "manual",
@@ -36172,9 +36190,6 @@
         }
       }
     },
-    "No certificates loaded" : {
-      "comment" : "Empty state for the Pod Certificate view"
-    },
     "No confidence reminders are used." : {
       "comment" : "Description for BeepPreference.silent",
       "extractionState" : "manual",
@@ -40391,6 +40406,9 @@
     "Omnipod 5 Setup" : {
       "comment" : "Title for O5 key fetch view\nTitle for the Omnipod 5 key setup screen"
     },
+    "Omnipod 5 Support" : {
+      "comment" : "Text for Omnipod 5 Support navigation link in OmniSettingsView\nTitle for the Omnipod 5 Support screen"
+    },
     "Omnipod Classic" : {
       "comment" : "Title string for Omnipod Classic",
       "extractionState" : "manual",
@@ -43628,6 +43646,9 @@
           }
         }
       }
+    },
+    "Please check your Internet connection and try again." : {
+      "comment" : "O5 fetch failure: DNS resolution failed, recovery suggestion"
     },
     "Please confirm that the Pod is securely attached to your body.\n\nThe cannula can be inserted only once with each Pod. Tap “Confirm” when Pod is attached." : {
       "comment" : "Alert message body for confirm pod attachment",
@@ -52058,6 +52079,9 @@
           }
         }
       }
+    },
+    "Press Continue to download a certificate now and enable support for Omnipod 5 on your next Pod change." : {
+      "comment" : "Instruction to download an O5 certificate"
     },
     "Previous Pod" : {
       "comment" : "Text for Previous Pod row and page",

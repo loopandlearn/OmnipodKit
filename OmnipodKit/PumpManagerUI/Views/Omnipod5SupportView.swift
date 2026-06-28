@@ -10,9 +10,7 @@
 //  same App Attest download flow used by the pairing setup wizard.
 //
 //  The overflow ("…") menu offers "Load custom certificate" (only when no cert is
-//  loaded) and, when the O5_CERTIFICATE_DEBUG compilation flag is defined, "Delete
-//  saved certificate" for a deletable (non-built-in) cert. The menu is hidden
-//  entirely when it would have no options.
+//  loaded) and "Delete saved certificate" with a deletable (non compiled-in) cert.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
@@ -21,6 +19,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 import LoopKit
 import LoopKitUI
+
+fileprivate var showCertificateIdOnDelete = false
+fileprivate var showLoadedCertificateId = true
 
 struct Omnipod5SupportView: View {
 
@@ -38,33 +39,16 @@ struct Omnipod5SupportView: View {
     private var appName: String { Bundle.main.bundleDisplayName }
 
     @State private var certLoaded = !O5RegistrationData.isEmpty
+    @State private var deletableCert = O5RegistrationData.deletableCert
     @State private var showingFetchSheet = false
     @State private var showingFileImporter = false
     @State private var importError: String?
     @State private var pendingDelete = false
-
-    // Source of the certificate currently in use (active controllerId if known,
-    // otherwise the first one in the registry).
-    private var activeSource: O5RegistrationSource? {
-        if let source = O5RegistrationData.source(for: controllerId) {
-            return source
-        }
-        if let first = O5RegistrationData.allValues.first {
-            return O5RegistrationData.source(for: first.controllerId)
-        }
-        return nil
-    }
-
-    // Built-in (compiled-in) certs can't be deleted without rebuilding the app.
-    private var isDeletable: Bool {
-        certLoaded && activeSource != nil && activeSource != .builtIn
-    }
+    @State private var pendingDeleteFinalConfirm = false
 
     private var menuHasOptions: Bool {
-        if !certLoaded { return true }       // "Load custom certificate"
-        #if O5_CERTIFICATE_DEBUG
-        if isDeletable { return true }       // "Delete saved certificate"
-        #endif
+        if !certLoaded { return true }          // "Load custom certificate"
+        if deletableCert != nil { return true } // "Delete saved certificate"
         return false
     }
 
@@ -122,10 +106,21 @@ struct Omnipod5SupportView: View {
             isPresented: $pendingDelete,
             titleVisibility: .visible
         ) {
-            Button(LocalizedString("Delete saved certificate", comment: "Confirm destructive delete action"), role: .destructive) {
-                deleteCertificate()
+            Button(deleteCertificateString, role: .destructive) {
+                pendingDeleteFinalConfirm = true
             }
             Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
+        }
+        .alert(
+            deleteCertificateString,
+            isPresented: $pendingDeleteFinalConfirm
+        ) {
+            Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
+            Button(LocalizedString("Continue", comment: "Confirm destructive delete action on the final confirmation alert"), role: .destructive) {
+                deleteCertificate()
+            }
+        } message: {
+            Text(finalDeleteMessage)
         }
     }
 
@@ -135,17 +130,19 @@ struct Omnipod5SupportView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.largeTitle)
                 .foregroundColor(.green)
-            Text(loadedIntro)
+            Text(loadedMessage)
                 .multilineTextAlignment(.center)
-            Text(loadedDetail)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            if let source = activeSource {
-                Text(String(format: LocalizedString("Certificate source: %1$@", comment: "Secondary label showing where the O5 certificate came from (1: source)"), sourceText(source)))
+            if showLoadedCertificateId, let certId = O5RegistrationData.deletableCert {
+                Text(String(format: LocalizedString("Certificate ID: %1$@", comment: "Certificate Id (1: certificate Id)"), String(format: "0x%08X", certId.controllerId)))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
+                if let source = O5RegistrationData.source(for: certId.controllerId), source != .downloaded {
+                    Text(String(format: LocalizedString("Certificate source: %1$@", comment: "Secondary label showing where the O5 certificate came from (1: source)"), sourceText(source)))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
         .padding(.horizontal)
@@ -179,15 +176,13 @@ struct Omnipod5SupportView: View {
                             Label(LocalizedString("Load custom certificate", comment: "Menu action to import an o5keypair file"), systemImage: "square.and.arrow.down")
                         }
                     }
-                    #if O5_CERTIFICATE_DEBUG
-                    if isDeletable {
+                    if O5RegistrationData.deletableCert != nil {
                         Button(role: .destructive) {
                             pendingDelete = true
                         } label: {
-                            Label(LocalizedString("Delete saved certificate", comment: "Destructive menu action to remove the saved O5 certificate"), systemImage: "trash")
+                            Label(deleteCertificateString, systemImage: "trash")
                         }
                     }
-                    #endif
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -224,19 +219,19 @@ struct Omnipod5SupportView: View {
 
     // MARK: - Messages
 
-    private var loadedIntro: String {
-        String(format: LocalizedString("%1$@ is able to connect to Omnipod 5 Pods.",
-            comment: "Heading shown when a valid O5 certificate is loaded (1: app name)"), appName)
+    private var deleteCertificateString: String {
+        if let deletableCert = O5RegistrationData.deletableCert, showCertificateIdOnDelete {
+            return String(format: LocalizedString("Delete saved certificate ID %1$@",
+                comment: "Title of the final O5 certificate delete confirmation alert (1: certificate ID)"),
+                          String(format: "0x%08X", deletableCert.controllerId))
+        } else {
+            return LocalizedString("Delete saved certificate", comment: "Confirm destructive delete action")
+        }
     }
 
-    private var loadedDetail: String {
-        if podType.isO5 {
-            return LocalizedString("You are currently configured to use Omnipod 5 Pods. To return to DASH or Eros, select ‘Change pod type’.",
-                comment: "Guidance shown when already configured for Omnipod 5")
-        } else {
-            return String(format: LocalizedString("You are currently configured to use %1$@ Pods. You can pair an Omnipod 5 Pod by selecting ‘Change pod type’ on your next Pod change.",
-                comment: "Guidance shown when configured for a non-O5 pod type (1: current pod type)"), podType.briefName)
-        }
+    private var loadedMessage: String {
+        String(format: LocalizedString("%1$@ is able to connect to Omnipod 5 Pods.",
+            comment: "Heading shown when a valid O5 certificate is loaded (1: app name)"), appName)
     }
 
     private var needsCertMessage: String {
@@ -249,10 +244,10 @@ struct Omnipod5SupportView: View {
 
     private var deleteMessage: String {
         let ncerts = O5RegistrationData.allValues.count
-        var activePodMessage = ""
+        var activeO5PodMessage = ""
         var baseMessage = ""
-        if hasActivePod {
-            activePodMessage = LocalizedString("Your current Omnipod 5 Pod session will not be affected. ",
+        if hasActivePod && podType.isO5 {
+            activeO5PodMessage = LocalizedString("Your current Omnipod 5 Pod session will not be affected. ",
                 comment: "Confirmation message when forgetting a saved O5 certificate while a pod session is active"
             )
         }
@@ -264,18 +259,23 @@ struct Omnipod5SupportView: View {
             baseMessage = LocalizedString("A new certificate will be used for the next Omnipod 5 Pod pairing.",
                 comment: "Confirmation message when a new certificate will be used"
             )
-        } else if activePodMessage.isEmpty {
+        } else if activeO5PodMessage.isEmpty {
             baseMessage = LocalizedString("This certificate will be permanently deleted.",
                 comment: "Confirmation message when forgetting a saved O5 certificate"
             )
         }
 
-        return activePodMessage + baseMessage
+        return activeO5PodMessage + baseMessage
+    }
+
+    private var finalDeleteMessage: String {
+        deleteMessage + "\n\n" + LocalizedString("Deleting the certificate is not needed to switch another pod or pump type. Are you sure you want to continue?",
+            comment: "Final confirmation message before deleting a saved O5 certificate")
     }
 
     private func sourceText(_ source: O5RegistrationSource) -> String {
         switch source {
-        case .builtIn:    return LocalizedString("Compiled", comment: "O5 cert source: built-in")
+        case .compiled:   return LocalizedString("Compiled", comment: "O5 cert source: compiled")
         case .imported:   return LocalizedString("Imported", comment: "O5 cert source: imported")
         case .downloaded: return LocalizedString("Downloaded", comment: "O5 cert source: downloaded")
         }
@@ -308,12 +308,12 @@ struct Omnipod5SupportView: View {
     }
 
     private func deleteCertificate() {
-        // Remove every deletable (non-built-in) certificate so the store is fully reset.
-        for cert in O5RegistrationData.allValues where O5RegistrationData.source(for: cert.controllerId) != .builtIn {
+        // Remove every deletable (non-compiled-in) certificate so the store is fully reset.
+        for cert in O5RegistrationData.allValues where O5RegistrationData.source(for: cert.controllerId) != .compiled {
             try? O5CertificateKeychain.delete(controllerId: cert.controllerId)
             O5RegistrationData.remove(controllerId: cert.controllerId)
         }
-        refreshO5IdsFromCertStore()
+        refreshO5IdsFromCertStore() // a no-op if non O5
         certLoaded = !O5RegistrationData.isEmpty
         onCertStoreChanged()
     }
