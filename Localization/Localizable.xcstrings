@@ -12163,12 +12163,6 @@
         }
       }
     },
-    "Certificate ID: %1$@" : {
-      "comment" : "Certificate Id (1: certificate Id)"
-    },
-    "Certificate source: %1$@" : {
-      "comment" : "Secondary label showing where the O5 certificate came from (1: source)"
-    },
     "Change Pod now. Insulin delivery will stop 8 hours after the Pod has expired or when no more insulin remains." : {
       "comment" : "The action string on pod status page when pod expired",
       "extractionState" : "manual",
@@ -18343,8 +18337,8 @@
     "Delete saved certificate" : {
       "comment" : "Confirm destructive delete action"
     },
-    "Delete saved certificate ID %1$@" : {
-      "comment" : "Title of the final O5 certificate delete confirmation alert (1: certificate ID)"
+    "Delete saved certificate %1$@" : {
+      "comment" : "Title of the final O5 certificate delete confirmation alert (1: certificate number)"
     },
     "Deleting the certificate is not needed to switch another pod or pump type. Are you sure you want to continue?" : {
       "comment" : "Final confirmation message before deleting a saved O5 certificate"

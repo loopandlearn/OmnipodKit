@@ -20,8 +20,6 @@ import UniformTypeIdentifiers
 import LoopKit
 import LoopKitUI
 
-fileprivate var showCertificateIdOnDelete = false
-fileprivate var showLoadedCertificateId = true
 
 struct Omnipod5SupportView: View {
 
@@ -106,13 +104,13 @@ struct Omnipod5SupportView: View {
             isPresented: $pendingDelete,
             titleVisibility: .visible
         ) {
-            Button(deleteCertificateString, role: .destructive) {
+            Button(deleteSavedCertificateString, role: .destructive) {
                 pendingDeleteFinalConfirm = true
             }
             Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
         }
         .alert(
-            deleteCertificateString,
+            deleteSavedCertificateString,
             isPresented: $pendingDeleteFinalConfirm
         ) {
             Button(LocalizedString("Cancel", comment: "Cancel button"), role: .cancel) {}
@@ -132,18 +130,6 @@ struct Omnipod5SupportView: View {
                 .foregroundColor(.green)
             Text(loadedMessage)
                 .multilineTextAlignment(.center)
-            if showLoadedCertificateId, let certId = O5RegistrationData.deletableCert {
-                Text(String(format: LocalizedString("Certificate ID: %1$@", comment: "Certificate Id (1: certificate Id)"), String(format: "0x%08X", certId.controllerId)))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                if let source = O5RegistrationData.source(for: certId.controllerId), source != .downloaded {
-                    Text(String(format: LocalizedString("Certificate source: %1$@", comment: "Secondary label showing where the O5 certificate came from (1: source)"), sourceText(source)))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
         }
         .padding(.horizontal)
     }
@@ -180,7 +166,7 @@ struct Omnipod5SupportView: View {
                         Button(role: .destructive) {
                             pendingDelete = true
                         } label: {
-                            Label(deleteCertificateString, systemImage: "trash")
+                            Label(deleteSavedCertificateString, systemImage: "trash")
                         }
                     }
                 } label: {
@@ -219,10 +205,10 @@ struct Omnipod5SupportView: View {
 
     // MARK: - Messages
 
-    private var deleteCertificateString: String {
-        if let deletableCert = O5RegistrationData.deletableCert, showCertificateIdOnDelete {
-            return String(format: LocalizedString("Delete saved certificate ID %1$@",
-                comment: "Title of the final O5 certificate delete confirmation alert (1: certificate ID)"),
+    private var deleteSavedCertificateString: String {
+        if let deletableCert = O5RegistrationData.deletableCert {
+            return String(format: LocalizedString("Delete saved certificate %1$@",
+                comment: "Title of the final O5 certificate delete confirmation alert (1: certificate number)"),
                           String(format: "0x%08X", deletableCert.controllerId))
         } else {
             return LocalizedString("Delete saved certificate", comment: "Confirm destructive delete action")
