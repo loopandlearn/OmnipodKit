@@ -258,7 +258,7 @@ class PodCommsSession: MessageTransportDelegate {
 
     /// Sets the podState's deliveryStoppedAt if not already set or it is
     /// later than the computed actual stopped time using the podTime.
-    private func setDeliverytoppedAt(podTime: TimeInterval?) {
+    private func setDeliveryStoppedAt(podTime: TimeInterval?) {
         let computedStoppedAt: Date
         if let podTime = podTime, let expiresAt = podState.expiresAt {
             /// Use expiresAt which slides with pod clock skew to compute an adjusted activatedAt
@@ -278,7 +278,7 @@ class PodCommsSession: MessageTransportDelegate {
     private func handlePodFault(fault: DetailedStatus) {
         if podState.fault == nil {
             podState.fault = fault // save the first fault returned
-            setDeliverytoppedAt(podTime: fault.faultEventTimeSinceActivation)
+            setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
             if podState.unacknowledgedCommand != nil {
                 // Process the pending unacknowledgeCommnd to handle any pending doses matters for an unacknowledged
@@ -1153,7 +1153,7 @@ class PodCommsSession: MessageTransportDelegate {
             let deactivatePod = DeactivatePodCommand(nonce: podState.currentNonce)
             let status: StatusResponse = try send([deactivatePod])
             podState.updateFromStatusResponse(status, at: currentDate)
-            setDeliverytoppedAt(podTime: status.timeActive)
+            setDeliveryStoppedAt(podTime: status.timeActive)
         } catch let error as PodCommsError {
             /// Don't set DeliveryStopped as we don't know if the pod was deactivated.
             /// Instead, wait until a successful deactivation or the user discards the pod.

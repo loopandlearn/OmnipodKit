@@ -1532,13 +1532,20 @@ extension OmniPumpManager {
             status = nil
         } else {
             status = try? session.getStatus(noSeqGetStatus: true)
+            if status == nil {
+                // Had some comms error or perhaps a pod fault. Evaluate pod's
+                // status in case it has change to trigger updates to clients.
+                evaluateStatus()
+            }
         }
 
         // Silence any pending acknowledged alerts
         silenceAcknowledgedAlerts()
 
-        // If we have new status, store the dosesForStorage which updates lastPumpDataReportDate
-        if status != nil {
+        // If we have a status return or if the pod is currently faulted,
+        // store the dosesForStorage which updates lastPumpDataReportDate
+        // and ensures that any updated doses will be saved to the client.
+        if status != nil || state.podState?.isFaulted == true {
             session.dosesForStorage() { (doses) -> Bool in
                 return store(doses: doses, in: session)
             }
@@ -1561,7 +1568,8 @@ extension OmniPumpManager {
 
         // Don't use guard state.hasActivePod here as it prevents getPodStatus from working
         // after the pod has been paired, but before the pod setup process has been completed.
-        guard state.podState?.setupProgress.isPaired == true, state.podState?.fault == nil else {
+        // Instead just verify that the pod is at least paired and not faulted.
+        guard state.podState?.setupProgress.isPaired == true, state.podState?.isFaulted == false else {
             completion?(.failure(PumpManagerError.configuration(OmniPumpManagerError.noPodPaired)))
             return
         }
