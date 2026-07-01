@@ -67,7 +67,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     var isHighTemp: Bool =
         false // Track this for situations where cancelling temp basal is unacknowledged, and recovery fails, and we have to assume the most possible delivery
     var insulinType: InsulinType?
-    var bolusReference: String? // Opaque, caller-supplied reference echoed back on the resulting DoseEntry; not interpreted by the pump
+    var bolusReference: UUID? // Opaque, caller-supplied reference echoed back on the resulting DoseEntry; not interpreted by the pump
 
     var finishTime: Date? {
         get {
@@ -112,7 +112,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         scheduledCertainty: ScheduledCertainty,
         insulinType: InsulinType,
         automatic: Bool = false,
-        bolusReference: String? = nil
+        bolusReference: UUID? = nil
     ) {
         doseType = .bolus
         units = bolusAmount
@@ -328,7 +328,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
             insulinType = InsulinType(rawValue: rawInsulinType)
         }
 
-        bolusReference = rawValue["bolusReference"] as? String
+        bolusReference = (rawValue["bolusReference"] as? String).flatMap { UUID(uuidString: $0) }
     }
 
     public var rawValue: RawValue {
@@ -345,7 +345,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         rawValue["scheduledTempRate"] = scheduledTempRate
         rawValue["duration"] = duration
         rawValue["insulinType"] = insulinType?.rawValue
-        rawValue["bolusReference"] = bolusReference
+        rawValue["bolusReference"] = bolusReference?.uuidString
 
         return rawValue
     }

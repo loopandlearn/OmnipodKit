@@ -666,7 +666,7 @@ class PodCommsSession: MessageTransportDelegate {
         case unacknowledged(error: PodCommsError)
     }
 
-    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0, bolusReference: String? = nil) -> DeliveryCommandResult {
+    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0, bolusReference: UUID? = nil) -> DeliveryCommandResult {
 
         if podState.unacknowledgedCommand != nil {
             do {

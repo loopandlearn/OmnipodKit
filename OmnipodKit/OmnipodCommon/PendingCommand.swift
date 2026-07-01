@@ -13,7 +13,7 @@ import Foundation
 enum StartProgram: RawRepresentable {
     typealias RawValue = [String: Any]
 
-    case bolus(volume: Double, automatic: Bool, bolusReference: String? = nil)
+    case bolus(volume: Double, automatic: Bool, bolusReference: UUID? = nil)
     case basalProgram(schedule: BasalSchedule)
     case tempBasal(unitsPerHour: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool)
     
@@ -29,7 +29,7 @@ enum StartProgram: RawRepresentable {
                 "volume": volume,
                 "automatic": automatic
             ]
-            raw["bolusReference"] = bolusReference
+            raw["bolusReference"] = bolusReference?.uuidString
             return raw
         case .basalProgram(let schedule):
             return [
@@ -60,7 +60,7 @@ enum StartProgram: RawRepresentable {
             {
                 return nil
             }
-            self = .bolus(volume: volume, automatic: automatic, bolusReference: rawValue["bolusReference"] as? String)
+            self = .bolus(volume: volume, automatic: automatic, bolusReference: (rawValue["bolusReference"] as? String).flatMap { UUID(uuidString: $0) })
         case .basalProgram:
             guard let rawSchedule = rawValue["schedule"] as? BasalSchedule.RawValue,
                   let schedule = BasalSchedule(rawValue: rawSchedule) else
