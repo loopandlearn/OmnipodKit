@@ -2488,6 +2488,10 @@ extension OmniPumpManager: PumpManager {
     // MARK: - Programming Delivery
 
     public func enactBolus(units: Double, activationType: BolusActivationType, completion: @escaping (PumpManagerError?) -> Void) {
+        enactBolus(units: units, activationType: activationType, bolusReference: nil, completion: completion)
+    }
+
+    public func enactBolus(units: Double, activationType: BolusActivationType, bolusReference: UUID?, completion: @escaping (PumpManagerError?) -> Void) {
         guard self.hasActivePod else {
             completion(.configuration(OmniPumpManagerError.noPodPaired))
             return
@@ -2552,7 +2556,7 @@ extension OmniPumpManager: PumpManager {
             //      in 63 minutes if bolus had not completed by then.
             let bolusWasAutomaticIndicator: TimeInterval = activationType.isAutomatic ? TimeInterval(minutes: 0x3F) : 0
 
-            let result = session.bolus(units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator)
+            let result = session.bolus(units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator, bolusReference: bolusReference)
 
             switch result {
             case .success:

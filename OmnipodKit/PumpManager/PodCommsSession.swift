@@ -666,7 +666,7 @@ class PodCommsSession: MessageTransportDelegate {
         case unacknowledged(error: PodCommsError)
     }
 
-    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0) -> DeliveryCommandResult {
+    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0, bolusReference: UUID? = nil) -> DeliveryCommandResult {
 
         if podState.unacknowledgedCommand != nil {
             do {
@@ -710,10 +710,10 @@ class PodCommsSession: MessageTransportDelegate {
 
         let bolusExtraCommand = BolusExtraCommand(units: units, timeBetweenPulses: timeBetweenPulses, extendedUnits: extendedUnits, extendedDuration: extendedDuration, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: programReminderInterval, bolusInfo: bolusInfo)
         do {
-            podState.unacknowledgedCommand = PendingCommand.program(.bolus(volume: units, automatic: automatic), transport.messageNumber, currentDate)
+            podState.unacknowledgedCommand = PendingCommand.program(.bolus(volume: units, automatic: automatic, bolusReference: bolusReference), transport.messageNumber, currentDate)
             let statusResponse: StatusResponse = try send([bolusScheduleCommand, bolusExtraCommand])
             podState.unacknowledgedCommand = nil
-            podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic)
+            podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic, bolusReference: bolusReference)
             podState.updateFromStatusResponse(statusResponse, at: currentDate)
             return DeliveryCommandResult.success(statusResponse: statusResponse)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {

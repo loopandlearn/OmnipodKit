@@ -13,7 +13,7 @@ import Foundation
 enum StartProgram: RawRepresentable {
     typealias RawValue = [String: Any]
 
-    case bolus(volume: Double, automatic: Bool)
+    case bolus(volume: Double, automatic: Bool, bolusReference: UUID? = nil)
     case basalProgram(schedule: BasalSchedule)
     case tempBasal(unitsPerHour: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool)
     
@@ -23,12 +23,14 @@ enum StartProgram: RawRepresentable {
     
     var rawValue: RawValue {
         switch self {
-        case .bolus(let volume, let automatic):
-            return [
+        case .bolus(let volume, let automatic, let bolusReference):
+            var raw: RawValue = [
                 "programType": StartProgramType.bolus.rawValue,
                 "volume": volume,
                 "automatic": automatic
             ]
+            raw["bolusReference"] = bolusReference?.uuidString
+            return raw
         case .basalProgram(let schedule):
             return [
                 "programType": StartProgramType.basalProgram.rawValue,
@@ -58,7 +60,7 @@ enum StartProgram: RawRepresentable {
             {
                 return nil
             }
-            self = .bolus(volume: volume, automatic: automatic)
+            self = .bolus(volume: volume, automatic: automatic, bolusReference: (rawValue["bolusReference"] as? String).flatMap { UUID(uuidString: $0) })
         case .basalProgram:
             guard let rawSchedule = rawValue["schedule"] as? BasalSchedule.RawValue,
                   let schedule = BasalSchedule(rawValue: rawSchedule) else
@@ -80,8 +82,8 @@ enum StartProgram: RawRepresentable {
     
     static func == (lhs: StartProgram, rhs: StartProgram) -> Bool {
         switch(lhs, rhs) {
-        case (.bolus(let lhsVolume, let lhsAutomatic), .bolus(let rhsVolume, let rhsAutomatic)):
-            return lhsVolume == rhsVolume && lhsAutomatic == rhsAutomatic
+        case (.bolus(let lhsVolume, let lhsAutomatic, let lhsBolusReference), .bolus(let rhsVolume, let rhsAutomatic, let rhsBolusReference)):
+            return lhsVolume == rhsVolume && lhsAutomatic == rhsAutomatic && lhsBolusReference == rhsBolusReference
         case (.basalProgram(let lhsSchedule), .basalProgram(let rhsSchedule)):
             return lhsSchedule == rhsSchedule
         case (.tempBasal(let lhsUnitsPerHour, let lhsDuration, let lhsIsHighTemp, let lhsAutomatic), .tempBasal(let rhsUnitsPerHour, let rhsDuration, let rhsIsHighTemp, let rhsAutomatic)):
