@@ -67,6 +67,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     var isHighTemp: Bool =
         false // Track this for situations where cancelling temp basal is unacknowledged, and recovery fails, and we have to assume the most possible delivery
     var insulinType: InsulinType?
+    var bolusReference: String? // Opaque, caller-supplied reference echoed back on the resulting DoseEntry; not interpreted by the pump
 
     var finishTime: Date? {
         get {
@@ -110,7 +111,8 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         startTime: Date,
         scheduledCertainty: ScheduledCertainty,
         insulinType: InsulinType,
-        automatic: Bool = false
+        automatic: Bool = false,
+        bolusReference: String? = nil
     ) {
         doseType = .bolus
         units = bolusAmount
@@ -120,6 +122,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         scheduledUnits = nil
         self.automatic = automatic
         self.insulinType = insulinType
+        self.bolusReference = bolusReference
     }
 
     init(
@@ -324,6 +327,8 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         if let rawInsulinType = rawValue["insulinType"] as? InsulinType.RawValue {
             insulinType = InsulinType(rawValue: rawInsulinType)
         }
+
+        bolusReference = rawValue["bolusReference"] as? String
     }
 
     public var rawValue: RawValue {
@@ -340,6 +345,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         rawValue["scheduledTempRate"] = scheduledTempRate
         rawValue["duration"] = duration
         rawValue["insulinType"] = insulinType?.rawValue
+        rawValue["bolusReference"] = bolusReference
 
         return rawValue
     }
@@ -377,7 +383,8 @@ extension DoseEntry {
                 deliveredUnits: dose.finalizedUnits,
                 insulinType: dose.insulinType,
                 automatic: dose.automatic,
-                isMutable: dose.isMutable()
+                isMutable: dose.isMutable(),
+                bolusReference: dose.bolusReference
             )
         case .tempBasal:
             self = DoseEntry(
@@ -406,13 +413,14 @@ extension StartProgram {
         insulinType: InsulinType
     ) -> UnfinalizedDose? {
         switch self {
-        case let .bolus(volume: volume, automatic: automatic):
+        case let .bolus(volume: volume, automatic: automatic, bolusReference: bolusReference):
             return UnfinalizedDose(
                 bolusAmount: volume,
                 startTime: programDate,
                 scheduledCertainty: certainty,
                 insulinType: insulinType,
-                automatic: automatic
+                automatic: automatic,
+                bolusReference: bolusReference
             )
         case let .tempBasal(unitsPerHour: rate, duration: duration, isHighTemp, automatic):
             return UnfinalizedDose(
