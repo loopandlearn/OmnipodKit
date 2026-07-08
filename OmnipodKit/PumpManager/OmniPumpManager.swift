@@ -1513,12 +1513,30 @@ extension OmniPumpManager {
     // Used to serialize a set of Pod Commands for a given session - vectors to correct version
     private func runSession(withName name: String, _ block: @escaping (_ result: PodComms.SessionRunResult) -> Void) {
         if let blePodComms = self.podComms as? BlePodComms {
-            blePodComms.bleRunSession(withName: name, block)
+            blePodComms.bleRunSession(withName: name, onFault: onFault, block)
         } else if let erosPodComms = self.podComms as? ErosPodComms {
             let device = self.rileyLinkDeviceProvider.firstConnectedDevice
-            erosPodComms.erosRunSession(withName: name, using: device, block)
+            erosPodComms.erosRunSession(withName: name, using: device, onFault: onFault, block)
         } else {
             block(.failure(.diagnosticMessage(str: OmniPumpManagerError.podTypeNotConfigured.localizedDescription)))
+        }
+    }
+
+    /// Called at the end of the PodComms RunSession manager sequence if a pod fault has been
+    /// detected to ensure the any updated dose information is saved immediately after the pod fault
+    /// is detected reported to the app as doses may contained interrupted doses. This will better
+    /// handle various cases where a pod fault has have detected during some operation, but the
+    /// calling flow has to rely on some later flow (e.g., in forgetPod() or handlePodUpdatesAsNeeded())
+    /// to actually handle getting the interrupted doses saved after the pod fault has occurred.
+    func onFault(session: PodCommsSession) {
+        if state.podState?.isFaulted == true,
+           let dosesToStore = state.podState?.dosesToStore,
+           dosesToStore.count > 0
+        {
+            self.log.default("@@@ onFault storing doses: %{public}@", String(describing: dosesToStore))
+            session.dosesForStorage() { (doses) -> Bool in
+                return store(doses: doses, in: session)
+            }
         }
     }
 

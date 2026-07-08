@@ -326,8 +326,12 @@ class ErosPodComms: PodComms {
         }
     }
 
-    func erosRunSession(withName name: String, using deviceSelector: @escaping (_ completion: @escaping (_ device: RileyLinkDevice?) -> Void) -> Void, _ block: @escaping (_ result: SessionRunResult) -> Void)
-    {
+    func erosRunSession(
+        withName name: String,
+        using deviceSelector: @escaping (_ completion: @escaping (_ device: RileyLinkDevice?) -> Void) -> Void,
+        onFault: @escaping (_ session: PodCommsSession) -> Void,
+        _ block: @escaping (_ result: SessionRunResult) -> Void
+    ) {
         deviceSelector { (device) in
             guard let device = device else {
                 block(.failure(PodCommsError.noRileyLinkAvailable))
@@ -352,6 +356,12 @@ class ErosPodComms: PodComms {
                 erosPodMessageTransport.messageLogger = self.messageLogger
                 let podSession = PodCommsSession(podState: self.podState!, transport: erosPodMessageTransport, delegate: self)
                 block(.success(session: podSession))
+
+                // If the pod is faulted, call the onFault
+                // handler to save any updated dose info.
+                if self.podState?.isFaulted == true {
+                    onFault(podSession)
+                }
             }
         }
     }

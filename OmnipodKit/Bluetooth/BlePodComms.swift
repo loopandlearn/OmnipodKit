@@ -629,7 +629,11 @@ class BlePodComms: PodComms {
         }
     }
 
-    func bleRunSession(withName name: String, _ block: @escaping (_ result: SessionRunResult) -> Void) {
+    func bleRunSession(
+        withName name: String,
+        onFault: @escaping (_ session: PodCommsSession) -> Void,
+        _ block: @escaping (_ result: SessionRunResult) -> Void
+    ) {
 
         guard let manager = manager, manager.peripheral.state == .connected else {
             block(.failure(PodCommsError.podNotConnected))
@@ -654,6 +658,12 @@ class BlePodComms: PodComms {
 
             let podSession = PodCommsSession(podState: self.podState!, transport: transport, delegate: self)
             block(.success(session: podSession))
+
+            // If the pod is faulted, call the onFault
+            // handler to save any updated dose info.
+            if self.podState?.isFaulted == true {
+                onFault(podSession)
+            }
         }
     }
 
