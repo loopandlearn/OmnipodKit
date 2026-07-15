@@ -122,7 +122,7 @@ struct PodSessionLogListContent: View {
 
             Section(
                 header: Text(LocalizedString("Pod Sessions", comment: "Section header for pod session log entries")),
-                footer: Text(LocalizedString("Each completed pod is recorded here with its fault code and ref string, if any, so you can report it to your supplier without needing a screenshot.", comment: "Footer explanation for the pod session log"))
+                footer: Text(LocalizedString("Each completed pod is recorded here with its fault code and ref string.", comment: "Footer explanation for the pod session log"))
             ) {
                 if details.isEmpty {
                     Text(LocalizedString("No pod sessions recorded yet.", comment: "Text shown when the pod session log is empty"))
