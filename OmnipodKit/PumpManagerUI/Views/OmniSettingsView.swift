@@ -494,6 +494,17 @@ struct OmniSettingsView: View  {
                             .foregroundColor(Color.secondary)
                     }
                 }
+
+                let localizedPodSessionLogStr = LocalizedString("Pod Session Log", comment: "Text for Pod Session Log row and page")
+                NavigationLink(destination: PodSessionLogView(viewModel: viewModel)) {
+                    HStack {
+                        Text(localizedPodSessionLogStr)
+                            .foregroundColor(Color.primary)
+                        Spacer()
+                        Text(String(viewModel.podSessionLogDetails.count))
+                            .foregroundColor(Color.secondary)
+                    }
+                }
             }
 
             Section(header: SectionHeader(label: LocalizedString("Configuration", comment: "Section header for configuration section")))

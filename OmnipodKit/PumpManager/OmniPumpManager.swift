@@ -778,6 +778,39 @@ extension OmniPumpManager {
         }
     }
 
+    // Completed pod sessions currently retained in the session log, most recent first.
+    var podSessionLog: [PodState] {
+        state.podSessionLog
+    }
+
+    // Deletes specific pod session log entries (e.g. via swipe-to-delete in the UI).
+    func deletePodSessionLogEntries(at offsets: IndexSet) {
+        setState { state in
+            state.removeSessionLogEntries(at: offsets)
+        }
+    }
+
+    // Clears the entire pod session log.
+    func clearPodSessionLog() {
+        setState { state in
+            state.clearSessionLog()
+        }
+    }
+
+    var podSessionLogRetention: PodSessionLogRetention {
+        set {
+            setState { (state) in
+                state.podSessionLogRetention = newValue
+                // Apply the new retention window immediately rather than waiting
+                // for the next pod session to end.
+                state.pruneSessionLog()
+            }
+        }
+        get {
+            state.podSessionLogRetention
+        }
+    }
+
     var defaultLowReservoirReminderValue: Double {
         set {
             setState { (state) in
@@ -1034,6 +1067,9 @@ extension OmniPumpManager {
                 /// (always the case for a simulator), set deliveryStoppedAt with the current time
                 if podState.deliveryStoppedAt == nil {
                     state.previousPodState?.deliveryStoppedAt = Date()
+                }
+                if let completedPodState = state.previousPodState {
+                    state.recordCompletedPodSession(completedPodState)
                 }
             }
 
