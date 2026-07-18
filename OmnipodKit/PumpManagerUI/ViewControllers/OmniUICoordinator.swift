@@ -24,7 +24,7 @@ enum OmniUIScreen {
     case lowReservoirReminderSetup
     case insulinTypeSelection
     case selectPodType
-    case rileyLinkSetup // will be skipped for non-Eros pods
+    case rileyLinkSetup // Eros only step
     case pairAndPrime
     case insertCannula
     case confirmAttachment
@@ -80,8 +80,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
     weak var pumpManagerOnboardingDelegate: PumpManagerOnboardingDelegate?
 
     weak var completionDelegate: CompletionDelegate?
-
-    var podType = unknownOmnipodType
 
     var pumpManager: OmniPumpManager
 
@@ -172,7 +170,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
 
         case .selectPodType:
             let didConfirm: (PodType) -> Void = { [weak self] (selectedPodType) in
-                self?.podType = selectedPodType
                 self?.pumpManager.podType = selectedPodType
                 self?.stepFinished()
             }
@@ -181,7 +178,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
  
             let o5NotAvailable = O5CertificateStore.isEmpty
-            let podTypeSelectionView = PodTypeSelection(initialValue: self.podType, o5NotAvailable: o5NotAvailable, didConfirm: didConfirm, didCancel: didCancel)
+            let podTypeSelectionView = PodTypeSelection(initialValue: pumpManager.podType, o5NotAvailable: o5NotAvailable, didConfirm: didConfirm, didCancel: didCancel)
             let hostedView = hostingController(rootView: podTypeSelectionView)
             hostedView.navigationItem.title = LocalizedString("Pod Type", comment: "Title for Pod Type selection screen")
             return hostedView
@@ -216,10 +213,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
         case .settings:
             let viewModel = OmniSettingsViewModel(pumpManager: pumpManager)
             viewModel.didFinish = { [weak self] in
-                if self?.pumpManager.podType == unknownOmnipodType {
-                    print("Resetting OmniUICoordinator podType to unknownOmnipodType")
-                    self?.podType = unknownOmnipodType
-                }
                 self?.stepFinished()
             }
             viewModel.navigateTo = { [weak self] (screen) in
@@ -262,7 +255,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
 
             let view = hostingController(rootView: PairPodView(viewModel: viewModel).onAppear(perform: {UIApplication.shared.isIdleTimerDisabled = true}), onDisappear: {UIApplication.shared.isIdleTimerDisabled = false})
-            view.navigationItem.title = String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), self.podType.briefName)
+            view.navigationItem.title = String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), pumpManager.podType.briefName)
             view.navigationItem.backButtonDisplayMode = .generic
             return view
 
@@ -390,7 +383,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
 
     private func stepFinished() {
         if let nextStep = currentScreen.next() {
-            if nextStep == .rileyLinkSetup && !podType.usesRileyLink {
+            if nextStep == .rileyLinkSetup && !pumpManager.podType.usesRileyLink {
                 // Skip rileyLinkSetup to pairAndPrme for non-Eros
                 navigateTo(.pairAndPrime)
             } else {
@@ -421,11 +414,11 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 isOnboarded: false,
                 podState: nil,
                 timeZone: basalSchedule.timeZone,
-                basalSchedule: BasalSchedule(repeatingScheduleValues: basalSchedule.items, podType: self.podType),
+                basalSchedule: BasalSchedule(repeatingScheduleValues: basalSchedule.items, podType: unknownOmnipodType),
                 maxBasalRateUnitsPerHour: pumpManagerSettings.maxBasalRateUnitsPerHour,
                 maxBolusUnits: pumpManagerSettings.maxBolusUnits,
                 insulinType: nil,
-                podType: self.podType)
+                podType: unknownOmnipodType)
 
             self.pumpManager = OmniPumpManager(state: pumpManagerState, rileyLinkDeviceProvider: deviceProvider)
         } else {
@@ -449,26 +442,25 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
     }
 
     private func determineInitialStep() -> OmniUIScreen {
-        self.podType = pumpManager.podType
         if pumpManager.state.podState?.needsCommsRecovery == true {
             return .pendingCommandRecovery
         } else if pumpManager.podCommState == .activating {
             if pumpManager.state.podState?.readyForCannulaInsertion == true && pumpManager.podAttachmentConfirmed {
                 return .insertCannula
             } else {
-                assert(self.podType != unknownOmnipodType)
+                assert(pumpManager.podType != unknownOmnipodType)
                 return .pairAndPrime // need to finish the priming
             }
         } else if !pumpManager.isOnboarded {
             if !pumpManager.initialConfigurationCompleted {
                 return .firstRunScreen
             }
-            if self.podType == unknownOmnipodType {
+            if pumpManager.podType == unknownOmnipodType {
                 return .selectPodType // need to first select a pod type
             }
             return .pairAndPrime // pair and prime a new pod
         } else {
-            if self.podType == unknownOmnipodType {
+            if pumpManager.podType == unknownOmnipodType {
                 return .selectPodType // need to first select a pod type
             }
             return .settings
