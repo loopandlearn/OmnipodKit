@@ -389,16 +389,6 @@ public class OmniPumpManager: RileyLinkPumpManager {
         backgroundTask.stopBackgroundTask()
     }
 
-    typealias syncSilencePodStateFuncType = (_ silencePod: Bool, _ silencePodEnd: Date?) -> Void
-
-    /// Function to be called when silencePod variables are updated
-    private var syncSilencePodState: syncSilencePodStateFuncType?
-
-    /// Initializes the resetSilencePodState var for callbacks when silence pod mode has changed
-    func setSyncSilencePodState(_ callbackFunc: @escaping syncSilencePodStateFuncType) {
-        syncSilencePodState = callbackFunc
-    }
-
 
     // MARK: - RileyLink specific vars and funcs
 
@@ -648,9 +638,6 @@ extension OmniPumpManager {
             doSetSilencePod(session: session, silencePod: false, silencePodEnd: nil) { error in
                 if let error = error {
                     self.log.default("@@@ handleSilencePodEnd: disable silence mode failed: %{public}@", error.localizedDescription)
-                } else {
-                    // Call back to sync the UI silence pod state variables
-                    self.syncSilencePodState?(false, nil)
                 }
             }
         }
