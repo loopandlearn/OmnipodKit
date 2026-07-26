@@ -408,7 +408,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
             
             if discoveryModeEnabled && peripheral.state == .disconnected && podAdvertisement.pairable {
                 // Connect to any pairable device, during discovery
-                log.default("Connecting to pairable device %{public} in discovery mode", peripheral)
+                log.default("Connecting to pairable device %{public}@ in discovery mode", peripheral)
                 manager.connect(peripheral, options: nil)
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
                 log.debug("Reonnecting to autoconnect device")
