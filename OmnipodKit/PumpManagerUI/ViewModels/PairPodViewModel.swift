@@ -218,9 +218,10 @@ class PairPodViewModel: ObservableObject, Identifiable {
                         self.autoRetryAttempted = true
                         let autoRetryPauseTime = TimeInterval(seconds: 3)
                         print("### pairAndPrimePod encountered error \(error.localizedDescription), retrying after \(autoRetryPauseTime) seconds")
-                        DispatchQueue.global(qos: .utility).async {
-                            Thread.sleep(forTimeInterval: autoRetryPauseTime)
-
+                        // Retry from the main queue: pairAndPrime() can end up scheduling a
+                        // discovery Timer on the calling thread, which never fires on a
+                        // worker thread with no running run loop.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + autoRetryPauseTime) {
                             self.pairAndPrime() // handles both pairing or priming failures
                         }
                     }

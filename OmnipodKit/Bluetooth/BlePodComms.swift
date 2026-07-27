@@ -77,36 +77,44 @@ class BlePodComms: PodComms {
                 completion(.failure(error))
                 return
             }
-            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                let devices = self.bluetoothManager.getConnectedDevices()
+            // The discoverPods completion can run on a caller thread with no active
+            // run loop (e.g. a pairing auto-retry from a background queue), where a
+            // Timer scheduled on the current thread would never fire and discovery
+            // would hang without ever timing out. Always schedule on the main run loop.
+            DispatchQueue.main.async {
+                Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+                    let devices = self.bluetoothManager.getConnectedDevices()
 
-                if devices.count > 1 {
-                    self.log.default("Multiple pods found while scanning")
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.failure(PodCommsError.tooManyPodsFound))
-                    timer.invalidate()
-                }
+                    if devices.count > 1 {
+                        self.log.default("Multiple pods found while scanning")
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.failure(PodCommsError.tooManyPodsFound))
+                        timer.invalidate()
+                        return
+                    }
 
-                let elapsed = Date().timeIntervalSince(discoveryStartTime)
+                    let elapsed = Date().timeIntervalSince(discoveryStartTime)
 
-                // If we've found a pod by 2 seconds, let's go.
-                if elapsed > TimeInterval(seconds: 2) && devices.count > 0 {
-                    let targetPod = devices.first!
-                    let uuidString = targetPod.manager.peripheral.identifier.uuidString
-                    self.log.default("Found pod UUID %{public}@!", uuidString)
-                    self.bluetoothManager.connectToDevice(uuidString: uuidString)
-                    self.manager = targetPod.manager
-                    targetPod.manager.delegate = self
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.success(devices.first!))
-                    timer.invalidate()
-                }
+                    // If we've found a pod by 2 seconds, let's go.
+                    if elapsed > TimeInterval(seconds: 2) && devices.count > 0 {
+                        let targetPod = devices.first!
+                        let uuidString = targetPod.manager.peripheral.identifier.uuidString
+                        self.log.default("Found pod UUID %{public}@!", uuidString)
+                        self.bluetoothManager.connectToDevice(uuidString: uuidString)
+                        self.manager = targetPod.manager
+                        targetPod.manager.delegate = self
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.success(targetPod))
+                        timer.invalidate()
+                        return
+                    }
 
-                if elapsed > TimeInterval(seconds: 10) {
-                    self.log.default("No pods found while scanning")
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.failure(PodCommsError.noPodsFound))
-                    timer.invalidate()
+                    if elapsed > TimeInterval(seconds: 10) {
+                        self.log.default("No pods found while scanning")
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.failure(PodCommsError.noPodsFound))
+                        timer.invalidate()
+                    }
                 }
             }
         }

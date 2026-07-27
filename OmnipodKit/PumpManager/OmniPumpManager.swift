@@ -1330,7 +1330,6 @@ extension OmniPumpManager {
                     blePodComms.connectToNewPod { result in
                         switch result {
                         case .failure(let error):
-                            completion(.failure(.communication(error as? LocalizedError)))
                             completionFailure(error as? LocalizedError)
                         case .success:
                             // Have new podState, reset all the per pod pump manager state
