@@ -287,6 +287,16 @@ class BluetoothManager: NSObject {
     /// supplied (fall back to `delayedConnectProbeSeconds`). managerQueue-isolated.
     private var heartbeatTargetDate: Date?
 
+    /// The reading interval last supplied via `setHeartbeatRequest`, used to advance a chronically-stale
+    /// target so it doesn't collapse onto the floor. managerQueue-isolated.
+    private var heartbeatInterval: TimeInterval?
+
+    /// When `heartbeatTargetDate` was last (re)set. A host that supplies a live reading schedule refreshes
+    /// this every reading; a host that only calls the legacy `setMustProvideBLEHeartbeat` sets it once. That
+    /// distinction is how `issueDelayedConnectProbe` tells a briefly-late reading (retry at the floor) from a
+    /// target no host is refreshing (advance it). managerQueue-isolated.
+    private var heartbeatTargetSetAt: Date?
+
     /// True while a real command's connect owns the link (connect-on-demand). The heartbeat probe and
     /// a command connect must never be outstanding together — a command preempts the probe and, while
     /// it's active, the probe is neither armed nor allowed to claim a didConnect. Cleared on the
@@ -353,8 +363,12 @@ class BluetoothManager: NSObject {
             if let request = request {
                 let base = request.lastCGMReadingDate ?? Date()
                 self.heartbeatTargetDate = base.addingTimeInterval(request.expectedCGMReadingInterval + BluetoothManager.heartbeatBufferSeconds)
+                self.heartbeatInterval = request.expectedCGMReadingInterval
+                self.heartbeatTargetSetAt = Date()
             } else {
                 self.heartbeatTargetDate = nil
+                self.heartbeatInterval = nil
+                self.heartbeatTargetSetAt = nil
             }
             let wasEnabled = self.heartbeatEnabled
             self.heartbeatEnabled = enabled
@@ -404,6 +418,21 @@ class BluetoothManager: NSObject {
         // near-zero delay — an overdue target (missed/late reading) retries at the floor, which for a
         // network CGM promptly catches a value that arrives a little late. Falls back to the fixed probe
         // interval when Loop hasn't supplied a schedule.
+        // If no host is refreshing the schedule -- it set the heartbeat preference once (legacy
+        // setMustProvideBLEHeartbeat) and hasn't updated it within ~1.5 reading intervals -- the fixed
+        // target goes chronically overdue and every probe collapses onto heartbeatMinDelaySeconds (the 60s
+        // floor). That produces a ~60s background wake cadence that burns the iOS background budget and gets
+        // the app suspended for long stretches (Trio field report, LoopKit/LoopKit#599). Advance the stale
+        // target by whole reading intervals so we hold the expected ~interval cadence instead. A host that
+        // refreshes the schedule every reading (Loop) keeps heartbeatTargetSetAt fresh, so its floor-based
+        // late-reading retry is untouched.
+        if let interval = heartbeatInterval, interval > 0,
+           let setAt = heartbeatTargetSetAt, Date().timeIntervalSince(setAt) > interval * 1.5,
+           var advanced = heartbeatTargetDate, advanced <= Date() {
+            let now = Date()
+            while advanced <= now { advanced.addTimeInterval(interval) }
+            heartbeatTargetDate = advanced
+        }
         let target = heartbeatTargetDate ?? Date().addingTimeInterval(TimeInterval(BluetoothManager.delayedConnectProbeSeconds))
         // CBConnectPeripheralOptionStartDelayKey requires an INTEGER number of seconds — a fractional
         // NSNumber(double) is rejected with CBErrorDomain Code=1 "One or more parameters were invalid",
