@@ -287,7 +287,7 @@ class BluetoothManager: NSObject {
     /// supplied (fall back to `delayedConnectProbeSeconds`). managerQueue-isolated.
     private var heartbeatTargetDate: Date?
 
-    /// The reading interval last supplied via `setHeartbeatRequest`, used to advance a chronically-stale
+    /// The reading interval last supplied via `setHeartbeatSchedule`, used to advance a chronically-stale
     /// target so it doesn't collapse onto the floor. managerQueue-isolated.
     private var heartbeatInterval: TimeInterval?
 
@@ -351,25 +351,12 @@ class BluetoothManager: NSObject {
         heartbeatEnabled && !shouldHoldConnection
     }
 
-    /// Enable/disable and schedule the pump-provided heartbeat (delayed-connect loop). Driven by
-    /// PumpManager.setBLEHeartbeatRequest. `request == nil` disables it (fall back to connect-on-demand +
-    /// alarm scan). When non-nil, the next-heartbeat target is (lastCGMReading + expectedInterval + buffer);
-    /// this is refreshed on every call (e.g. after each CGM reading) so the cadence tracks the reading
-    /// schedule. Refreshing the target while a probe is already in flight does NOT churn it — the in-flight
-    /// probe completes and the next one picks up the new target.
-    func setHeartbeatRequest(_ request: PumpHeartbeatRequest?) {
+    /// Enable/disable the pump-provided heartbeat (delayed-connect loop). The enable value is the host's
+    /// `pumpManagerMustProvideBLEHeartbeat` answer, resolved in OmniPumpManager.updateBLEHeartbeatPreference —
+    /// the single source of truth — NOT whether a schedule was supplied. Disabling falls back to
+    /// connect-on-demand + alarm scan. `setHeartbeatSchedule` separately refines the wake cadence.
+    func setHeartbeatEnabled(_ enabled: Bool) {
         managerQueue.async {
-            let enabled = request != nil
-            if let request = request {
-                let base = request.lastCGMReadingDate ?? Date()
-                self.heartbeatTargetDate = base.addingTimeInterval(request.expectedCGMReadingInterval + BluetoothManager.heartbeatBufferSeconds)
-                self.heartbeatInterval = request.expectedCGMReadingInterval
-                self.heartbeatTargetSetAt = Date()
-            } else {
-                self.heartbeatTargetDate = nil
-                self.heartbeatInterval = nil
-                self.heartbeatTargetSetAt = nil
-            }
             let wasEnabled = self.heartbeatEnabled
             self.heartbeatEnabled = enabled
             let pid = ProcessInfo.processInfo.processIdentifier
@@ -392,6 +379,26 @@ class BluetoothManager: NSObject {
                     }
                 }
                 self.resumeScanIfNeeded()
+            }
+        }
+    }
+
+    /// Record the CGM reading schedule used to align the heartbeat wake cadence: the next-heartbeat target is
+    /// (lastCGMReading + expectedInterval + buffer), refreshed on every call (e.g. after each CGM reading) so
+    /// the cadence tracks the reading schedule. `nil` clears it (fall back to the fixed probe interval). Does
+    /// NOT enable/disable the heartbeat — that's `setHeartbeatEnabled`. Refreshing the target while a probe is
+    /// in flight doesn't churn it — the in-flight probe completes and the next one picks up the new target.
+    func setHeartbeatSchedule(_ request: PumpHeartbeatRequest?) {
+        managerQueue.async {
+            if let request = request {
+                let base = request.lastCGMReadingDate ?? Date()
+                self.heartbeatTargetDate = base.addingTimeInterval(request.expectedCGMReadingInterval + BluetoothManager.heartbeatBufferSeconds)
+                self.heartbeatInterval = request.expectedCGMReadingInterval
+                self.heartbeatTargetSetAt = Date()
+            } else {
+                self.heartbeatTargetDate = nil
+                self.heartbeatInterval = nil
+                self.heartbeatTargetSetAt = nil
             }
         }
     }

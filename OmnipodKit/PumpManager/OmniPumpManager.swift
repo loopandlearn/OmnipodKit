@@ -307,28 +307,42 @@ public class OmniPumpManager: RileyLinkPumpManager {
     }
 
     public func setMustProvideBLEHeartbeat(_ mustProvideBLEHeartbeat: Bool) {
-        // Bridge the legacy boolean entry point through the richer request path (no reading-schedule
-        // detail — fall back to a default cadence in that case).
-        setBLEHeartbeatRequest(mustProvideBLEHeartbeat
-            ? PumpHeartbeatRequest(lastCGMReadingDate: nil, expectedCGMReadingInterval: .minutes(5))
-            : nil)
+        // Enable/disable is owned by the pumpManagerMustProvideBLEHeartbeat delegate (see
+        // updateBLEHeartbeatPreference) — the single source of truth — so the pushed boolean is not used to
+        // set it here (the legacy path carries no reading schedule anyway). Just re-evaluate.
+        updateBLEHeartbeatPreference()
     }
 
     public func setBLEHeartbeatRequest(_ request: PumpHeartbeatRequest?) {
-        // Log at the call site so we capture exactly what Loop requests and when — provideHeartbeat
-        // isn't persisted, so reading it elsewhere can be stale relative to this call.
+        // A non-nil request supplies the CGM reading SCHEDULE (last reading + interval) used to align the
+        // wake cadence; it does NOT decide whether the heartbeat is enabled — that's the delegate's job
+        // (updateBLEHeartbeatPreference). Record the schedule, then re-evaluate enable from the delegate, so
+        // the push (this call) and the pull (the delegate) can never hold conflicting enable state.
         let pid = ProcessInfo.processInfo.processIdentifier
-        let mustProvide = request != nil
         let desc = request.map { "last=\($0.lastCGMReadingDate.map { String(describing: $0) } ?? "nil") interval=\(Int($0.expectedCGMReadingInterval))s" } ?? "nil"
-        logDeviceCommunication("[heartbeat] pid=\(pid) setBLEHeartbeatRequest(\(desc))", type: .connection)
+        logDeviceCommunication("[heartbeat] pid=\(pid) setBLEHeartbeatRequest schedule=\(desc)", type: .connection)
+        if !self.state.podType.usesRileyLink {
+            (podComms as? BlePodComms)?.setHeartbeatSchedule(request)
+        }
+        updateBLEHeartbeatPreference()
+    }
+
+    /// Single source of truth for whether the pump must provide its own periodic BLE heartbeat: the host's
+    /// `pumpManagerMustProvideBLEHeartbeat` delegate (true only when the CGM can't wake the app itself, e.g. a
+    /// network CGM). Both push entry points funnel through here, and it's also called on pod connect, so the
+    /// heartbeat engages whether or not the host pushes a request — some hosts (e.g. Trio) rely on the pull,
+    /// matching MinimedKit, which is pull-only. Mirrors MinimedKit: must NOT be called on the delegate's queue
+    /// (`pumpDelegate.call` synchronizes on it).
+    func updateBLEHeartbeatPreference() {
+        let mustProvide = pumpDelegate.call { $0?.pumpManagerMustProvideBLEHeartbeat(self) == true }
+        let pid = ProcessInfo.processInfo.processIdentifier
+        logDeviceCommunication("[heartbeat] pid=\(pid) mustProvideBLEHeartbeat(delegate)=\(mustProvide)", type: .connection)
         if self.state.podType.usesRileyLink {
             rileyLinkDeviceProvider.timerTickEnabled = self.state.isPumpDataStale || mustProvide
         } else {
+            // provideHeartbeat isn't persisted, so reading it elsewhere can be stale relative to this call.
             provideHeartbeat = mustProvide
-            // BLE pod: when the host needs us to provide the heartbeat (e.g. a CGM that can't), run the
-            // delayed-connect loop for periodic background wakes, scheduled from the CGM reading time;
-            // otherwise stay disconnected + alarm-scan and connect on demand.
-            (podComms as? BlePodComms)?.setHeartbeatRequest(request)
+            (podComms as? BlePodComms)?.setHeartbeatEnabled(mustProvide)
         }
     }
 
@@ -399,6 +413,10 @@ public class OmniPumpManager: RileyLinkPumpManager {
     func omnipodPeripheralDidConnect(manager: PeripheralManager) {
         logDeviceCommunication("Pod connected \(manager.peripheral.identifier.uuidString)", type: .connection)
         notifyPodConnectionStateDidChange(isConnected: true)
+        // Pull the current must-provide from the host on every connect, so the heartbeat engages even for a
+        // host that never pushes setBLEHeartbeatRequest (this callback runs on the BLE queue, not the
+        // delegate's, so the synchronous pumpManagerMustProvideBLEHeartbeat query is safe).
+        updateBLEHeartbeatPreference()
     }
 
     func omnipodPeripheralDidDisconnect(peripheral: CBPeripheral, error: Error?) {
