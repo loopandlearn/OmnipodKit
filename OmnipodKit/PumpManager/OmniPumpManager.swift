@@ -327,22 +327,33 @@ public class OmniPumpManager: RileyLinkPumpManager {
         updateBLEHeartbeatPreference()
     }
 
+    /// Serializes heartbeat-preference evaluation OFF the delegate's queue (see updateBLEHeartbeatPreference).
+    private let heartbeatPrefQueue = DispatchQueue(label: "com.loopkit.OmnipodKit.heartbeatPref")
+
     /// Single source of truth for whether the pump must provide its own periodic BLE heartbeat: the host's
     /// `pumpManagerMustProvideBLEHeartbeat` delegate (true only when the CGM can't wake the app itself, e.g. a
     /// network CGM). Both push entry points funnel through here, and it's also called on pod connect, so the
     /// heartbeat engages whether or not the host pushes a request — some hosts (e.g. Trio) rely on the pull,
-    /// matching MinimedKit, which is pull-only. Mirrors MinimedKit: must NOT be called on the delegate's queue
-    /// (`pumpDelegate.call` synchronizes on it).
+    /// matching MinimedKit, which is pull-only.
+    ///
+    /// `pumpDelegate.call` synchronizes on the delegate's queue, so it must never run ON that queue or it
+    /// deadlocks. Our callers include the host's push (setMustProvideBLEHeartbeat / setBLEHeartbeatRequest),
+    /// which a host like Loop or iAPS invokes on the delegate queue — that hung the app (PR #121 field report;
+    /// Trio was unaffected because it doesn't push). Hop to a private serial queue first so the synchronous
+    /// query can't deadlock regardless of the caller's queue. `state` is Locked, so reading it here is safe.
     func updateBLEHeartbeatPreference() {
-        let mustProvide = pumpDelegate.call { $0?.pumpManagerMustProvideBLEHeartbeat(self) == true }
-        let pid = ProcessInfo.processInfo.processIdentifier
-        logDeviceCommunication("[heartbeat] pid=\(pid) mustProvideBLEHeartbeat(delegate)=\(mustProvide)", type: .connection)
-        if self.state.podType.usesRileyLink {
-            rileyLinkDeviceProvider.timerTickEnabled = self.state.isPumpDataStale || mustProvide
-        } else {
-            // provideHeartbeat isn't persisted, so reading it elsewhere can be stale relative to this call.
-            provideHeartbeat = mustProvide
-            (podComms as? BlePodComms)?.setHeartbeatEnabled(mustProvide)
+        heartbeatPrefQueue.async { [weak self] in
+            guard let self = self else { return }
+            let mustProvide = self.pumpDelegate.call { $0?.pumpManagerMustProvideBLEHeartbeat(self) == true }
+            let pid = ProcessInfo.processInfo.processIdentifier
+            self.logDeviceCommunication("[heartbeat] pid=\(pid) mustProvideBLEHeartbeat(delegate)=\(mustProvide)", type: .connection)
+            if self.state.podType.usesRileyLink {
+                self.rileyLinkDeviceProvider.timerTickEnabled = self.state.isPumpDataStale || mustProvide
+            } else {
+                // provideHeartbeat isn't persisted, so reading it elsewhere can be stale relative to this call.
+                self.provideHeartbeat = mustProvide
+                (self.podComms as? BlePodComms)?.setHeartbeatEnabled(mustProvide)
+            }
         }
     }
 
