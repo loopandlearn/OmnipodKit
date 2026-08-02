@@ -46,7 +46,9 @@ class PodAdvertisementO5Tests: XCTestCase {
 
     func testO5InvalidServiceCount() {
         let uuid1 = CBUUID(string: o5OmnipodServiceUUID.advertisement.rawValue)
-        let uuid2 = CBUUID(string: o5Omnipod5HeartbeatServiceUUID.advertisement.rawValue)
+        // An arbitrary second service UUID (formerly the unused O5 "heartbeat" service):
+        // any extra service beyond the O5 advertisement makes the advert invalid.
+        let uuid2 = CBUUID(string: "ECF301E2-674B-4474-94D0-364F3AA653E6")
         XCTAssertNotNil(PodAdvertisement(advertisementData(serviceUUID: uuid1), podType: omnipod5Type))
         XCTAssertNil(
             PodAdvertisement(

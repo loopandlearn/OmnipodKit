@@ -273,6 +273,20 @@ enum PodKeepAlive: Int, CaseIterable, Codable {
         }
     }
 
+    /// Modes that keep the pod connected even while the app is backgrounded / phone locked (silentTune via
+    /// a background silent-tune, rileyLink via a BLE wake device). The connection layer holds the pod
+    /// connected in these modes instead of applying connect-on-demand's idle/background disconnect.
+    /// `.whenOpen` keeps alive only while foregrounded (already covered by the foreground keep-alive), and
+    /// `.disabled` is nominal connect-on-demand — both are false here.
+    var keepsPodConnectedInBackground: Bool {
+        switch self {
+        case .silentTune, .rileyLink:
+            return true
+        case .disabled, .whenOpen:
+            return false
+        }
+    }
+
     var heartBeatInterval: TimeInterval? {
         switch self {
         case .rileyLink:

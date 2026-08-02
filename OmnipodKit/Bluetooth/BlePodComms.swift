@@ -55,6 +55,12 @@ class BlePodComms: PodComms {
         super.forgetPod()
     }
 
+    /// Enable/disable and schedule the pump-provided BLE heartbeat (delayed-connect loop). Driven by
+    /// OmniPumpManager.setBLEHeartbeatRequest — used only when the CGM can't provide a heartbeat.
+    func setHeartbeatRequest(_ request: PumpHeartbeatRequest?) {
+        bluetoothManager?.setHeartbeatRequest(request)
+    }
+
     // Removes references to the bluetoothManager to avoid future
     // "Bluetooth use unsupported on this device" errors on the
     // next BlePodComms instantiation and subsequent usage.
@@ -639,7 +645,27 @@ class BlePodComms: PodComms {
 
     func bleRunSession(withName name: String, _ block: @escaping (_ result: SessionRunResult) -> Void) {
 
-        guard let manager = manager, manager.peripheral.state == .connected else {
+        // In connect-on-demand mode the pod is normally disconnected, and self.manager (set only in
+        // omnipodPeripheralDidConnect / on restore) is nil on a fresh launch — nothing has connected
+        // yet. Adopt the pod's PeripheralManager from the device list (it exists while disconnected)
+        // so configureAndRun can bootstrap the first on-demand connect. Without this, every command
+        // failed with podNotConnected and the connect could never start.
+        if manager == nil, BluetoothManager.connectOnDemandEnabled, let bleId = podState?.bleIdentifier {
+            self.manager = bluetoothManager.peripheralManager(forIdentifier: bleId)
+            if self.manager != nil {
+                log.default("[connectOnDemand] adopted PeripheralManager for %{public}@ while disconnected", bleId)
+            }
+        }
+
+        guard let manager = manager else {
+            log.default("[connectOnDemand] no PeripheralManager for pod yet (not discovered) — podNotConnected")
+            block(.failure(PodCommsError.podNotConnected))
+            return
+        }
+        // In connect-on-demand mode the pod is normally disconnected; manager.runSession ->
+        // configureAndRun connects on demand before the session block runs. Only require an existing
+        // connection here in the classic "held connected" mode.
+        if !BluetoothManager.connectOnDemandEnabled, manager.peripheral.state != .connected {
             block(.failure(PodCommsError.podNotConnected))
             return
         }
@@ -678,6 +704,24 @@ class BlePodComms: PodComms {
 // MARK: - OmniConnectionDelegate
 
 extension BlePodComms: OmniConnectionDelegate {
+    func omnipodLogDeviceEvent(_ message: String) {
+        delegate?.omnipodLogDeviceEvent(message)
+    }
+
+    func omnipodHeartbeatDidFire() {
+        delegate?.omnipodHeartbeatDidFire()
+    }
+
+    func omnipodDidDetectAlert(slots: AlertSet) {
+        delegate?.omnipodDidDetectAlert(slots: slots)
+    }
+
+    /// Lift the fault-listener re-wake suppression once all pod alerts have cleared (OmniPumpManager
+    /// calls this from a connected status read).
+    func resumeAlarmScanAfterAlertsCleared() {
+        bluetoothManager?.resumeAlarmScanAfterAlertsCleared()
+    }
+
     func omnipodPeripheralWasRestored(manager: PeripheralManager) {
         if let podState = podState, manager.peripheral.identifier.uuidString == podState.bleIdentifier {
             log.bleDebug("omnipodPeripheralWasRestored for %@", manager.peripheral.identifier.uuidString)

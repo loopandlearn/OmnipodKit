@@ -562,6 +562,12 @@ class BlePodMessageTransport: MessageTransport {
         incrementNonceSeq()
         let decrypted = try enDecrypt.decrypt(readMessage, nonceSeq)
 
+        // Unconditional raw-response capture (before the prefix check throws it away). On a
+        // "rejected" registration this is THE datum we need to iterate the envelope.
+        log.default("O5 AID RawResp: type=%{public}@ seq=%{public}d len=%{public}d hex=%{public}@ ascii=%{public}@ expectPrefix=%{public}@",
+                    String(describing: decrypted.type), decrypted.sequenceNumber, decrypted.payload.count,
+                    decrypted.payload.hexadecimalString, String(data: decrypted.payload, encoding: .utf8) ?? "<non-ascii>", responsePrefix)
+
         // Extract response data using the caller-provided response prefix.
         // AID responses use plain ASCII key=value format (no SLPE length prefix),
         // so we just strip the prefix and return everything after it.

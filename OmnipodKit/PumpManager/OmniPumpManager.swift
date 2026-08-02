@@ -307,10 +307,28 @@ public class OmniPumpManager: RileyLinkPumpManager {
     }
 
     public func setMustProvideBLEHeartbeat(_ mustProvideBLEHeartbeat: Bool) {
+        // Bridge the legacy boolean entry point through the richer request path (no reading-schedule
+        // detail — fall back to a default cadence in that case).
+        setBLEHeartbeatRequest(mustProvideBLEHeartbeat
+            ? PumpHeartbeatRequest(lastCGMReadingDate: nil, expectedCGMReadingInterval: .minutes(5))
+            : nil)
+    }
+
+    public func setBLEHeartbeatRequest(_ request: PumpHeartbeatRequest?) {
+        // Log at the call site so we capture exactly what Loop requests and when — provideHeartbeat
+        // isn't persisted, so reading it elsewhere can be stale relative to this call.
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let mustProvide = request != nil
+        let desc = request.map { "last=\($0.lastCGMReadingDate.map { String(describing: $0) } ?? "nil") interval=\(Int($0.expectedCGMReadingInterval))s" } ?? "nil"
+        logDeviceCommunication("[heartbeat] pid=\(pid) setBLEHeartbeatRequest(\(desc))", type: .connection)
         if self.state.podType.usesRileyLink {
-            rileyLinkDeviceProvider.timerTickEnabled = self.state.isPumpDataStale || mustProvideBLEHeartbeat
+            rileyLinkDeviceProvider.timerTickEnabled = self.state.isPumpDataStale || mustProvide
         } else {
-            provideHeartbeat = mustProvideBLEHeartbeat
+            provideHeartbeat = mustProvide
+            // BLE pod: when the host needs us to provide the heartbeat (e.g. a CGM that can't), run the
+            // delayed-connect loop for periodic background wakes, scheduled from the CGM reading time;
+            // otherwise stay disconnected + alarm-scan and connect on demand.
+            (podComms as? BlePodComms)?.setHeartbeatRequest(request)
         }
     }
 
@@ -348,10 +366,33 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
     private func issueHeartbeatIfNeeded() {
         if self.provideHeartbeat, dateGenerator().timeIntervalSince(lastHeartbeat) > .minutes(2) {
+            logDeviceCommunication("[heartbeat] pumpManagerBLEHeartbeatDidFire — Loop cycle triggered", type: .connection)
             self.pumpDelegate.notify { (delegate) in
                 delegate?.pumpManagerBLEHeartbeatDidFire(self)
             }
             self.lastHeartbeat = Date()
+        }
+    }
+
+    func omnipodLogDeviceEvent(_ message: String) {
+        logDeviceCommunication(message, type: .connection)
+    }
+
+    func omnipodHeartbeatDidFire() {
+        // A pump-provided heartbeat wake (delayed-connect probe) completed — run a Loop cycle. Loop's
+        // resulting status/dose commands connect on demand (which preempts the re-armed probe).
+        issueHeartbeatIfNeeded()
+    }
+
+    func omnipodDidDetectAlert(slots: AlertSet) {
+        // A pod alert was detected connectionlessly (from the advertisement). Connect on demand and read
+        // the real pod status: getPodStatus surfaces newly-active alerts to Loop via alertsChanged ->
+        // issueAlert. This turns the low-power advert wake into a real Loop alert with accurate details.
+        logDeviceCommunication("[POD-ALERT] detected \(slots) from advertisement — fetching pod status to surface it", type: .connection)
+        getPodStatus(canOptimize: false) { result in
+            if case .failure(let error) = result {
+                self.log.error("omnipodDidDetectAlert: getPodStatus failed: %{public}@", String(describing: error))
+            }
         }
     }
 
@@ -1537,9 +1578,10 @@ extension OmniPumpManager {
         // Silence any pending acknowledged alerts
         silenceAcknowledgedAlerts()
 
-        // If we have a status return or if the pod is currently faulted,
-        // store the dosesForStorage which updates lastPumpDataReportDate
-        // and ensures that any updated doses will be saved to the client.
+        // If we have a status return or if the pod is currently faulted, store dosesForStorage — updates
+        // lastPumpDataReportDate and saves any updated doses to the client, including the in-progress
+        // bolus finalized by handlePodFault on a fault (upstream loopandlearn #99; supersedes our earlier
+        // didReadStatus flush for the incomplete-dose-on-fault case).
         if status != nil || state.podState?.isFaulted == true {
             session.dosesForStorage() { (doses) -> Bool in
                 return store(doses: doses, in: session)
@@ -2627,16 +2669,12 @@ extension OmniPumpManager: PumpManager {
     }
 
     public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
-
         if unitsPerHour > state.maxBasalRateUnitsPerHour {
-            /// The app is trying to set a TBR above the configured max basal.
-            /// This might happen if the app isn't properly sync'ing its max
-            /// basal rate value to the Pump Manager in certain situations.
-            /// Rather than returning an invalidSetting error that will cause Trio
-            /// to get into a tizzy and stop looping, just log a debug message
-            /// to note this condition for debugging purposes and continue on.
-            //completion(.configuration(OmniPumpManagerError.invalidSetting))
-            log.error("@@@ enactTempBasal requested unitsPerHour %{public}@ exceeds configured maxBasal of %{public}@!",
+            /// The app is trying to set a TBR above the configured max basal. This can happen if the
+            /// app isn't properly sync'ing its max basal rate to the Pump Manager. Rather than returning
+            /// an invalidSetting error that could stop looping, log and continue (loopandlearn #85
+            /// workaround for mismatched basal limits).
+            log.error("@@@ runTemporaryBasalProgram requested unitsPerHour %{public}@ exceeds configured maxBasal of %{public}@!",
                       String(describing: unitsPerHour), String(describing: state.maxBasalRateUnitsPerHour))
         }
 
@@ -3020,6 +3058,10 @@ extension OmniPumpManager: PumpManager {
         for alert in removed {
             log.default("Alert slot cleared: %{public}@", String(describing: alert))
         }
+        // Re-wake quieting: once all pod alerts have cleared, let the connectionless alarm scan resume.
+        if newAlerts.isEmpty {
+            (podComms as? BlePodComms)?.resumeAlarmScanAfterAlertsCleared()
+        }
     }
 
     private func getPumpManagerAlert(for podAlert: PodAlert, slot: AlertSlot) -> PumpManagerAlert? {
@@ -3088,7 +3130,7 @@ extension OmniPumpManager: PumpManager {
     func store(doses: [UnfinalizedDose], in session: PodCommsSession) -> Bool {
         session.assertOnSessionQueue()
 
-        // We block the session until the data's confirmed stored by the delegate
+        // We block the session until the data's confirmed stored by the delegate.
         let semaphore = DispatchSemaphore(value: 0)
         var success = false
 
@@ -3097,7 +3139,18 @@ extension OmniPumpManager: PumpManager {
             semaphore.signal()
         }
 
-        semaphore.wait()
+        // Bounded wait to guarantee liveness. The completion is dispatched to the delegate queue (Loop's
+        // is .main), while this runs on the pod command queue HOLDING podStateLock (BlePodComms.bleRunSession).
+        // If the main thread is itself blocked acquiring podStateLock — e.g. a concurrent forgetPod /
+        // handleDiscardedPodDosing during pod deactivation — an untimed wait() deadlocks the command queue
+        // forever (observed: deactivating a faulted pod hung ~10 min until force-kill). On timeout, bail and
+        // return false so dosesForStorage RETAINS the doses for a later flush (re-storing is idempotent —
+        // DoseStore dedupes by syncIdentifier). Returning unwinds the session and releases podStateLock,
+        // breaking the deadlock. Legitimate stores complete in well under a second.
+        if semaphore.wait(timeout: .now() + .seconds(10)) == .timedOut {
+            self.log.error("store(doses:) timed out waiting for delegate confirmation — retaining %d dose(s) for retry (avoids podStateLock deadlock)", doses.count)
+            return false
+        }
 
         if success {
             setState { (state) in
