@@ -49158,6 +49158,9 @@
         }
       }
     },
+    "Pod keep alive disabled. Additional pod status requests are not issued to prevent pod disconnects (nominal behavior)." : {
+      "comment" : "Description for PodKeepAlive.disabled"
+    },
     "Pod keep alive disabled. Pod disconnects 3 minutes after last message exchange (nominal behavior)." : {
       "comment" : "Description for PodKeepAlive.disabled",
       "extractionState" : "manual",
@@ -49482,6 +49485,9 @@
         }
       }
     },
+    "Pod keep alive enabled when app is in the foreground with phone unlocked. Attempt to keep pod connected by issuing additional pod status request after 2 minutes, 40 seconds." : {
+      "comment" : "Description for PodKeepAlive.whenOpen"
+    },
     "Pod keep alive enabled. Additional pod status request issued after 2 minutes, 40 seconds.\n\nAttempt to keep pod connected even when phone is locked by using a silent tune playing in the background. The silent tune may be interrupted by other apps. If silent tune is interrupted, pod keep alive stops working. The silent tune consumes extra iPhone battery." : {
       "comment" : "Description for PodKeepAlive.silentTune",
       "extractionState" : "manual",
@@ -49805,6 +49811,9 @@
           }
         }
       }
+    },
+    "Pod keep alive enabled. Attempt to keep pod connected by issuing additional pod status request after 2 minutes, 40 seconds even when phone is locked by playing a silent tune. The silent tune may be interrupted by other apps. If silent tune is interrupted, pod keep alive stops working. The silent tune consumes extra iPhone battery." : {
+      "comment" : "Description for PodKeepAlive.silentTune"
     },
     "Pod not connected" : {
       "comment" : "Error message shown when the pod is not connected.",
@@ -73833,6 +73842,9 @@
           }
         }
       }
+    },
+    "When enabled, additional pod status requests are issued to minimize pod Bluetooth disconnects." : {
+      "comment" : "Summary of the Pod Keep Alive concept"
     },
     "When Open" : {
       "comment" : "Title string for PodKeepAlive.whenOpen",

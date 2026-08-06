@@ -82,6 +82,9 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
     var podType: PodType
 
+    // Currently only available for DASH
+    var podKeepAlive: PodKeepAlive
+
     // Eros only state
     var rileyLinkConnectionManagerState: RileyLinkConnectionState? = nil
     var pairingAttemptAddress: UInt32? = nil
@@ -121,6 +124,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         maxBolusUnits: Double,
         insulinType: InsulinType?,
         podType: PodType,
+        podKeepAlive: PodKeepAlive = .disabled, // currently only available for DASH
         rileyLinkConnectionManagerState: RileyLinkConnectionState? = nil, // Eros
         controllerId: UInt32? = nil, // BLE
         podId: UInt32? = nil) // BLE
@@ -144,6 +148,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         self.alertsWithPendingAcknowledgment = []
 
         self.podType = podType
+        self.podKeepAlive = podKeepAlive
 
         if podType.usesRileyLink {
             self.rileyLinkConnectionManagerState = rileyLinkConnectionManagerState
@@ -227,9 +232,6 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         /// to do the only enforcement of the Therapy Setting bolus limit as was done in OmniKit/OmniBLE.
         let maxBolusUnits = rawValue["maxBolusUnits"] as? Double ?? Pod.maximumBolusUnits
 
-        log.debug("@@@ [OmniPumpManagerState] initializing maxBasalRateUnitsPerHour to %{public}@ and maxBolusUnits to %{public}@",
-                  String(describing: maxBasalRateUnitsPerHour), String(describing: maxBolusUnits))
-
         // Omnipod model specific values
         let rileyLinkConnectionManagerState: RileyLinkConnectionState?
         var controllerId, podId: UInt32?
@@ -269,6 +271,13 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             }
         }
 
+        var podKeepAlive: PodKeepAlive
+        if let rawPodKeepAlive = rawValue["podKeepAlive"] as? PodKeepAlive.RawValue {
+            podKeepAlive = PodKeepAlive(rawValue: rawPodKeepAlive) ?? .disabled
+        } else {
+            podKeepAlive = .disabled
+        }
+
         self.init(
             isOnboarded: isOnboarded,
             podState: podState,
@@ -278,6 +287,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             maxBolusUnits: maxBolusUnits,
             insulinType: insulinType ?? .novolog,
             podType: podType,
+            podKeepAlive: podKeepAlive, // currently only available for DASH
             rileyLinkConnectionManagerState: rileyLinkConnectionManagerState, // Eros only
             controllerId: controllerId, // non-Eros only
             podId: podId // non-Eros only
@@ -377,6 +387,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         ]
 
         value["podType"] = podType.rawValue
+        value["podKeepAlive"] = podKeepAlive.rawValue
         value["insulinType"] = insulinType?.rawValue
         value["podState"] = podState?.rawValue
         value["rileyLinkConnectionManagerState"] = rileyLinkConnectionManagerState?.rawValue
@@ -437,6 +448,7 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             "* acknowledgedTimeOffsetAlert: \(acknowledgedTimeOffsetAlert)",
             "* initialConfigurationCompleted: \(initialConfigurationCompleted)",
             "* podType: \(podType)",
+            "* podKeepAlive: \(podKeepAlive)",
             "",
         ].joined(separator: "\n")
         if podType.usesRileyLink {

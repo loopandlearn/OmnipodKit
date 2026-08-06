@@ -157,15 +157,10 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 name: UIApplication.willEnterForegroundNotification,
                 object: nil
             )
-
-            // Needed setup if pod keep alives might be used
-            podKeepAliveSetup(refresh: refresh)
         }
-    }
 
-    func refresh() {
-        // run in a separate thread?
-        getPodStatus(canOptimize: true) { _ in }
+        /// Initialize or disable the podKeepAlive state as needed
+        self.podKeepAlive = state.podKeepAlive
     }
 
     public required convenience init?(rawState: PumpManager.RawStateValue) {
@@ -249,7 +244,8 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
         }
 
-        if oldValue.podState != newValue.podState {
+        /// Notify podState observers of any podState or silencePod state changes
+        if oldValue.podState != newValue.podState || oldValue.silencePod != newValue.silencePod {
             podStateObservers.forEach { (observer) in
                 observer.podStateDidUpdate(newValue.podState)
             }
@@ -429,13 +425,17 @@ public class OmniPumpManager: RileyLinkPumpManager {
         }
     }
 
-    private let backgroundTask = BackgroundTask()
+    private let silentTune = SilentTune()
+
     @objc func appMovedToBackground() {
-        backgroundTask.startBackgroundTask(hasPod: state.podState != nil)
+        /// If using Silent Tune pod keep alives and a pod, starting playing the silent tune.
+        if state.podKeepAlive == .silentTune && state.podState != nil {
+            silentTune.startPlayer()
+        }
     }
 
     @objc func appMovedToForeground() {
-        backgroundTask.stopBackgroundTask()
+        silentTune.stopPlayer()
     }
 
 
@@ -858,6 +858,23 @@ extension OmniPumpManager {
         return state.podState?.expiresAt
     }
 
+    var podKeepAlive: PodKeepAlive {
+        get {
+            return state.podKeepAlive
+        }
+        set {
+            setState { (state) in
+                state.podKeepAlive = newValue
+            }
+
+            /// Handle all the setup and teardown for timer based pod keep alive modes
+            setPodKeepAliveTimerState(podKeepAlive: newValue)
+
+            /// Initialize/disable the podKeepAlive state kept in the BluetoothManager for managing pod connections
+            (podComms as? BlePodComms)?.setPodKeepAlive(podKeepAlive: podKeepAlive)
+        }
+    }
+
     func buildPumpStatusHighlight(for state: OmniPumpManagerState, andDate date: Date = Date()) -> PumpStatusHighlight? {
         if state.podState?.needsCommsRecovery == true {
             return PumpStatusHighlight(
@@ -1027,6 +1044,8 @@ extension OmniPumpManager {
 
             setState { (state) in
                 state.podType = newValue
+                /// Pod keep alives are always disabled when switching to a new pod type
+                state.podKeepAlive = .disabled
             }
 
             finishInit(podType: newValue)
@@ -1355,11 +1374,11 @@ extension OmniPumpManager {
                             self.resetPerPodPumpManagerState()
 
                             if self.usingInPlayPod == true && self.iPhoneWithPossibleInPlayIssues {
-                                if Storage.shared.podKeepAlive.value == .disabled {
+                                if self.state.podKeepAlive == .disabled {
                                     // Enable the most conservative pod keep alive mode
-                                    // that should work through the for pod setup process.
+                                    // that should continue through the pod setup process.
                                     self.log.debug("@@@ Enabling pod keep alives")
-                                    Storage.shared.podKeepAlive.value = .whenOpen
+                                    self.podKeepAlive = .whenOpen
                                 }
                             }
 
