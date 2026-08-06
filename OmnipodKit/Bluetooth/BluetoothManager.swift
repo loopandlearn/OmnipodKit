@@ -714,6 +714,14 @@ class BluetoothManager: NSObject {
     /// lingering iOS-side connection intent and re-fetch the peripheral before connecting.
     private func freshConnect(_ peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
+        // freshConnect exists ONLY to unstick a wedged .connecting state before a cold connect. If the pod
+        // is already healthily .connected, cancelling here would murder the live link (the self-inflicted
+        // disconnect that didDisconnect then mislabels a "drop"). Leave the connection alone.
+        if peripheral.state == .connected {
+            log.default("[connectOnDemand] freshConnect skipped — already connected to %{public}@", peripheral.identifier.uuidString)
+            pendingFreshConnectID = nil
+            return
+        }
         manager.cancelPeripheralConnection(peripheral)
         let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
         // Keep the session's peripheral reference in sync with the object we actually connect.
@@ -1201,6 +1209,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
+
+        // We are connected — any outstanding fresh-discovery cold-connect fallback is now moot. Clearing
+        // the token no-ops a still-pending 4s fallback timer (connectViaFreshDiscovery) so it cannot fire
+        // freshConnect() → cancelPeripheralConnection() against THIS live link. That stale-timer teardown,
+        // re-read by didDisconnect as an unintended "drop", was the root of the self-inflicted
+        // connect → cancel → "reconnecting after drop" → reconnect loop.
+        if pendingFreshConnectID == peripheral.identifier.uuidString {
+            pendingFreshConnectID = nil
+        }
 
         // Connected — stop the connect-helper scan (connectOnDemand started a light scan to speed the
         // connect). We don't scan while connected; the monitor scan is restored on the next disconnect.
