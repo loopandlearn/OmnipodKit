@@ -1082,7 +1082,16 @@ extension BluetoothManager: CBCentralManagerDelegate {
     /// the condition persists (re-wake quieting; lifted by resumeAlarmScanAfterAlertsCleared()).
     private func surfacePodConditionAndQuiet(alertSet: AlertSet) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
-        connectionDelegate?.omnipodDidDetectAlert(slots: alertSet)
+        // Notify the host OFF managerQueue. The delegate handles this synchronously by driving
+        // getPodStatus -> runSession -> bleRunSession -> peripheralManager(forIdentifier:), which does
+        // managerQueue.sync. This runs from didDiscover (already on managerQueue), so calling the delegate
+        // inline is a sync-to-self deadlock — it hung/crash-looped the app on a fresh launch when a DASH pod
+        // advertised a fault/alert before any connection had established BlePodComms.manager
+        // (loopandlearn/OmnipodKit#126). Quieting the alarm scan stays on managerQueue.
+        let delegate = connectionDelegate
+        DispatchQueue.global(qos: .userInitiated).async {
+            delegate?.omnipodDidDetectAlert(slots: alertSet)
+        }
         alarmScanSuppressed = true
         if manager.isScanning { manager.stopScan() }
     }
