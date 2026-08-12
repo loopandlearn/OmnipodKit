@@ -25,7 +25,7 @@
 	<key>com.loopkit.Loop.DeviceManufacturer</key>
 	<string>Insulet</string>
 	<key>com.loopkit.Loop.PumpManagerDisplayName</key>
-	<string>Omnipod Eros / Dash / 5</string>
+	<string>Omnipod Classic / DASH / 5</string>
 	<key>com.loopkit.Loop.PumpManagerIdentifier</key>
 	<string>Omni</string>
 </dict>
