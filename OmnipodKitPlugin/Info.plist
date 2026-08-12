@@ -22,8 +22,10 @@
 	<string>Copyright © 2025 LoopKit Authors. All rights reserved.</string>
 	<key>NSPrincipalClass</key>
 	<string>OmnipodKitPlugin.OmnipodPlugin</string>
+	<key>com.loopkit.Loop.DeviceManufacturer</key>
+	<string>Insulet</string>
 	<key>com.loopkit.Loop.PumpManagerDisplayName</key>
-	<string>All Omnipod Types</string>
+	<string>Omnipod Eros / Dash / 5</string>
 	<key>com.loopkit.Loop.PumpManagerIdentifier</key>
 	<string>Omni</string>
 </dict>
