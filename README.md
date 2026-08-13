@@ -10,7 +10,7 @@ OmnipodKit is a new universal Omnipod pump manager that
 * Simplifies future Open-Source Omnipod code maintenance
 
 To use the OmnipodKit pump manager,
-select `Omnipod Classic / DASH / 5` when adding a pump type in your
+select `Omnipod` when adding a pump type in your
 favorite iOS Open-Source Automated Insulin Delivery app.
 The actual Omnipod pod type will be selected during
 the pump manager initialization setup sequence.
