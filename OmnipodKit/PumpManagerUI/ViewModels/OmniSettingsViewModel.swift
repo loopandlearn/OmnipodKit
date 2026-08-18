@@ -283,7 +283,7 @@ class OmniSettingsViewModel: ObservableObject {
         // Trigger refresh
         pumpManager.getPodStatus() { _ in }
 
-        if pumpManager.podType.usesRileyLink {
+        if pumpManager.podType.isEros {
             pumpManager.updateRLConnectionStatus()
         }
     }

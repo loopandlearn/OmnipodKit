@@ -49650,6 +49650,9 @@
         }
       }
     },
+    "Pod keep alive enabled. Additional pod status request issued after 2 minutes.\n\nRequires a RileyLink-compatible device within Bluetooth range. Allows pod keep alive messages when app is in background. This method uses less iPhone battery and slightly more DASH battery than the Silent Tune method. A RileyLink-compatible device must be enabled in pump view." : {
+      "comment" : "Description for PodKeepAlive.rileyLink"
+    },
     "Pod keep alive enabled. Additional pod status request issued after 2 minutes.\n\nRequires a RileyLink-compatible device within Bluetooth range. Allows pod keep alive messages when app is in background. This method uses less iPhone battery and slightly more DASH battery than the Silent Tune method. The RileyLink-compatible device must be selected and be connected." : {
       "comment" : "Description for PodKeepAlive.rileyLink",
       "extractionState" : "manual",

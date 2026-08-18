@@ -313,12 +313,13 @@ class BluetoothManager: NSObject {
     /// live and in-app commands are instant. On background we disconnect and resume the heartbeat probe.
     private var isAppForeground = false
 
-    /// Set via BlePodComm.setPodKeepAlive() which is used by OmniPumpManager to track pump manager state.
-    var podKeepAlive: PodKeepAlive = .disabled
+    /// Set via BlePodComm.setPodKeepAliveKeepsConnectedInBackground() which is used by
+    /// OmniPumpManager to track podKeepAlive.keepsPodConnectedInBackground state.
+    var podKeepAliveKeepsConnectedInBackground = false
 
     /// True when the pod should be HELD connected rather than idle/background-disconnected — the gate that
-    /// suppresses connect-on-demand's disconnects. True while the app is foregrounded (foreground keep-alive)
-    /// OR whenever a *background* Pod Keep Alive mode (currrently only with silentTune for DASH pods) is
+    /// suppresses connect-on-demand's disconnects. True while the app is foregrounded (foreground
+    /// keep-alive), OR whenever a *background* Pod Keep Alive mode (silentTune / rileyLink — DASH only) is
     /// selected. Those modes exist for iPhone 16/17e + InPlay (Atlas) DASH pods where a disconnect→reconnect
     /// is unreliable, so the pod must stay connected and the keep-alive's periodic status refresh maintains
     /// the link. When Pod Keep Alive is `.disabled` (the default) OR `.whenOpen`, this collapses to exactly
@@ -326,7 +327,7 @@ class BluetoothManager: NSObject {
     /// managerQueue and cross-queue by PeripheralManager (benign bool race).
     var shouldHoldConnection: Bool {
         if isAppForeground { return true }
-        return podKeepAlive.keepsPodConnectedInBackground
+        return podKeepAliveKeepsConnectedInBackground
     }
 
     /// True once this PROCESS has ever been foregrounded. A [delayedConnect] with everFg=false means

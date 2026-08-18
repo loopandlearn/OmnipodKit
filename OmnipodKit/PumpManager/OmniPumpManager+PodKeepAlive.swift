@@ -54,7 +54,7 @@ extension OmniPumpManager {
     }
 
     /// Handles all the setup and teardown for timer based pod keep alive modes
-    func setPodKeepAliveTimerState(podKeepAlive: PodKeepAlive) {
+    func setPodKeepAliveTimerState(_ podKeepAlive: PodKeepAlive) {
         let now = Date()
         if state.podKeepAlive.usesTimerBasedKeepAlives {
             print("@@@ enabling pod keep alive timer for mode \(state.podKeepAlive) at \(timeStr(now))")
@@ -79,6 +79,33 @@ extension OmniPumpManager {
             print("@@@ disabling pod keep alive timer at \(timeStr(now))")
             gotPodResponseSetup(nil) // callbacks on pod responses no longer neededpwd
             podKeepAliveTimer?.invalidate()
+        }
+    }
+
+    func rileyLinkTimerDidTick() {
+        guard self.hasSetupPod else {
+            return
+        }
+
+        let now = Date()
+        let nowTimeStr = timeStr(now)
+
+        let lastResponseTime = state.podState?.podTimeUpdated ?? .distantPast
+
+        let refreshTargetTime = lastResponseTime.addingTimeInterval(podKeepAliveRefreshInterval)
+        let refreshTargetTimeStr = timeStr(refreshTargetTime)
+        print("@@@ RileyLinkTimerDidTick next refresh target time of \(timeStr(lastResponseTime)) + \(podKeepAliveRefreshInterval.timeIntervalStr) = \(refreshTargetTimeStr)")
+
+        let rileyLinkTickInterval: TimeInterval = .minutes(1)
+        let nextExpectedTickTime = now.addingTimeInterval(rileyLinkTickInterval)
+        let nextExpectedTickTimeStr = timeStr(nextExpectedTickTime)
+        print("@@@ next RileyLink tick expected at \(nowTimeStr) + \(rileyLinkTickInterval.timeIntervalStr) = \(nextExpectedTickTimeStr)")
+
+        let pad: TimeInterval = .seconds(5)
+        if refreshTargetTime < nextExpectedTickTime - pad {
+            print("@@@ RileyLinkTimerDidTick refreshTargetTime \(refreshTargetTimeStr) within \(pad.timeIntervalStr) before nextExpectedTickTime \(nextExpectedTickTimeStr)")
+            print("@@@ RileyLinkTimerDidTick calling getPodStatus at \(nowTimeStr)")
+            self.getPodStatus(canOptimize: false) { _ in }
         }
     }
 }

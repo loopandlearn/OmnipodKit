@@ -70,9 +70,9 @@ class BlePodComms: PodComms {
     }
 
     /// Sets bluetoothManager's podKeepAlive value to drive the pod connection policy.
-    func setPodKeepAlive(podKeepAlive: PodKeepAlive) {
-        print("@@@ setting bluetoothManager.podKeepAlive to \(podKeepAlive)")
-        bluetoothManager.podKeepAlive = podKeepAlive
+    func setPodKeepAliveKeepsConnectedInBackground(_ keepConnectedInBackground: Bool) {
+        print("@@@ setting bluetoothManager.podKeepAliveKeepsConnectedInBackground to \(keepConnectedInBackground)")
+        bluetoothManager.podKeepAliveKeepsConnectedInBackground = keepConnectedInBackground
     }
 
     func connectToNewPod(_ completion: @escaping (Result<Omni, Error>) -> Void) {
