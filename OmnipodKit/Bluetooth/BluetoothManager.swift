@@ -273,11 +273,11 @@ class BluetoothManager: NSObject {
         }
     }()
 
-    /// True on the iPhone controller generations that exhibit the LL deadlock: iPhone 16 family (incl.
-    /// 16e) = `iPhone17,x`, and iPhone 17 family (incl. 17e) = `iPhone18,x`. A safe superset — on any
-    /// unaffected model a healthy connect completes <1s and never trips the watchdog.
+    /// True on the iPhone models that exhibit the LL deadlock: the iPhone 16 family (all variants,
+    /// incl. 16e) = `iPhone17,x`, and the iPhone 17e specifically = `iPhone18,5`. Deliberately NOT the
+    /// rest of the iPhone 17 family (`iPhone18,1`-`18,4`) — those controllers are not affected.
     static var isEagerConnectDeviceModel: Bool {
-        deviceModelIdentifier.hasPrefix("iPhone17,") || deviceModelIdentifier.hasPrefix("iPhone18,")
+        deviceModelIdentifier.hasPrefix("iPhone17,") || deviceModelIdentifier == "iPhone18,5"
     }
 
 
