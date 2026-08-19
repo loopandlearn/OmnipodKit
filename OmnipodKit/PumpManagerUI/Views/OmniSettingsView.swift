@@ -317,6 +317,27 @@ struct OmniSettingsView: View  {
                 }
             }
 
+            // Persistent advisory for InPlay-variant pods on affected iPhone models (iPhone 16
+            // family / iPhone 17e): connection establishment can stall and is retried
+            // automatically, so slower-than-normal connects are expected. Tap for details.
+            if viewModel.connectionSlownessExpected {
+                Section {
+                    NavigationLink(destination: InPlayConnectionInfoView()) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(LocalizedString("Slower Connections Expected", comment: "Title of InPlay connection notice row"))
+                                    .font(Font.subheadline.weight(.semibold))
+                                Text(LocalizedString("This pod and phone combination can be slow to connect.", comment: "Subtitle of InPlay connection notice row"))
+                                    .font(.footnote)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+
             let lifeState = self.viewModel.lifeState
             Section(header: SectionHeader(label: LocalizedString("Actions", comment: "Section header for Actions section"))) {
                 // If need to pair a pod, display this as the only action

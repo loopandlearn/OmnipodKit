@@ -189,6 +189,14 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
+    /// Persistent advisory: this pod uses the InPlay BLE variant AND this iPhone model (iPhone 16
+    /// family / iPhone 17e) is known to trigger its firmware bug — connections can stall and are
+    /// automatically retried, so slower-than-normal connects are expected. Shown as a standing
+    /// notice in settings (with a detail view), not a transient alert.
+    var connectionSlownessExpected: Bool {
+        return pumpManager.iPhoneWithPossibleInPlayIssues && pumpManager.usingInPlayPod == true
+    }
+
     var isScheduledBasal: Bool {
         switch basalDeliveryState {
         case .active(_), .initiatingTempBasal:
