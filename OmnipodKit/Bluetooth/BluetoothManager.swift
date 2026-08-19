@@ -215,6 +215,71 @@ class BluetoothManager: NSObject {
         UserDefaults.standard.object(forKey: "OmnipodKit.scanningEnabled") as? Bool ?? true
     }
 
+    // MARK: - Eager connect (InPlay / iPhone 16-class LL-deadlock mitigation)
+
+    /// Master switch for the eager-connect watchdog. InPlay-firmware DASH pods (peripheral name
+    /// "InPlay BLE") silently ignore the LL_CONNECTION_PARAM_REQ control PDU; on iPhone 16-class
+    /// controllers iOS often issues that procedure early in a connect, deadlocking the LL procedure
+    /// queue so the connect wedges in `.connecting` with no callback (~7s until the pod terminates the
+    /// dead link, then iOS silently auto-retries — chains of invisible ~20s stalls). The watchdog caps
+    /// the cost: a connect that hasn't reached `.connected` within `eagerConnectWatchdogSeconds` is
+    /// presumed wedged, so we `cancelPeripheralConnection` (which tears the wedge down on-air, freeing
+    /// the pod to advertise again, and re-arms iOS's fast connection scan) and re-connect. Healthy
+    /// connects complete <1s and never trip it. Gated to affected phones + InPlay/unknown pods by
+    /// `shouldUseEagerConnect(for:)`. Default ON.
+    static var eagerConnectEnabled: Bool {
+        UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectEnabled") as? Bool ?? true
+    }
+
+    /// Apply the eager watchdog on ANY device, bypassing the iPhone-model gate — for bench A/B testing.
+    static var eagerConnectForceAllDevices: Bool {
+        UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectForceAllDevices") as? Bool ?? false
+    }
+
+    /// How long to wait for didConnect before presuming a connect is wedged (~3-5x the measured healthy
+    /// connect population of <1s).
+    static var eagerConnectWatchdogSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectWatchdogSeconds") as? Double) ?? 3.0
+    }
+
+    /// Pause after `cancelPeripheralConnection` before re-issuing `connect()`, to let the LL termination
+    /// land and the pod resume advertising (observed ~10ms; 200ms is comfortable margin).
+    static var eagerConnectTeardownSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectTeardownSeconds") as? Double) ?? 0.2
+    }
+
+    /// Overall budget for the eager cancel/retry cycle on an on-demand command connect. Kept just under
+    /// the PeripheralManager `runCommand` `.connect` timeout (20s) so the watchdog owns the retries
+    /// underneath that single wait (which only clears on a real didConnect).
+    static var eagerConnectBudgetSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 18.0
+    }
+
+    /// Overall budget for the eager cancel/retry cycle during pairing discovery — longer than one
+    /// wedge-cycle so a wedged first attempt doesn't consume the whole pairing window.
+    static var eagerPairingBudgetSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerPairingBudgetSeconds") as? Double) ?? 28.0
+    }
+
+    /// CoreBluetooth peripheral (advertised local) name of the affected InPlay-firmware DASH pod variant.
+    static let inPlayPeripheralName = "InPlay BLE"
+
+    /// hw.machine identifier of this device, e.g. "iPhone17,1". Computed once.
+    private static let deviceModelIdentifier: String = {
+        var sys = utsname()
+        uname(&sys)
+        return withUnsafeBytes(of: &sys.machine) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+        }
+    }()
+
+    /// True on the iPhone controller generations that exhibit the LL deadlock: iPhone 16 family (incl.
+    /// 16e) = `iPhone17,x`, and iPhone 17 family (incl. 17e) = `iPhone18,x`. A safe superset — on any
+    /// unaffected model a healthy connect completes <1s and never trips the watchdog.
+    static var isEagerConnectDeviceModel: Bool {
+        deviceModelIdentifier.hasPrefix("iPhone17,") || deviceModelIdentifier.hasPrefix("iPhone18,")
+    }
+
 
     /// Fallback start delay (seconds) for the delayed-connect probe when Loop hasn't supplied a heartbeat
     /// schedule (no `heartbeatTargetDate`). Normally the delay is computed from the CGM reading schedule —
@@ -398,11 +463,20 @@ class BluetoothManager: NSObject {
 
     /// Stamp the connect time and issue the connect, so didConnect can report the latency.
     private func timedConnect(_ peripheral: CBPeripheral) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
         if connectRequestedAt[peripheral.identifier.uuidString] == nil {
             connectRequestedAt[peripheral.identifier.uuidString] = Date()
         }
         let cm: CBCentralManager = manager
         cm.connect(peripheral, options: nil)
+        // Pairing/discovery connect: without a watchdog, a wedged connect was abandoned on the discovery
+        // timeout WITHOUT cancelling, leaving iOS silently re-wedging the pod — which then stops
+        // advertising and blinds the very scan trying to rediscover it. Arm the watchdog so a wedged
+        // pairing connect is cancelled (freeing the pod to advertise) and retried within the budget.
+        if shouldUseEagerConnect(for: peripheral) {
+            connectionDelegate?.omnipodLogDeviceEvent("[eager] pairing connect — arming watchdog")
+            armConnectWatchdog(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerPairingBudgetSeconds))
+        }
     }
 
     /// Issue a connect with CBConnectPeripheralOptionStartDelayKey and record the time — the pump-provided
@@ -731,6 +805,101 @@ class BluetoothManager: NSObject {
         manager.connect(target, options: nil)
     }
 
+    // MARK: - Eager connect watchdog (InPlay / iPhone 16-class)
+
+    /// Governing generation token per peripheral id — bumped on every arm/disarm so a stale scheduled
+    /// watchdog tick no-ops (same token pattern as `pendingFreshConnectID`).
+    private var connectWatchdogGeneration: [String: Int] = [:]
+
+    /// Peripheral ids currently under active watchdog management. While present, `didDisconnect` and
+    /// `didFailToConnect` must NOT independently reconnect (the watchdog's cancel fires those callbacks
+    /// and the watchdog itself owns the cancel/retry cycle — otherwise the handlers race it).
+    private var connectWatchdogActive: Set<String> = []
+
+    /// Whether the eager watchdog currently owns (re)connection for this peripheral.
+    private func isConnectWatchdogActive(_ peripheral: CBPeripheral) -> Bool {
+        connectWatchdogActive.contains(peripheral.identifier.uuidString)
+    }
+
+    /// Whether to use the eager cancel/retry connect strategy for this peripheral: the feature is on,
+    /// the phone is an affected model (or force-all is set), AND the pod is InPlay or its type isn't yet
+    /// known (pre-pairing / cold reconnect — we can't tell it's NOT InPlay). A pod whose name is known
+    /// and is not "InPlay BLE" opts out.
+    func shouldUseEagerConnect(for peripheral: CBPeripheral) -> Bool {
+        guard BluetoothManager.eagerConnectEnabled else { return false }
+        guard BluetoothManager.eagerConnectForceAllDevices || BluetoothManager.isEagerConnectDeviceModel else { return false }
+        if let name = peripheral.name, !name.isEmpty {
+            return name == BluetoothManager.inPlayPeripheralName
+        }
+        return true
+    }
+
+    /// Direct eager connect: skip the fresh-discovery scan (a known/recovered peripheral is reconnected
+    /// via `retrievePeripherals` + a plain `connect()`, which also re-arms iOS's fast connection scan)
+    /// and arm the watchdog. Used for on-demand command connects to affected pods.
+    private func eagerConnect(_ peripheral: CBPeripheral, deadline: Date) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+        if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
+            device.manager.peripheral = target
+        }
+        if manager.isScanning { manager.stopScan() }  // a concurrent scan starves connection completion on iOS
+        log.default("[eager] direct connect for %{public}@ (name=%{public}@)", target.identifier.uuidString, target.name ?? "?")
+        connectionDelegate?.omnipodLogDeviceEvent("[eager] direct connect (name=\(target.name ?? "?"))")
+        manager.connect(target, options: nil)
+        armConnectWatchdog(target, deadline: deadline)
+    }
+
+    /// Arm the eager-connect watchdog for `peripheral`. If it hasn't reached `.connected` within
+    /// `eagerConnectWatchdogSeconds`, presume the InPlay/iPhone-16 LL deadlock: log the (pathognomonic)
+    /// still-`.connecting` state, `cancelPeripheralConnection` to tear the wedge down on-air, wait
+    /// `eagerConnectTeardownSeconds`, then re-issue `connect()` and re-arm — until `deadline`. Disarmed
+    /// by `didConnect`. Runs entirely on `managerQueue`.
+    private func armConnectWatchdog(_ peripheral: CBPeripheral, deadline: Date) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        let id = peripheral.identifier.uuidString
+        let generation = (connectWatchdogGeneration[id] ?? 0) + 1
+        connectWatchdogGeneration[id] = generation
+        connectWatchdogActive.insert(id)
+        managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectWatchdogSeconds) { [weak self] in
+            guard let self = self, self.connectWatchdogGeneration[id] == generation else { return }  // stale / disarmed
+            let target = self.manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+            guard target.state != .connected else { self.disarmConnectWatchdog(target); return }
+            self.log.default("[eager] connect watchdog FIRED for %{public}@ state=%{public}d name=%{public}@ — cancelling wedged connect",
+                             id, target.state.rawValue, target.name ?? "?")
+            // Distinct telemetry: watchdog firing with state==connecting is pathognomonic for the wedge;
+            // tagging the pod name ("InPlay BLE") lets prevalence be measured per pod lot / phone model.
+            self.connectionDelegate?.omnipodLogDeviceEvent("[eager] watchdog fired state=\(target.state.rawValue) name=\(target.name ?? "?") — cancel+retry")
+            self.manager.cancelPeripheralConnection(target)
+            guard Date().addingTimeInterval(BluetoothManager.eagerConnectTeardownSeconds) < deadline else {
+                self.log.default("[eager] connect watchdog budget exhausted for %{public}@ — giving up", id)
+                self.disarmConnectWatchdog(target)
+                return
+            }
+            self.managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectTeardownSeconds) { [weak self] in
+                guard let self = self, self.connectWatchdogGeneration[id] == generation else { return }
+                let retryTarget = self.manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+                guard retryTarget.state != .connected else { self.disarmConnectWatchdog(retryTarget); return }
+                if let device = self.devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
+                    device.manager.peripheral = retryTarget
+                }
+                self.log.default("[eager] re-issuing connect for %{public}@ after teardown", id)
+                self.connectionDelegate?.omnipodLogDeviceEvent("[eager] re-issue connect")
+                self.manager.connect(retryTarget, options: nil)
+                self.armConnectWatchdog(retryTarget, deadline: deadline)
+            }
+        }
+    }
+
+    /// Invalidate any pending watchdog tick for this peripheral (bump the generation token).
+    private func disarmConnectWatchdog(_ peripheral: CBPeripheral) {
+        let id = peripheral.identifier.uuidString
+        connectWatchdogActive.remove(id)
+        if let gen = connectWatchdogGeneration[id] {
+            connectWatchdogGeneration[id] = gen + 1
+        }
+    }
+
     // MARK: - Central calls (MUST run on managerQueue)
     //
     // CBCentralManager was created with `managerQueue`, so every call into it has to be serialized on
@@ -760,6 +929,15 @@ class BluetoothManager: NSObject {
             manager.cancelPeripheralConnection(peripheral)
         }
         commandConnectInFlight = true
+        // Eager connect (InPlay / iPhone-16 mitigation): a known pod on an affected phone connects
+        // directly (skipping the fresh-discovery scan), with the watchdog cancelling and retrying any
+        // wedged attempt within a bounded budget instead of a single blind wait.
+        if shouldUseEagerConnect(for: peripheral) {
+            log.default("[eager] command connect for %{public}@", peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[eager] command connect")
+            eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
+            return
+        }
         // Fresh-discovery connect: briefly scan for the pod and connect on its just-heard advert
         // (~1-2s) instead of a bare cold connect() that waits out iOS's duty-cycled reacquisition
         // (~10-16s — the slow user-initiated Suspend). Falls back to a cold connect after 4s if the
@@ -1228,6 +1406,9 @@ extension BluetoothManager: CBCentralManagerDelegate {
             pendingFreshConnectID = nil
         }
 
+        // A completed connect satisfies the eager watchdog — invalidate any pending cancel/retry tick.
+        disarmConnectWatchdog(peripheral)
+
         // Connected — stop the connect-helper scan (connectOnDemand started a light scan to speed the
         // connect). We don't scan while connected; the monitor scan is restored on the next disconnect.
         if manager.isScanning {
@@ -1291,6 +1472,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         connectionDelegate?.omnipodPeripheralDidDisconnect(peripheral: peripheral, error: error)
 
+        // The eager watchdog owns this connect's cancel/retry cycle — its own cancelPeripheralConnection
+        // produced THIS callback. Do not independently reconnect (that would race the watchdog's retry,
+        // reviving the old cancel↔"reconnecting after drop" loop); the watchdog re-issues after teardown.
+        if isConnectWatchdogActive(peripheral) {
+            log.default("[eager] didDisconnect under active watchdog for %{public}@ — deferring reconnect to watchdog", peripheral.identifier.uuidString)
+            delayedProbeInFlight = false
+            return
+        }
+
         if autoConnectIDs.contains(peripheral.identifier.uuidString) {
             log.debug("Reconnecting disconnected autoconnect peripheral")
             autoReconnect(peripheral)
@@ -1328,6 +1518,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
         log.error("[#%{public}@] FAILED TO CONNECT: %{public}@ error=%{public}@", instanceID, peripheral, String(describing: error))
 
         connectionDelegate?.omnipodPeripheralDidFailToConnect(peripheral: peripheral, error: error)
+
+        // Under active watchdog: defer reconnection to it (don't start the idle scan / probe here, which
+        // would starve the watchdog's next connect attempt).
+        if isConnectWatchdogActive(peripheral) {
+            log.default("[eager] didFailToConnect under active watchdog for %{public}@ — deferring to watchdog", peripheral.identifier.uuidString)
+            delayedProbeInFlight = false
+            return
+        }
 
         if autoConnectIDs.contains(peripheral.identifier.uuidString) {
             autoReconnect(peripheral)
