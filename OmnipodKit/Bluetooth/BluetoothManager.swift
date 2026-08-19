@@ -239,7 +239,11 @@ class BluetoothManager: NSObject {
     /// How long to wait for didConnect before presuming a connect is wedged (~3-5x the measured healthy
     /// connect population of <1s).
     static var eagerConnectWatchdogSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectWatchdogSeconds") as? Double) ?? 3.0
+        // 2s: healthy connects complete sub-second (ATT ~90-280ms after capture on-air; 0-1s
+        // app-level), and a post-cancel retry cycle is ~1.3s — so 2s is ~2x margin over the healthy
+        // population while wasting ~1s less per wedge than the original 3s. A false trip costs only
+        // ~1s (one extra cancel/retry); watch the fired-but-healthy telemetry to validate.
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectWatchdogSeconds") as? Double) ?? 2.0
     }
 
     /// Pause after `cancelPeripheralConnection` before re-issuing `connect()`, to let the LL termination
@@ -249,10 +253,12 @@ class BluetoothManager: NSObject {
     }
 
     /// Overall budget for the eager cancel/retry cycle on an on-demand command connect. Kept just under
-    /// the PeripheralManager `runCommand` `.connect` timeout (20s) so the watchdog owns the retries
-    /// underneath that single wait (which only clears on a real didConnect).
+    /// the PeripheralManager `runCommand` `.connect` timeout (30s) so the watchdog owns the retries
+    /// underneath that single wait (which only clears on a real didConnect). Field data (2026-08-19,
+    /// InPlay + iPhone 16 Pro): 13/35 attempts exhausted the original 18s (~6 cycles); the beep capture
+    /// survived 5 straight wedges with ~2.6s to spare. 28s at a ~2.4s cycle gives ~11 attempts.
     static var eagerConnectBudgetSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 18.0
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 28.0
     }
 
     /// Overall budget for the eager cancel/retry cycle during pairing discovery — longer than one
@@ -933,6 +939,17 @@ class BluetoothManager: NSObject {
         // directly (skipping the fresh-discovery scan), with the watchdog cancelling and retrying any
         // wedged attempt within a bounded budget instead of a single blind wait.
         if shouldUseEagerConnect(for: peripheral) {
+            // Dedupe: two sessions racing (field logs show doubled command connects seconds apart)
+            // must not issue a second connect on top of a watchdog-managed one. If the watchdog
+            // already owns an in-flight connect attempt, just refresh its budget — re-arming bumps
+            // the generation token, superseding the old timer; the pending connect stays pending and
+            // didConnect satisfies every waiting session's .connect condition.
+            if isConnectWatchdogActive(peripheral), peripheral.state == .connecting {
+                log.default("[eager] command connect for %{public}@ — watchdog already managing an in-flight connect; refreshing budget", peripheral.identifier.uuidString)
+                connectionDelegate?.omnipodLogDeviceEvent("[eager] command connect — already in flight, refreshing budget")
+                armConnectWatchdog(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
+                return
+            }
             log.default("[eager] command connect for %{public}@", peripheral.identifier.uuidString)
             connectionDelegate?.omnipodLogDeviceEvent("[eager] command connect")
             eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
