@@ -135,10 +135,10 @@ extension PeripheralManager {
                 // disconnect-then-wait stalls). If already connected (burst of sessions), no-op.
                 if self.peripheral.state != .connected {
                     do {
-                        // 30s: sized above BluetoothManager.eagerConnectBudgetSeconds (28s) so the
+                        // 45s: sized above BluetoothManager.eagerConnectBudgetSeconds (40s) so the
                         // eager watchdog's cancel/retry cycles own the recovery underneath this
                         // single wait, rather than this timeout firing first.
-                        try self.connectOnDemand(timeout: 30)
+                        try self.connectOnDemand(timeout: 45)
                     } catch let error {
                         self.log.error("[connectOnDemand] on-demand connect failed: %{public}@", String(describing: error))
                     }

@@ -253,18 +253,19 @@ class BluetoothManager: NSObject {
     }
 
     /// Overall budget for the eager cancel/retry cycle on an on-demand command connect. Kept just under
-    /// the PeripheralManager `runCommand` `.connect` timeout (30s) so the watchdog owns the retries
+    /// the PeripheralManager `runCommand` `.connect` timeout (45s) so the watchdog owns the retries
     /// underneath that single wait (which only clears on a real didConnect). Field data (2026-08-19,
-    /// InPlay + iPhone 16 Pro): 13/35 attempts exhausted the original 18s (~6 cycles); the beep capture
-    /// survived 5 straight wedges with ~2.6s to spare. 28s at a ~2.4s cycle gives ~11 attempts.
+    /// InPlay + iPhone 16 Pro): per-attempt wedge probability is PER-POD (~55% and ~84% observed on two
+    /// pods). At 84%, 28s (~12 cycles) measured ~10% command failure (all budget exhaustions); 40s
+    /// (~17 cycles at ~2.3s) predicts ~5%. Failures self-heal on the next loop cycle.
     static var eagerConnectBudgetSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 28.0
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 40.0
     }
 
     /// Overall budget for the eager cancel/retry cycle during pairing discovery — longer than one
     /// wedge-cycle so a wedged first attempt doesn't consume the whole pairing window.
     static var eagerPairingBudgetSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerPairingBudgetSeconds") as? Double) ?? 28.0
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerPairingBudgetSeconds") as? Double) ?? 40.0
     }
 
     /// CoreBluetooth peripheral (advertised local) name of the affected InPlay-firmware DASH pod variant.
