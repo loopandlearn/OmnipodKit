@@ -1354,7 +1354,7 @@ extension OmniPumpManager {
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
 
-                            if self.usingInPlayPod == true && self.iPhoneWithPossibleInPlayIssues {
+                            if self.usingInPlayPod == true && UIDevice.hasPossibleInPlayBLEIssues {
                                 if Storage.shared.podKeepAlive.value == .disabled {
                                     // Enable the most conservative pod keep alive mode
                                     // that should work through the for pod setup process.
@@ -2205,13 +2205,6 @@ extension OmniPumpManager {
             self.log.error("Configure alerts %{public}@ failed: %{public}@", String(describing: podAlerts), String(describing: error))
             completion(.communication(error))
         }
-    }
-
-    // Running on any iPhone 16 or an iPhone 17e which are known
-    // to have BLE reconnect issues with InPlay BLE DASH pods?
-    // (Shared definition — also gates BluetoothManager's eager-connect watchdog.)
-    var iPhoneWithPossibleInPlayIssues: Bool {
-        return UIDevice.hasPossibleInPlayBLEIssues
     }
 
     // Using an InPlay BLE pod?

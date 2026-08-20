@@ -133,8 +133,8 @@ public extension UIDevice {
     /// True on the iPhone models known to trigger the InPlay BLE DASH pod firmware bug (the pod
     /// silently ignores LL_CONNECTION_PARAM_REQ, wedging connection establishment): the iPhone 16
     /// family (all variants, incl. 16e) and the iPhone 17e specifically. Deliberately NOT the rest
-    /// of the iPhone 17 family, which is unaffected. Single source of truth — used by both the
-    /// BluetoothManager eager-connect gate and OmniPumpManager's pod keep-alive/UI advisories.
+    /// of the iPhone 17 family, which is unaffected. Single source of truth for all affected-model
+    /// checks (eager-connect gate, pod keep-alive defaulting, settings advisory).
     static var hasPossibleInPlayBLEIssues: Bool {
         let model = UIDevice.modelName
         return model.contains("iPhone 16") || model == "iPhone 17e"

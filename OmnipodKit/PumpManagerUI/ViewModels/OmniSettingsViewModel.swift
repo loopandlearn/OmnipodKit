@@ -194,7 +194,7 @@ class OmniSettingsViewModel: ObservableObject {
     /// automatically retried, so slower-than-normal connects are expected. Shown as a standing
     /// notice in settings (with a detail view), not a transient alert.
     var connectionSlownessExpected: Bool {
-        return pumpManager.iPhoneWithPossibleInPlayIssues && pumpManager.usingInPlayPod == true
+        return UIDevice.hasPossibleInPlayBLEIssues && pumpManager.usingInPlayPod == true
     }
 
     var isScheduledBasal: Bool {
