@@ -269,23 +269,8 @@ class BluetoothManager: NSObject {
     }
 
     /// CoreBluetooth peripheral (advertised local) name of the affected InPlay-firmware DASH pod variant.
+    /// (OmniPumpManager's `usingInPlayPod` matches against this same constant.)
     static let inPlayPeripheralName = "InPlay BLE"
-
-    /// hw.machine identifier of this device, e.g. "iPhone17,1". Computed once.
-    private static let deviceModelIdentifier: String = {
-        var sys = utsname()
-        uname(&sys)
-        return withUnsafeBytes(of: &sys.machine) { raw in
-            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
-        }
-    }()
-
-    /// True on the iPhone models that exhibit the LL deadlock: the iPhone 16 family (all variants,
-    /// incl. 16e) = `iPhone17,x`, and the iPhone 17e specifically = `iPhone18,5`. Deliberately NOT the
-    /// rest of the iPhone 17 family (`iPhone18,1`-`18,4`) — those controllers are not affected.
-    static var isEagerConnectDeviceModel: Bool {
-        deviceModelIdentifier.hasPrefix("iPhone17,") || deviceModelIdentifier == "iPhone18,5"
-    }
 
 
     /// Fallback start delay (seconds) for the delayed-connect probe when Loop hasn't supplied a heartbeat
@@ -834,7 +819,7 @@ class BluetoothManager: NSObject {
     /// and is not "InPlay BLE" opts out.
     func shouldUseEagerConnect(for peripheral: CBPeripheral) -> Bool {
         guard BluetoothManager.eagerConnectEnabled else { return false }
-        guard BluetoothManager.eagerConnectForceAllDevices || BluetoothManager.isEagerConnectDeviceModel else { return false }
+        guard BluetoothManager.eagerConnectForceAllDevices || UIDevice.hasPossibleInPlayBLEIssues else { return false }
         if let name = peripheral.name, !name.isEmpty {
             return name == BluetoothManager.inPlayPeripheralName
         }

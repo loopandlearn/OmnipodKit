@@ -2209,21 +2209,16 @@ extension OmniPumpManager {
 
     // Running on any iPhone 16 or an iPhone 17e which are known
     // to have BLE reconnect issues with InPlay BLE DASH pods?
+    // (Shared definition — also gates BluetoothManager's eager-connect watchdog.)
     var iPhoneWithPossibleInPlayIssues: Bool {
-
-        let iPhoneModel = UIDevice.modelName
-        if iPhoneModel.contains("iPhone 16") || iPhoneModel == "iPhone 17e" {
-            return true
-        }
-
-        return false
+        return UIDevice.hasPossibleInPlayBLEIssues
     }
 
     // Using an InPlay BLE pod?
     var usingInPlayPod: Bool? {
 
         if let blePodComms = podComms as? BlePodComms, let deviceBLEName = blePodComms.manager?.peripheral.name {
-            return deviceBLEName == "InPlay BLE"
+            return deviceBLEName == BluetoothManager.inPlayPeripheralName
         }
         return nil // don't know -- maybe not paired yet
     }
