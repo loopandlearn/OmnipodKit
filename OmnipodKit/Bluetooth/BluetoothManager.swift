@@ -838,6 +838,11 @@ class BluetoothManager: NSObject {
     /// watchdog tick no-ops (same token pattern as `pendingFreshConnectID`).
     private var connectWatchdogGeneration: [String: Int] = [:]
 
+    /// Peripheral ids with a system auto-reconnect in progress (didDisconnect reported
+    /// isReconnecting=true), keyed to when we learned of it — used to measure and log the
+    /// re-establishment latency when didConnect completes it.
+    private var autoReconnectPendingSince: [String: Date] = [:]
+
     /// Peripheral ids currently under active watchdog management. While present, `didDisconnect` and
     /// `didFailToConnect` must NOT independently reconnect (the watchdog's cancel fires those callbacks
     /// and the watchdog itself owns the cancel/retry cycle — otherwise the handlers race it).
@@ -1462,6 +1467,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
         // A completed connect satisfies the eager watchdog — invalidate any pending cancel/retry tick.
         disarmConnectWatchdog(peripheral)
 
+        // If this connect completes a system auto-reconnect (EnableAutoReconnect experiment), log the
+        // measured re-establishment latency — the key observable for the experiment.
+        if let since = autoReconnectPendingSince.removeValue(forKey: peripheral.identifier.uuidString) {
+            let latency = Date().timeIntervalSince(since)
+            log.default("[autoReconnect] link RE-ESTABLISHED by system after %{public}.1fs for %{public}@", latency, peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[autoReconnect] link re-established by system after \(String(format: "%.1f", latency))s")
+        }
+
         // Connected — stop the connect-helper scan (connectOnDemand started a light scan to speed the
         // connect). We don't scan while connected; the monitor scan is restored on the next disconnect.
         if manager.isScanning {
@@ -1549,6 +1562,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
         // eager watchdog (if active) stays armed as a bounded supervisor: its cancel would also cancel
         // the system's auto-reconnect before re-issuing a supervised connect.
         if isReconnecting {
+            autoReconnectPendingSince[peripheral.identifier.uuidString] = Date()
             delayedProbeInFlight = false
             return
         }
