@@ -268,6 +268,25 @@ class BluetoothManager: NSObject {
         (UserDefaults.standard.object(forKey: "OmnipodKit.eagerPairingBudgetSeconds") as? Double) ?? 40.0
     }
 
+    /// EXPERIMENT: pass CBConnectPeripheralOptionEnableAutoReconnect (iOS 17+) on eager connects, to
+    /// probe whether it changes the low-level stack's reacquisition behavior on wedge-prone pods.
+    /// With it, an unexpected post-establishment drop is auto-reconnected by the system, reported via
+    /// centralManager(_:didDisconnectPeripheral:timestamp:isReconnecting:error:) with
+    /// isReconnecting=true (we then defer to the system; didConnect fires on re-establishment). An
+    /// explicit cancelPeripheralConnection (idle-disconnect, watchdog) still cancels any pending
+    /// auto-reconnect, so the normally-disconnected model is unaffected.
+    static var eagerAutoReconnectEnabled: Bool {
+        UserDefaults.standard.object(forKey: "OmnipodKit.eagerAutoReconnectEnabled") as? Bool ?? true
+    }
+
+    /// Connect options for eager connects (auto-reconnect experiment when enabled and available).
+    private var eagerConnectOptions: [String: Any]? {
+        if #available(iOS 17.0, *), BluetoothManager.eagerAutoReconnectEnabled {
+            return [CBConnectPeripheralOptionEnableAutoReconnect: true]
+        }
+        return nil
+    }
+
     /// CoreBluetooth peripheral (advertised local) name of the affected InPlay-firmware DASH pod variant.
     /// (OmniPumpManager's `usingInPlayPod` matches against this same constant.)
     static let inPlayPeripheralName = "InPlay BLE"
@@ -838,7 +857,7 @@ class BluetoothManager: NSObject {
         if manager.isScanning { manager.stopScan() }  // a concurrent scan starves connection completion on iOS
         log.default("[eager] direct connect for %{public}@ (name=%{public}@)", target.identifier.uuidString, target.name ?? "?")
         connectionDelegate?.omnipodLogDeviceEvent("[eager] direct connect (name=\(target.name ?? "?"))")
-        manager.connect(target, options: nil)
+        manager.connect(target, options: eagerConnectOptions)
         armConnectWatchdog(target, deadline: deadline)
     }
 
@@ -877,7 +896,7 @@ class BluetoothManager: NSObject {
                 }
                 self.log.default("[eager] re-issuing connect for %{public}@ after teardown", id)
                 self.connectionDelegate?.omnipodLogDeviceEvent("[eager] re-issue connect")
-                self.manager.connect(retryTarget, options: nil)
+                self.manager.connect(retryTarget, options: self.eagerConnectOptions)
                 self.armConnectWatchdog(retryTarget, deadline: deadline)
             }
         }
@@ -1478,10 +1497,29 @@ extension BluetoothManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        handleDisconnect(central, peripheral: peripheral, error: error, isReconnecting: false)
+    }
+
+    /// iOS 17+ variant: when implemented, CoreBluetooth calls this INSTEAD of the classic
+    /// didDisconnectPeripheral for all disconnects. `isReconnecting == true` means the connect was made
+    /// with CBConnectPeripheralOptionEnableAutoReconnect and the SYSTEM is re-establishing the link
+    /// itself (didConnect will fire again on success) — so we log it distinctly and skip our own
+    /// reconnection machinery for that case.
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: Error?) {
+        let age = CFAbsoluteTimeGetCurrent() - timestamp
+        log.default("[autoReconnect] didDisconnect(timestamp:isReconnecting:) isReconnecting=%{public}@ eventAge=%{public}.3fs error=%{public}@",
+                    String(describing: isReconnecting), age, String(describing: error))
+        if isReconnecting {
+            connectionDelegate?.omnipodLogDeviceEvent("[autoReconnect] system auto-reconnecting (drop \(String(format: "%.1f", age))s ago, error=\(error.map { String(describing: $0) } ?? "nil"))")
+        }
+        handleDisconnect(central, peripheral: peripheral, error: error, isReconnecting: isReconnecting)
+    }
+
+    private func handleDisconnect(_ central: CBCentralManager, peripheral: CBPeripheral, error: Error?, isReconnecting: Bool) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
-        log.default("[#%{public}@] DISCONNECTED: %{public}@ error=%{public}@ willReconnect=%{public}@", instanceID, peripheral,
-                    String(describing: error), String(describing: autoConnectIDs.contains(peripheral.identifier.uuidString)))
+        log.default("[#%{public}@] DISCONNECTED: %{public}@ error=%{public}@ willReconnect=%{public}@ systemReconnecting=%{public}@", instanceID, peripheral,
+                    String(describing: error), String(describing: autoConnectIDs.contains(peripheral.identifier.uuidString)), String(describing: isReconnecting))
 
         // Proxy disconnection events to peripheral manager
         for device in devices where device.manager.peripheral.identifier == peripheral.identifier {
@@ -1489,6 +1527,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
         }
 
         connectionDelegate?.omnipodPeripheralDidDisconnect(peripheral: peripheral, error: error)
+
+        // The system is auto-reconnecting this link itself (EnableAutoReconnect experiment): defer to
+        // it — no app-side reconnect, no probe re-arm; didConnect fires when it re-establishes. The
+        // eager watchdog (if active) stays armed as a bounded supervisor: its cancel would also cancel
+        // the system's auto-reconnect before re-issuing a supervised connect.
+        if isReconnecting {
+            delayedProbeInFlight = false
+            return
+        }
 
         // The eager watchdog owns this connect's cancel/retry cycle — its own cancelPeripheralConnection
         // produced THIS callback. Do not independently reconnect (that would race the watchdog's retry,
