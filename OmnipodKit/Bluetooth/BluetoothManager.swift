@@ -336,8 +336,13 @@ class BluetoothManager: NSObject {
     /// ~1 min before the next cycle every time — paying a storm per cycle anyway). If cycles stop
     /// (CGM gap, app suspended), the pod still disconnects at this deadline and the background
     /// heartbeat probe re-arms as designed.
+    ///
+    /// Default 3600 (hold-while-looping): field data (2026-08-20) showed cycle cadence varies 3-5 min,
+    /// and both 60s and 240s windows repeatedly hung up <1 min before the next cycle — paying a wedge
+    /// storm each time for nothing. Every command resets the timer, so any activity within the hour
+    /// keeps the link; a true idle hour still releases the pod (advertising/probe/fault-scan resume).
     static var eagerIdleDisconnectSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerIdleDisconnectSeconds") as? Double) ?? 240
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerIdleDisconnectSeconds") as? Double) ?? 3600
     }
 
     /// Candidate DASH alarm-state service UUIDs to filter on in low-power mode.
