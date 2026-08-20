@@ -664,7 +664,17 @@ extension PeripheralManager {
     /// hold the connection separately via `shouldHoldConnection`, so this delay only bites while backgrounded.)
     private func scheduleIdleDisconnectIfNeeded() {
         guard BluetoothManager.connectOnDemandEnabled else { return }
-        let idleDelay: TimeInterval = BluetoothManager.idleDisconnectSeconds
+        // Eager-gated pods (InPlay + affected iPhone): reconnecting costs a wedge storm (median ~10s,
+        // worst ~30s+), so a working connection is precious. Use a much longer idle window so one loop
+        // cycle's status→compute→dose burst (sessions ~10-25s apart) shares a single connection instead
+        // of paying 2-3 storms per cycle. The cycle still ends disconnected — the heartbeat probe
+        // re-arms ~a minute after the last command, well before the next CGM reading.
+        let idleDelay: TimeInterval
+        if bluetoothManager?.shouldUseEagerConnect(for: peripheral) == true {
+            idleDelay = BluetoothManager.eagerIdleDisconnectSeconds
+        } else {
+            idleDelay = BluetoothManager.idleDisconnectSeconds
+        }
         let idleAt = idleStart
         queue.asyncAfter(deadline: .now() + idleDelay) { [weak self] in
             guard let self = self, BluetoothManager.connectOnDemandEnabled else { return }

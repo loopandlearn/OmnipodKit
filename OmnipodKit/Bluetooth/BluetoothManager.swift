@@ -329,6 +329,15 @@ class BluetoothManager: NSObject {
         (UserDefaults.standard.object(forKey: "OmnipodKit.idleDisconnectSeconds") as? Double) ?? 4
     }
 
+    /// Idle-disconnect delay for eager-gated pods (InPlay + affected iPhone), where every reconnect
+    /// risks a wedge storm (median ~10s, worst ~30s+ measured). Long enough that one loop cycle's
+    /// status→compute→dose burst (sessions ~10-25s apart) shares a single connection — trading a
+    /// little extra connection time for 1 storm per cycle instead of 2-3. The pod still ends each
+    /// cycle disconnected, so the background heartbeat probe re-arms normally.
+    static var eagerIdleDisconnectSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerIdleDisconnectSeconds") as? Double) ?? 60
+    }
+
     /// Candidate DASH alarm-state service UUIDs to filter on in low-power mode.
     /// - `C005`: CONFIRMED 16-bit alarm 2nd-UUID on this pod (expiration reminder). Extend as more
     ///   alert/alarm types are captured.
