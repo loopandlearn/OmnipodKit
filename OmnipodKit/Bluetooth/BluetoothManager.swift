@@ -1538,8 +1538,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
         let age = CFAbsoluteTimeGetCurrent() - timestamp
         log.default("[autoReconnect] didDisconnect(timestamp:isReconnecting:) isReconnecting=%{public}@ eventAge=%{public}.3fs error=%{public}@",
                     String(describing: isReconnecting), age, String(describing: error))
+        // Log EVERY invocation to the device log (not just isReconnecting==true), so an Issue Report
+        // proves whether iOS is calling this iOS-17+ signature at all — otherwise "no [autoReconnect]
+        // events" is ambiguous between "never called" and "called with isReconnecting=false".
+        let errStr = error.map { String(describing: $0) } ?? "nil"
         if isReconnecting {
-            connectionDelegate?.omnipodLogDeviceEvent("[autoReconnect] system auto-reconnecting (drop \(String(format: "%.1f", age))s ago, error=\(error.map { String(describing: $0) } ?? "nil"))")
+            connectionDelegate?.omnipodLogDeviceEvent("[autoReconnect] system auto-reconnecting (drop \(String(format: "%.1f", age))s ago, error=\(errStr))")
+        } else {
+            connectionDelegate?.omnipodLogDeviceEvent("[autoReconnect] didDisconnect isReconnecting=false (eventAge \(String(format: "%.1f", age))s, error=\(errStr))")
         }
         handleDisconnect(central, peripheral: peripheral, error: error, isReconnecting: isReconnecting)
     }
