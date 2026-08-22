@@ -238,6 +238,13 @@ class BluetoothManager: NSObject {
 
     /// How long to wait for didConnect before presuming a connect is wedged (~3-5x the measured healthy
     /// connect population of <1s).
+    /// Watchdog interval while the app is FOREGROUND. The user may be waiting to bolus, so retry
+    /// harder: a wedge is unrecoverable by waiting and a cancel/retry cycle costs ~1.3s, so a shorter
+    /// deadline strictly reduces time-to-connect at the cost of a few extra (cheap) retries.
+    static var eagerConnectForegroundWatchdogSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectForegroundWatchdogSeconds") as? Double) ?? 1.5
+    }
+
     static var eagerConnectWatchdogSeconds: TimeInterval {
         // 2s: healthy connects complete sub-second (ATT ~90-280ms after capture on-air; 0-1s
         // app-level), and a post-cancel retry cycle is ~1.3s — so 2s is ~2x margin over the healthy
@@ -838,6 +845,10 @@ class BluetoothManager: NSObject {
     /// watchdog tick no-ops (same token pattern as `pendingFreshConnectID`).
     private var connectWatchdogGeneration: [String: Int] = [:]
 
+    /// When we began waiting for a connection with the app foregrounded (per peripheral id), for the
+    /// user-visible foreground time-to-connect metric.
+    private var foregroundConnectWaitSince: [String: Date] = [:]
+
     /// Peripheral ids with a system auto-reconnect in progress (didDisconnect reported
     /// isReconnecting=true), keyed to when we learned of it — used to measure and log the
     /// re-establishment latency when didConnect completes it.
@@ -893,7 +904,9 @@ class BluetoothManager: NSObject {
         let generation = (connectWatchdogGeneration[id] ?? 0) + 1
         connectWatchdogGeneration[id] = generation
         connectWatchdogActive.insert(id)
-        managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectWatchdogSeconds) { [weak self] in
+        let interval = isAppForeground ? BluetoothManager.eagerConnectForegroundWatchdogSeconds
+                                       : BluetoothManager.eagerConnectWatchdogSeconds
+        managerQueue.asyncAfter(deadline: .now() + interval) { [weak self] in
             guard let self = self, self.connectWatchdogGeneration[id] == generation else { return }  // stale / disarmed
             let target = self.manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
             guard target.state != .connected else { self.disarmConnectWatchdog(target); return }
@@ -1003,10 +1016,45 @@ class BluetoothManager: NSObject {
     private func enterForeground() {
         dispatchPrecondition(condition: .onQueue(managerQueue))
         isAppForeground = true
-        if let peripheral = keepAlivePeripheral, peripheral.state == .disconnected {
+        guard let peripheral = keepAlivePeripheral else { return }
+        switch peripheral.state {
+        case .connected, .disconnecting:
+            return
+        case .disconnected:
             log.default("[connectOnDemand] foreground — pre-connecting for keep-alive")
             connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] foreground — pre-connecting for keep-alive")
+            noteForegroundConnectWait(peripheral)
             beginCommandConnect(peripheral)
+        case .connecting:
+            // The user is looking at the app and may want to bolus NOW. A `.connecting` peripheral here
+            // is either a slow system reacquisition or a wedge — either way, waiting it out is the worst
+            // option. If nothing is supervising it, cancel and restart the eager cycle immediately; if
+            // the watchdog already owns it, re-arm so it runs on the (shorter) foreground interval.
+            noteForegroundConnectWait(peripheral)
+            if isConnectWatchdogActive(peripheral) {
+                log.default("[foreground] connect in flight under watchdog — re-arming on foreground interval")
+                connectionDelegate?.omnipodLogDeviceEvent("[foreground] re-arming watchdog on foreground interval")
+                armConnectWatchdog(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
+            } else if shouldUseEagerConnect(for: peripheral) {
+                log.default("[foreground] unsupervised connect in flight — cancelling and reconnecting eagerly")
+                connectionDelegate?.omnipodLogDeviceEvent("[foreground] cancelling stale in-flight connect, reconnecting eagerly")
+                manager.cancelPeripheralConnection(peripheral)
+                managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectTeardownSeconds) { [weak self] in
+                    guard let self = self, self.isAppForeground, peripheral.state != .connected else { return }
+                    self.beginCommandConnect(peripheral)
+                }
+            }
+        @unknown default:
+            return
+        }
+    }
+
+    /// Stamp the moment we started waiting for a connection with the app in the foreground, so
+    /// `didConnect` can report the user-visible "how long until the app could talk to the pod" latency.
+    private func noteForegroundConnectWait(_ peripheral: CBPeripheral) {
+        let id = peripheral.identifier.uuidString
+        if foregroundConnectWaitSince[id] == nil {
+            foregroundConnectWaitSince[id] = Date()
         }
     }
 
@@ -1466,6 +1514,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         // A completed connect satisfies the eager watchdog — invalidate any pending cancel/retry tick.
         disarmConnectWatchdog(peripheral)
+
+        // Foreground time-to-connect: the user-facing number (how long after opening the app before we
+        // could talk to the pod).
+        if let since = foregroundConnectWaitSince.removeValue(forKey: peripheral.identifier.uuidString) {
+            let latency = Date().timeIntervalSince(since)
+            log.default("[foreground] connected %{public}.1fs after foreground wait began", latency)
+            connectionDelegate?.omnipodLogDeviceEvent("[foreground] connected \(String(format: "%.1f", latency))s after foregrounding")
+        }
 
         // If this connect completes a system auto-reconnect (EnableAutoReconnect experiment), log the
         // measured re-establishment latency — the key observable for the experiment.
