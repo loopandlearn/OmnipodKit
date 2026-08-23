@@ -68,6 +68,7 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
+    // Used for internal logging purposes
     var briefName: String {
         switch podType {
         case .productIdUnknown:
@@ -81,18 +82,6 @@ struct PodType: CustomStringConvertible, Equatable {
         default:
             return "Unknown"
         }
-    }
-
-    var fullName: String {
-        if let podType = podType {
-            switch podType {
-            case .productIdEros, .productIdDash, .productIdOmnipod5:
-                return String(format: "Product ID %d %@", rawValue, description)
-            default:
-                break
-            }
-        }
-        return String(format: "Unknown Omnipod Product ID %d", rawValue)
     }
 
     // DASH uses a blue tab while both Eros and 05 pods use a clear tab
