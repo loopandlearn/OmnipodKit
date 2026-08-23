@@ -28,7 +28,7 @@ struct PairPodView: View {
                 Spacer()
                 Spacer()
                 HStack {
-                    InstructionList(instructions: self.viewModel.podType.usesRileyLink ?
+                    InstructionList(instructions: self.viewModel.podType.isEros ?
                         [
                             String(format: LocalizedString("Fill a new %1$@ pod with U-100 Insulin (leave %2$@ needle cap on). Listen for 2 beeps.",
                                 comment: "Label text for step 1 of Eros pair pod instructions (1: pod type name) (2: pod tab color"),
