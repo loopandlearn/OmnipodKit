@@ -312,8 +312,10 @@ class BluetoothManager: NSObject {
     /// idle-disconnect, reconnect on an unintended drop) so connection-gated UI (test beeps, etc.) is
     /// live and in-app commands are instant. On background we disconnect and resume the heartbeat probe.
     private var isAppForeground = false
-    /// Cross-queue read for PeripheralManager's idle-disconnect (benign bool race, like everForeground).
-    var appIsForeground: Bool { isAppForeground }
+
+    /// Set via BlePodComm.setPodKeepAliveKeepsConnectedInBackground() which is used by
+    /// OmniPumpManager to track podKeepAlive.keepsPodConnectedInBackground state.
+    var podKeepAliveKeepsConnectedInBackground = false
 
     /// True when the pod should be HELD connected rather than idle/background-disconnected — the gate that
     /// suppresses connect-on-demand's disconnects. True while the app is foregrounded (foreground
@@ -322,10 +324,10 @@ class BluetoothManager: NSObject {
     /// is unreliable, so the pod must stay connected and the keep-alive's periodic status refresh maintains
     /// the link. When Pod Keep Alive is `.disabled` (the default) OR `.whenOpen`, this collapses to exactly
     /// `isAppForeground` — i.e. no change from the validated connect-on-demand behavior. Read from
-    /// managerQueue and cross-queue by PeripheralManager (benign bool race, like appIsForeground).
+    /// managerQueue and cross-queue by PeripheralManager (benign bool race).
     var shouldHoldConnection: Bool {
         if isAppForeground { return true }
-        return podType.isDash && Storage.shared.podKeepAlive.value.keepsPodConnectedInBackground
+        return podKeepAliveKeepsConnectedInBackground
     }
 
     /// True once this PROCESS has ever been foregrounded. A [delayedConnect] with everFg=false means
@@ -714,6 +716,14 @@ class BluetoothManager: NSObject {
     /// lingering iOS-side connection intent and re-fetch the peripheral before connecting.
     private func freshConnect(_ peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
+        // freshConnect exists ONLY to unstick a wedged .connecting state before a cold connect. If the pod
+        // is already healthily .connected, cancelling here would murder the live link (the self-inflicted
+        // disconnect that didDisconnect then mislabels a "drop"). Leave the connection alone.
+        if peripheral.state == .connected {
+            log.default("[connectOnDemand] freshConnect skipped — already connected to %{public}@", peripheral.identifier.uuidString)
+            pendingFreshConnectID = nil
+            return
+        }
         manager.cancelPeripheralConnection(peripheral)
         let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
         // Keep the session's peripheral reference in sync with the object we actually connect.
@@ -1074,7 +1084,16 @@ extension BluetoothManager: CBCentralManagerDelegate {
     /// the condition persists (re-wake quieting; lifted by resumeAlarmScanAfterAlertsCleared()).
     private func surfacePodConditionAndQuiet(alertSet: AlertSet) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
-        connectionDelegate?.omnipodDidDetectAlert(slots: alertSet)
+        // Notify the host OFF managerQueue. The delegate handles this synchronously by driving
+        // getPodStatus -> runSession -> bleRunSession -> peripheralManager(forIdentifier:), which does
+        // managerQueue.sync. This runs from didDiscover (already on managerQueue), so calling the delegate
+        // inline is a sync-to-self deadlock — it hung/crash-looped the app on a fresh launch when a DASH pod
+        // advertised a fault/alert before any connection had established BlePodComms.manager
+        // (loopandlearn/OmnipodKit#126). Quieting the alarm scan stays on managerQueue.
+        let delegate = connectionDelegate
+        DispatchQueue.global(qos: .userInitiated).async {
+            delegate?.omnipodDidDetectAlert(slots: alertSet)
+        }
         alarmScanSuppressed = true
         if manager.isScanning { manager.stopScan() }
     }
@@ -1184,7 +1203,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
                     timedConnect(peripheral)  // pairing — an explicit connect, not auto-reconnect
                 }
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
-                log.debug("Reonnecting to autoconnect device")
+                log.debug("Reconnecting to autoconnect device")
                 autoReconnect(peripheral)
             } else {
                 log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
@@ -1201,6 +1220,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
+
+        // We are connected — any outstanding fresh-discovery cold-connect fallback is now moot. Clearing
+        // the token no-ops a still-pending 4s fallback timer (connectViaFreshDiscovery) so it cannot fire
+        // freshConnect() → cancelPeripheralConnection() against THIS live link. That stale-timer teardown,
+        // re-read by didDisconnect as an unintended "drop", was the root of the self-inflicted
+        // connect → cancel → "reconnecting after drop" → reconnect loop.
+        if pendingFreshConnectID == peripheral.identifier.uuidString {
+            pendingFreshConnectID = nil
+        }
 
         // Connected — stop the connect-helper scan (connectOnDemand started a light scan to speed the
         // connect). We don't scan while connected; the monitor scan is restored on the next disconnect.

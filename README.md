@@ -1,37 +1,43 @@
 # OmnipodKit
+Universal Omnipod Pump Manager for iOS Open-Source Automated Insulin Delivery (OS-AID) systems.
 
-## Overview
-
+## Description
 OmnipodKit is a new universal Omnipod pump manager that
 
-* Handles all supported Omnipod types
-* Simplifies future DIY Omnipod code maintenance
-* Has a number of improvements and updates for Omnipod support
-* Will be replacing both OmniKit (Eros) and OmniBLE (Dash)
+* Handles all supported Omnipod types (Omnipod 5, DASH, and Eros)
+* Includes a number of improvements and updates for Omnipod support
+* Supersedes both the OmniBLE and OmniKit pump managers
+* Simplifies future Open-Source Omnipod code maintenance
 
-To select the new OmnipodKit pump manager,
-select `All Omnipod Types` when doing an `Add Pump`.
+To use the OmnipodKit pump manager,
+select `All Omnipod Types` when adding a pump type in your
+favorite iOS Open-Source Automated Insulin Delivery app.
 The actual Omnipod pod type will be selected during
 the pump manager initialization setup sequence.
-After deactivating a pod when using the OmnipodKit pump manager,
+When there is no active pod,
 you can switch to either a different pod type OR
-to another completely different pump manager
-by scrolling to the bottom of the pod settings view and tapping on
+to different pump manager by scrolling to the bottom
+of the pod settings view and tapping on
 `Switch to another pod or pump type`.
 
-The `Omnipod` (OmniKit) and `Omnipod DASH` (OmniBLE) pump managers
-currently displayed with `Add Pump` are the original unmodified
-pump managers which maintain their own separate pump manager state.
-Currently if you already have an active pod session using a previous pump manager, you must wait until that pod session is completed and you deactivated the pod. 
+The OmniBLE and OmniKit pump managers are no longer
+included in current versions of iOS OS-AID apps,
+When an older version of an iOS OS-AID app using
+the OmniBLE and OmniKit pump managers is replaced by a more
+modern version of the app using the OmnipodKit pump manager,
+OmnipodKit will automatically handle the conversion of
+any saved OmniBLE or OmniKit state upon start up
+(including for a currently active pod).
 
-After the pod is deactivated:
+## Status
+This repository contains code being used by current versions
+of several iOS OS-AID systems including Loop and Trio.
+This repository is derived from and supersedes both the
+OmniBLE (DASH) and OmniKit (Eros) repositories and
+includes support for the Omnipod 5 pod type.
 
-* Scroll to the bottom of the Omnipod screen and select `Switch to other insulin delivery device`
-* From the main OS-AID screen, tap on `Add Pump`
-* Select `All Omnipod Types`
-   * Follow the onboarding prompts until you get to the pod selection screen
-   * Select your pod type and continue
+## For more information on Loop
+Please join loop zulipchat at https://loop.zulipchat.com
 
-Eventually the OmniKit and OmniBLE pump manager will be replaced by OmnipodKit.
-When this happens, OmnipodKit can handle the conversion of
-any OmniKit or OmniBLE state (including an active pod).
+## For more information on Trio
+Please join loop Discord at https://discord.triodocs.org
