@@ -292,7 +292,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
 
             let view = hostingController(rootView: PairPodView(viewModel: viewModel).onAppear(perform: {UIApplication.shared.isIdleTimerDisabled = true}), onDisappear: {UIApplication.shared.isIdleTimerDisabled = false})
-            view.navigationItem.title = String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), pumpManager.podType.briefName)
+            view.navigationItem.title = String(format: LocalizedString("Pair Pod", comment: "Title for pair pod screen"))
             view.navigationItem.backButtonDisplayMode = .generic
             return view
 
