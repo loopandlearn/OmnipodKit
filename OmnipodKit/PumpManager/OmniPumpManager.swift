@@ -237,6 +237,23 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
         }
 
+        /// This block depends on handlePodFault() handling any interrupted
+        /// dosing issues for a pod fault before actually setting podState.fault.
+        if oldValue.podState?.fault == nil && newValue.podState?.fault != nil {
+            /// Transitioning to a faulted state. Store any unfinalized doses now so the app
+            /// will have the updated dosing info for IOB calculations immediately instead
+            /// of having to potentially wait for the next pod response to do the store.
+            let unfinalizedDoses = [
+                newValue.podState?.unfinalizedBolus,
+                newValue.podState?.unfinalizedTempBasal,
+                newValue.podState?.unfinalizedSuspend,
+                newValue.podState?.unfinalizedResume,
+            ].compactMap { $0 }
+            /// This won't do anything like move doses to finalizedDoses or handle
+            /// errors as things like this will all be handled automatically later.
+            store(doses: unfinalizedDoses, completion: { _ in })
+        }
+
         /// Notify podState observers of any podState or silencePod state changes
         if oldValue.podState != newValue.podState || oldValue.silencePod != newValue.silencePod {
             podStateObservers.forEach { (observer) in
