@@ -288,6 +288,12 @@ class BluetoothManager: NSObject {
 
     /// Connect options for eager connects (auto-reconnect experiment when enabled and available).
     private var eagerConnectOptions: [String: Any]? {
+        // BACKGROUND: ask the system to keep the link up for us — it can re-establish while the app is
+        // suspended, which no app-side timer can do.
+        // FOREGROUND: do NOT use auto-reconnect. The user may be waiting to bolus, and the system's
+        // silent reacquisition (~27s median measured) is far slower than our eager cancel/retry cycle
+        // (~1.3s); an armed auto-reconnect would just compete with the watchdog.
+        if isAppForeground { return nil }
         if #available(iOS 17.0, *), BluetoothManager.eagerAutoReconnectEnabled {
             return [CBConnectPeripheralOptionEnableAutoReconnect: true]
         }
@@ -424,6 +430,11 @@ class BluetoothManager: NSObject {
     /// managerQueue and cross-queue by PeripheralManager (benign bool race, like appIsForeground).
     var shouldHoldConnection: Bool {
         if isAppForeground { return true }
+        // Eager-gated pods (InPlay + affected iPhone): reconnecting costs a wedge storm, and the pod
+        // releases the link itself after ~180s of inactivity anyway — so never tear it down on
+        // backgrounding. The link is kept via CBConnectPeripheralOptionEnableAutoReconnect (issued on
+        // background connects), which restores it without needing app CPU while suspended.
+        if let peripheral = keepAlivePeripheral, shouldUseEagerConnect(for: peripheral) { return true }
         return podType.isDash && Storage.shared.podKeepAlive.value.keepsPodConnectedInBackground
     }
 
@@ -1643,6 +1654,32 @@ extension BluetoothManager: CBCentralManagerDelegate {
             autoReconnect(peripheral)
         }
         delayedProbeInFlight = false
+
+        // Eager-gated pods: the recovery strategy differs by app state.
+        //  - FOREGROUND: the user may be waiting to bolus — reconnect eagerly (direct connect + fast
+        //    watchdog cancel/retry), no auto-reconnect.
+        //  - BACKGROUND: we may be suspended at any moment, so no app-side timer can be trusted. Issue a
+        //    standing connect carrying CBConnectPeripheralOptionEnableAutoReconnect and let the system
+        //    re-establish the link (measured ~27s median) with no app CPU required. This is what keeps
+        //    the pod connected through its ~180s inactivity hangups while backgrounded.
+        if shouldUseEagerConnect(for: peripheral) {
+            if isAppForeground {
+                log.default("[eager] drop while foreground — reconnecting eagerly")
+                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while foreground — reconnecting eagerly")
+                noteForegroundConnectWait(peripheral)
+                beginCommandConnect(peripheral)
+            } else {
+                let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+                if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
+                    device.manager.peripheral = target
+                }
+                log.default("[eager] drop while background — standing connect with auto-reconnect")
+                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background — standing connect (auto-reconnect)")
+                manager.connect(target, options: eagerConnectOptions)
+            }
+            return
+        }
+
         if shouldHoldConnection && commandConnectInFlight {
             // Keep-alive (foreground, or a background Pod Keep Alive mode): an unintended drop while we want
             // to stay connected (a deliberate background/idle disconnect clears commandConnectInFlight first,
