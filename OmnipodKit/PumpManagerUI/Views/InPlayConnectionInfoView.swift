@@ -42,6 +42,16 @@ struct InPlayConnectionInfoView: View {
                 .padding(.vertical, 4)
             }
 
+            Section(header: SectionHeader(label: LocalizedString("Pump Heartbeat", comment: "Section header on InPlay connection info view"))) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(LocalizedString("To work around the radio issue, the app keeps the pod connected instead of reconnecting for each command. That means the pod can't be used to wake the app periodically in the background.", comment: "InPlay connection info: heartbeat body 1"))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(LocalizedString("If your CGM delivers readings to the app, looping continues normally — your CGM provides the wake-ups instead. A CGM that cannot wake the app may result in missed loops while the app is in the background.", comment: "InPlay connection info: heartbeat body 2"))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
+            }
+
             Section(header: SectionHeader(label: LocalizedString("What You Can Do", comment: "Section header on InPlay connection info view"))) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(LocalizedString("No action is needed — this is not a pod fault, and insulin delivery is not affected. The pod continues its programmed delivery even while disconnected.", comment: "InPlay connection info: guidance body 1"))

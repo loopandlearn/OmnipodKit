@@ -450,6 +450,11 @@ class BluetoothManager: NSObject {
     /// demand. managerQueue-isolated.
     private var heartbeatEnabled = false
 
+    /// Whether a host has asked the pump to provide the BLE heartbeat. Exposed so the pump manager can
+    /// warn when this is requested on a wedge-prone pod/phone combo, where we hold the connection (and
+    /// so the StartDelay probe — which requires a DISCONNECTED pod — can never run).
+    var isBLEHeartbeatRequested: Bool { heartbeatEnabled }
+
     /// The delayed-connect (StartDelay) heartbeat probe runs when Loop asks the pump to provide the BLE
     /// heartbeat (`heartbeatEnabled`, via PumpManager.setBLEHeartbeatRequest) AND we are NOT holding the pod
     /// connected. CBConnectPeripheralOptionStartDelayKey is a background-only mechanism — iOS ignores the
