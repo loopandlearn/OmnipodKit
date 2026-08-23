@@ -65070,7 +65070,7 @@
         }
       }
     },
-    "Tap ‘Continue’ to download a certificate to be stored in order to pair with Omnipod 5 Pods." : {
+    "Tap ‘Continue’ to download a certificate to be stored in order to pair with Omnipod 5 Pods. This is a one-time action that requires Internet access." : {
       "comment" : "Description when O5 keypairs are not available"
     },
     "Temp Basal" : {

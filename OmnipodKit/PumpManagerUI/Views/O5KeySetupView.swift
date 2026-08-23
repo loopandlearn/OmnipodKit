@@ -15,7 +15,6 @@ struct O5KeySetupView: View {
 
     @State private var o5KeypairsNotAvailable: Bool
     @State private var showingFetchSheet = false
-    @State private var hasAutoAdvanced = false
     private var didContinue: () -> Void
     private var didCancel: () -> Void
 
@@ -25,20 +24,12 @@ struct O5KeySetupView: View {
         self.didCancel = didCancel
     }
 
-    private func performContinue() {
-        if o5KeypairsNotAvailable {
-            showingFetchSheet = true
-        } else {
-            didContinue()
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading) {
             List {
                 Section {
                     if o5KeypairsNotAvailable {
-                        Text(LocalizedString("Tap ‘Continue’ to download a certificate to be stored in order to pair with Omnipod 5 Pods.", comment: "Description when O5 keypairs are not available"))
+                        Text(LocalizedString("Tap ‘Continue’ to download a certificate to be stored in order to pair with Omnipod 5 Pods. This is a one-time action that requires Internet access.", comment: "Description when O5 keypairs are not available"))
                         .padding(.vertical, 4)
                     } else {
                         HStack(spacing: 12) {
@@ -53,18 +44,17 @@ struct O5KeySetupView: View {
             }
             .insetGroupedListStyle()
 
-            Button(action: { performContinue() }) {
+            Button(action: {
+                if o5KeypairsNotAvailable {
+                    showingFetchSheet = true
+                } else {
+                    didContinue()
+                }
+            }) {
                 Text(LocalizedString("Continue", comment: "Text for Continue button on O5KeySetupView"))
                     .actionButtonStyle(.primary)
                     .padding()
             }
-        }
-        .onAppear {
-            // Auto-advance on first entry so the user doesn't have to tap Continue.
-            // The button stays available for re-attempts after cancelling the sheet.
-            guard !hasAutoAdvanced else { return }
-            hasAutoAdvanced = true
-            performContinue()
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
