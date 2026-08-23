@@ -338,19 +338,19 @@ struct OmniSettingsView: View  {
                 }
             }
 
-            // Warning: a host requested pump-provided background heartbeats, which this pod/phone
-            // combination cannot support (the mitigation holds the connection; the heartbeat probe
-            // needs a disconnected pod).
-            if viewModel.bleHeartbeatUnsupported {
+            // Advisory: a host requested pump-provided background heartbeats. On these combos the
+            // normal (StartDelay) heartbeat probe can't be used, so wakes come from link drops
+            // instead — workable, but less regular than on unaffected pods.
+            if viewModel.bleHeartbeatDegraded {
                 Section {
                     NavigationLink(destination: InPlayConnectionInfoView()) {
                         HStack(spacing: 10) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.orange)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(LocalizedString("Pump Heartbeat Unavailable", comment: "Title of BLE heartbeat unsupported notice row"))
+                                Text(LocalizedString("Reduced Background Wake-Ups", comment: "Title of BLE heartbeat degraded notice row"))
                                     .font(Font.subheadline.weight(.semibold))
-                                Text(LocalizedString("This pod and phone combination can't provide background wake-ups. Looping relies on your CGM.", comment: "Subtitle of BLE heartbeat unsupported notice row"))
+                                Text(LocalizedString("Background wake-ups from the pod are less frequent on this pod and phone combination.", comment: "Subtitle of BLE heartbeat degraded notice row"))
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
                             }

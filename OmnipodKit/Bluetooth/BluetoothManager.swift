@@ -282,12 +282,39 @@ class BluetoothManager: NSObject {
     /// isReconnecting=true (we then defer to the system; didConnect fires on re-establishment). An
     /// explicit cancelPeripheralConnection (idle-disconnect, watchdog) still cancels any pending
     /// auto-reconnect, so the normally-disconnected model is unaffected.
+    /// Optional gate: only fire a disconnect-driven heartbeat if the host hasn't seen a CGM reading in
+    /// at least this long. Default 0 = always fire on a drop (Loop ignores a heartbeat it doesn't need,
+    /// and an extra wake is far cheaper than a missed one).
+    static var eagerHeartbeatStaleReadingSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerHeartbeatStaleReadingSeconds") as? Double) ?? 0
+    }
+
+    /// Minimum spacing between disconnect-driven heartbeats.
+    static var eagerHeartbeatMinIntervalSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.eagerHeartbeatMinIntervalSeconds") as? Double) ?? 150
+    }
+
     static var eagerAutoReconnectEnabled: Bool {
         UserDefaults.standard.object(forKey: "OmnipodKit.eagerAutoReconnectEnabled") as? Bool ?? true
     }
 
     /// Connect options for eager connects (auto-reconnect experiment when enabled and available).
+    /// Disconnect-driven heartbeat mode: a wedge-prone pod on an affected phone whose host needs the
+    /// pump to provide background wakes. Here we deliberately do NOT use auto-reconnect — instead we let
+    /// the pod hang up on its own ~180s inactivity timer, take CoreBluetooth's didDisconnect as the wake
+    /// (State Restoration delivers it to a suspended app), eagerly reconnect (re-arming the next cycle),
+    /// and fire the heartbeat if the host's CGM data has gone stale. That yields a regular ~3min wake
+    /// cadence, versus the irregular ~9min observed when auto-reconnect silently holds the link up.
+    var isEagerHeartbeatMode: Bool {
+        guard heartbeatEnabled else { return false }
+        guard let peripheral = keepAlivePeripheral else { return false }
+        return shouldUseEagerConnect(for: peripheral)
+    }
+
     private var eagerConnectOptions: [String: Any]? {
+        // Disconnect-driven heartbeat mode owns its own reconnects — auto-reconnect would silently
+        // re-establish the link and rob us of the wake.
+        if isEagerHeartbeatMode { return nil }
         // BACKGROUND: ask the system to keep the link up for us — it can re-establish while the app is
         // suspended, which no app-side timer can do.
         // FOREGROUND: do NOT use auto-reconnect. The user may be waiting to bolus, and the system's
@@ -402,6 +429,13 @@ class BluetoothManager: NSObject {
     /// target no host is refreshing (advance it). managerQueue-isolated.
     private var heartbeatTargetSetAt: Date?
 
+    /// Most recent CGM reading time reported by the host (via PumpHeartbeatRequest). Used by the
+    /// disconnect-driven heartbeat to decide whether a wake is actually needed.
+    private var lastCGMReadingDate: Date?
+
+    /// When we last fired a disconnect-driven heartbeat, for throttling.
+    private var lastEagerHeartbeatFire: Date?
+
     /// True while a real command's connect owns the link (connect-on-demand). The heartbeat probe and
     /// a command connect must never be outstanding together — a command preempts the probe and, while
     /// it's active, the probe is neither armed nor allowed to claim a didConnect. Cleared on the
@@ -477,6 +511,7 @@ class BluetoothManager: NSObject {
             let enabled = request != nil
             if let request = request {
                 let base = request.lastCGMReadingDate ?? Date()
+                self.lastCGMReadingDate = request.lastCGMReadingDate
                 self.heartbeatTargetDate = base.addingTimeInterval(request.expectedCGMReadingInterval + BluetoothManager.heartbeatBufferSeconds)
                 self.heartbeatInterval = request.expectedCGMReadingInterval
                 self.heartbeatTargetSetAt = Date()
@@ -484,6 +519,7 @@ class BluetoothManager: NSObject {
                 self.heartbeatTargetDate = nil
                 self.heartbeatInterval = nil
                 self.heartbeatTargetSetAt = nil
+                self.lastCGMReadingDate = nil
             }
             let wasEnabled = self.heartbeatEnabled
             self.heartbeatEnabled = enabled
@@ -950,6 +986,31 @@ class BluetoothManager: NSObject {
                 self.armConnectWatchdog(retryTarget, deadline: deadline)
             }
         }
+    }
+
+    /// Fire the pump-provided heartbeat off a real link drop (disconnect-driven heartbeat mode).
+    /// Throttled by `eagerHeartbeatMinIntervalSeconds` because our own watchdog cancels can produce a
+    /// burst of disconnects during a wedge storm — those must not each count as a wake. Optionally
+    /// gated on CGM staleness (`eagerHeartbeatStaleReadingSeconds`, default 0 = always fire).
+    private func fireEagerHeartbeatIfNeeded() {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        let now = Date()
+        if let last = lastEagerHeartbeatFire,
+           now.timeIntervalSince(last) < BluetoothManager.eagerHeartbeatMinIntervalSeconds {
+            log.debug("[heartbeat] eager drop-driven heartbeat throttled")
+            return
+        }
+        let staleAfter = BluetoothManager.eagerHeartbeatStaleReadingSeconds
+        if staleAfter > 0, let lastReading = lastCGMReadingDate,
+           now.timeIntervalSince(lastReading) < staleAfter {
+            log.debug("[heartbeat] eager drop-driven heartbeat skipped — recent CGM reading")
+            return
+        }
+        lastEagerHeartbeatFire = now
+        let sinceReading = lastCGMReadingDate.map { String(format: "%.0fs", now.timeIntervalSince($0)) } ?? "?"
+        log.default("[heartbeat] firing on link drop (eager heartbeat mode, lastCGM %{public}@ ago)", sinceReading)
+        connectionDelegate?.omnipodLogDeviceEvent("[heartbeat] firing on link drop (eager mode, lastCGM \(sinceReading) ago)")
+        connectionDelegate?.omnipodHeartbeatDidFire()
     }
 
     /// Invalidate any pending watchdog tick for this peripheral (bump the generation token).
@@ -1673,6 +1734,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while foreground — reconnecting eagerly")
                 noteForegroundConnectWait(peripheral)
                 beginCommandConnect(peripheral)
+            } else if isEagerHeartbeatMode {
+                // Disconnect-driven heartbeat: CoreBluetooth just woke us for this drop (State
+                // Restoration delivers it even to a suspended app). Fire the heartbeat, then eagerly
+                // reconnect — the fresh connection re-arms the pod's ~180s inactivity timer, so the
+                // next hangup becomes the next wake, giving a self-sustaining ~3min cadence.
+                fireEagerHeartbeatIfNeeded()
+                log.default("[eager] drop while background (heartbeat mode) — eager reconnect")
+                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background (heartbeat mode) — eager reconnect")
+                eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
             } else {
                 let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
                 if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {

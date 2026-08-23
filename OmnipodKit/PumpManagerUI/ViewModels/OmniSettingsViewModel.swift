@@ -197,11 +197,10 @@ class OmniSettingsViewModel: ObservableObject {
         return UIDevice.hasPossibleInPlayBLEIssues && pumpManager.usingInPlayPod == true
     }
 
-    /// A host asked the pump to provide background heartbeats, but this pod/phone combination needs the
-    /// eager-connect mitigation (which holds the pod connected) — mutually exclusive with the heartbeat's
-    /// StartDelay probe. Surfaced as a warning: on this combination looping must be CGM-driven.
-    var bleHeartbeatUnsupported: Bool {
-        return pumpManager.bleHeartbeatUnsupportedForThisPod
+    /// A host asked the pump to provide background heartbeats on a combination needing the eager-connect
+    /// mitigation: wakes come from link drops rather than the usual timer probe, so they're less regular.
+    var bleHeartbeatDegraded: Bool {
+        return pumpManager.bleHeartbeatDegradedForThisPod
     }
 
     var isScheduledBasal: Bool {
