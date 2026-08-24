@@ -229,6 +229,12 @@ protocol PodCommsSessionDelegate: AnyObject {
     func podCommsSession(_ podCommsSession: PodCommsSession, didChange state: PodState)
 }
 
+fileprivate var gotPodResponse: (() -> Void)? = nil
+
+func gotPodResponseSetup(_ gotPodResponseFunc: (() -> Void)?) {
+    gotPodResponse = gotPodResponseFunc
+}
+
 class PodCommsSession: MessageTransportDelegate {
 
     let log = OSLog(category: "PodCommsSession")
@@ -277,7 +283,7 @@ class PodCommsSession: MessageTransportDelegate {
     // Handles updating PodState on first pod fault seen
     private func handlePodFault(fault: DetailedStatus) {
         if podState.fault == nil {
-            podState.fault = fault // save the first fault returned
+            // First pod fault seen, handle the transition to a faulted state.
             setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
             if podState.unacknowledgedCommand != nil {
@@ -287,6 +293,8 @@ class PodCommsSession: MessageTransportDelegate {
                 recoverUnacknowledgedCommand(using: derivedStatusResponse)
             }
             podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: currentDate)
+            // Now that the cancel dosing is handled, save the fault so the doses and fault will be reported together.
+            podState.fault = fault
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
         }
         log.error("Pod Fault: %@", String(describing: fault))
@@ -386,8 +394,8 @@ class PodCommsSession: MessageTransportDelegate {
                 throw error
             }
 
-            // Inform the pod keep alive code that we just received a pod response.
-            gotPodResponse() // XXX move down to transport code?
+            /// If timer based pod keep alives are enabled, call the getPodResponse function.
+            gotPodResponse?()
 
             // Simulate fault
             //let podInfoResponse = try PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000000000ab6a038403ff03860000285708030d0000")!)

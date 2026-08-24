@@ -451,8 +451,10 @@ class BluetoothManager: NSObject {
     /// idle-disconnect, reconnect on an unintended drop) so connection-gated UI (test beeps, etc.) is
     /// live and in-app commands are instant. On background we disconnect and resume the heartbeat probe.
     private var isAppForeground = false
-    /// Cross-queue read for PeripheralManager's idle-disconnect (benign bool race, like everForeground).
-    var appIsForeground: Bool { isAppForeground }
+
+    /// Set via BlePodComm.setPodKeepAliveKeepsConnectedInBackground() which is used by
+    /// OmniPumpManager to track podKeepAlive.keepsPodConnectedInBackground state.
+    var podKeepAliveKeepsConnectedInBackground = false
 
     /// True when the pod should be HELD connected rather than idle/background-disconnected — the gate that
     /// suppresses connect-on-demand's disconnects. True while the app is foregrounded (foreground
@@ -461,7 +463,7 @@ class BluetoothManager: NSObject {
     /// is unreliable, so the pod must stay connected and the keep-alive's periodic status refresh maintains
     /// the link. When Pod Keep Alive is `.disabled` (the default) OR `.whenOpen`, this collapses to exactly
     /// `isAppForeground` — i.e. no change from the validated connect-on-demand behavior. Read from
-    /// managerQueue and cross-queue by PeripheralManager (benign bool race, like appIsForeground).
+    /// managerQueue and cross-queue by PeripheralManager (benign bool race).
     var shouldHoldConnection: Bool {
         if isAppForeground { return true }
         // Eager-gated pods (InPlay + affected iPhone): reconnecting costs a wedge storm, and the pod
@@ -469,7 +471,7 @@ class BluetoothManager: NSObject {
         // backgrounding. The link is kept via CBConnectPeripheralOptionEnableAutoReconnect (issued on
         // background connects), which restores it without needing app CPU while suspended.
         if let peripheral = keepAlivePeripheral, shouldUseEagerConnect(for: peripheral) { return true }
-        return podType.isDash && Storage.shared.podKeepAlive.value.keepsPodConnectedInBackground
+        return podKeepAliveKeepsConnectedInBackground
     }
 
     /// True once this PROCESS has ever been foregrounded. A [delayedConnect] with everFg=false means
@@ -1562,7 +1564,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
                     }
                 }
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
-                log.debug("Reonnecting to autoconnect device")
+                log.debug("Reconnecting to autoconnect device")
                 autoReconnect(peripheral)
             } else {
                 log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
