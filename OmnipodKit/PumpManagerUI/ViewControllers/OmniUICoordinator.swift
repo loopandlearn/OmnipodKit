@@ -25,8 +25,8 @@ enum OmniUIScreen {
     case insulinTypeSelection
     case selectPodType
     case podTypeSelected // virtual routing step — never presented; resolves to o5KeySetup / rileyLinkSetup / pairAndPrime
-    case o5KeySetup
-    case rileyLinkSetup // will be skipped for non-Eros pods
+    case o5KeySetup // O5 only step
+    case rileyLinkSetup // Eros only step
     case pairAndPrime
     case insertCannula
     case confirmAttachment
@@ -89,8 +89,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
     weak var pumpManagerOnboardingDelegate: PumpManagerOnboardingDelegate?
 
     weak var completionDelegate: CompletionDelegate?
-
-    var podType = unknownOmnipodType
 
     var pumpManager: OmniPumpManager
 
@@ -181,7 +179,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
 
         case .selectPodType:
             let didConfirm: (PodType) -> Void = { [weak self] (selectedPodType) in
-                self?.podType = selectedPodType
                 self?.pumpManager.podType = selectedPodType
                 self?.stepFinished()
             }
@@ -190,7 +187,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
  
             let o5NotAvailable = !isOmnipod5Enabled()
-            let podTypeSelectionView = PodTypeSelection(initialValue: self.podType, o5NotAvailable: o5NotAvailable, didConfirm: didConfirm, didCancel: didCancel)
+            let podTypeSelectionView = PodTypeSelection(initialValue: pumpManager.podType, o5NotAvailable: o5NotAvailable, didConfirm: didConfirm, didCancel: didCancel)
             let hostedView = hostingController(rootView: podTypeSelectionView)
             hostedView.navigationItem.title = LocalizedString("Pod Type", comment: "Title for Pod Type selection screen")
             return hostedView
@@ -236,7 +233,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                     // We no longer have the certificate for our controllerId.
                     // Navagiate to select pod type to allow user to select a non O5 pod type
                     // or to confirm/select O5 pod type and then go through the O5 Setup process again.
-                    self?.podType = unknownOmnipodType  // forces user to manually select the pod type
+                    self?.pumpManager.podType = unknownOmnipodType  // forces user to manually select the pod type
                     self?.navigateTo(.selectPodType)
                 } else {
                     self?.stepFinished()
@@ -253,10 +250,6 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
         case .settings:
             let viewModel = OmniSettingsViewModel(pumpManager: pumpManager)
             viewModel.didFinish = { [weak self] in
-                if self?.pumpManager.podType == unknownOmnipodType {
-                    print("Resetting OmniUICoordinator podType to unknownOmnipodType")
-                    self?.podType = unknownOmnipodType
-                }
                 self?.stepFinished()
             }
             viewModel.navigateTo = { [weak self] (screen) in
@@ -299,7 +292,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
 
             let view = hostingController(rootView: PairPodView(viewModel: viewModel).onAppear(perform: {UIApplication.shared.isIdleTimerDisabled = true}), onDisappear: {UIApplication.shared.isIdleTimerDisabled = false})
-            view.navigationItem.title = String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), self.podType.briefName)
+            view.navigationItem.title = String(format: LocalizedString("Pair Pod", comment: "Title for pair pod screen"))
             view.navigationItem.backButtonDisplayMode = .generic
             return view
 
@@ -388,7 +381,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 fatalError("Pending command recovery UI attempted without pending command")
             }
 
-            let model = DeliveryUncertaintyRecoveryViewModel(appName: appName, uncertaintyStartedAt: pendingCommand.commandDate, usesRileyLink: self.pumpManager.podType.usesRileyLink)
+            let model = DeliveryUncertaintyRecoveryViewModel(appName: appName, uncertaintyStartedAt: pendingCommand.commandDate, usesRileyLink: self.pumpManager.podType.isEros)
             model.didRecover = { [weak self] in
                 self?.navigateTo(.uncertaintyRecovered)
             }
@@ -433,13 +426,13 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
         // Any caller asking to start pairing — whether through the routing step
         // or directly via `.pairAndPrime` (e.g. the Pair Pod button in settings)
         // gets diverted to the key setup screen if no cert is loaded.
-        if podType == omnipod5Type && O5CertificateStore.isEmpty {
+        if pumpManager.podType == omnipod5Type && O5CertificateStore.isEmpty {
             if screen == .podTypeSelected || screen == .pairAndPrime {
                 return .o5KeySetup
             }
         }
         guard screen == .podTypeSelected else { return screen }
-        if podType.usesRileyLink {
+        if pumpManager.podType.isEros {
             return .rileyLinkSetup
         }
         return .pairAndPrime
@@ -473,11 +466,11 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 isOnboarded: false,
                 podState: nil,
                 timeZone: basalSchedule.timeZone,
-                basalSchedule: BasalSchedule(repeatingScheduleValues: basalSchedule.items, podType: self.podType),
+                basalSchedule: BasalSchedule(repeatingScheduleValues: basalSchedule.items, podType: unknownOmnipodType),
                 maxBasalRateUnitsPerHour: pumpManagerSettings.maxBasalRateUnitsPerHour,
                 maxBolusUnits: pumpManagerSettings.maxBolusUnits,
                 insulinType: nil,
-                podType: self.podType)
+                podType: unknownOmnipodType)
 
             self.pumpManager = OmniPumpManager(state: pumpManagerState, rileyLinkDeviceProvider: deviceProvider)
         } else {
@@ -501,26 +494,25 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
     }
 
     private func determineInitialStep() -> OmniUIScreen {
-        self.podType = pumpManager.podType
         if pumpManager.state.podState?.needsCommsRecovery == true {
             return .pendingCommandRecovery
         } else if pumpManager.podCommState == .activating {
             if pumpManager.state.podState?.readyForCannulaInsertion == true && pumpManager.podAttachmentConfirmed {
                 return .insertCannula
             } else {
-                assert(self.podType != unknownOmnipodType)
+                assert(pumpManager.podType != unknownOmnipodType)
                 return .pairAndPrime // need to finish the priming
             }
         } else if !pumpManager.isOnboarded {
             if !pumpManager.initialConfigurationCompleted {
                 return .firstRunScreen
             }
-            if self.podType == unknownOmnipodType {
+            if pumpManager.podType == unknownOmnipodType {
                 return .selectPodType // need to first select a pod type
             }
             return .podTypeSelected // route to o5KeySetup / rileyLinkSetup / pairAndPrime as appropriate
         } else {
-            if self.podType == unknownOmnipodType {
+            if pumpManager.podType == unknownOmnipodType {
                 return .selectPodType // need to first select a pod type
             }
             // O5 selected, no cert, no active pod: route through pod-type
@@ -528,7 +520,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             // into the O5 cert download (via resolveRoutingStep's
             // .podTypeSelected → .o5KeySetup interception) instead of
             // landing in Settings where Pair Pod would fail.
-            if self.podType == omnipod5Type
+            if pumpManager.podType == omnipod5Type
                 && O5CertificateStore.isEmpty
                 && pumpManager.podCommState == .noPod {
                 return .selectPodType

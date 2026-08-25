@@ -55,12 +55,24 @@ class BlePodComms: PodComms {
         super.forgetPod()
     }
 
+    /// Enable/disable and schedule the pump-provided BLE heartbeat (delayed-connect loop). Driven by
+    /// OmniPumpManager.setBLEHeartbeatRequest — used only when the CGM can't provide a heartbeat.
+    func setHeartbeatRequest(_ request: PumpHeartbeatRequest?) {
+        bluetoothManager?.setHeartbeatRequest(request)
+    }
+
     // Removes references to the bluetoothManager to avoid future
     // "Bluetooth use unsupported on this device" errors on the
     // next BlePodComms instantiation and subsequent usage.
     func forgetBluetoothManager() {
         bluetoothManager.connectionDelegate = nil
         bluetoothManager = nil
+    }
+
+    /// Sets bluetoothManager's podKeepAlive value to drive the pod connection policy.
+    func setPodKeepAliveKeepsConnectedInBackground(_ keepConnectedInBackground: Bool) {
+        print("@@@ setting bluetoothManager.podKeepAliveKeepsConnectedInBackground to \(keepConnectedInBackground)")
+        bluetoothManager.podKeepAliveKeepsConnectedInBackground = keepConnectedInBackground
     }
 
     func connectToNewPod(_ completion: @escaping (Result<Omni, Error>) -> Void) {
@@ -71,36 +83,44 @@ class BlePodComms: PodComms {
                 completion(.failure(error))
                 return
             }
-            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                let devices = self.bluetoothManager.getConnectedDevices()
+            // The discoverPods completion can run on a caller thread with no active
+            // run loop (e.g. a pairing auto-retry from a background queue), where a
+            // Timer scheduled on the current thread would never fire and discovery
+            // would hang without ever timing out. Always schedule on the main run loop.
+            DispatchQueue.main.async {
+                Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+                    let devices = self.bluetoothManager.getConnectedDevices()
 
-                if devices.count > 1 {
-                    self.log.default("Multiple pods found while scanning")
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.failure(PodCommsError.tooManyPodsFound))
-                    timer.invalidate()
-                }
+                    if devices.count > 1 {
+                        self.log.default("Multiple pods found while scanning")
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.failure(PodCommsError.tooManyPodsFound))
+                        timer.invalidate()
+                        return
+                    }
 
-                let elapsed = Date().timeIntervalSince(discoveryStartTime)
+                    let elapsed = Date().timeIntervalSince(discoveryStartTime)
 
-                // If we've found a pod by 2 seconds, let's go.
-                if elapsed > TimeInterval(seconds: 2) && devices.count > 0 {
-                    let targetPod = devices.first!
-                    let uuidString = targetPod.manager.peripheral.identifier.uuidString
-                    self.log.default("Found pod UUID %{public}@!", uuidString)
-                    self.bluetoothManager.connectToDevice(uuidString: uuidString)
-                    self.manager = targetPod.manager
-                    targetPod.manager.delegate = self
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.success(devices.first!))
-                    timer.invalidate()
-                }
+                    // If we've found a pod by 2 seconds, let's go.
+                    if elapsed > TimeInterval(seconds: 2) && devices.count > 0 {
+                        let targetPod = devices.first!
+                        let uuidString = targetPod.manager.peripheral.identifier.uuidString
+                        self.log.default("Found pod UUID %{public}@!", uuidString)
+                        self.bluetoothManager.connectToDevice(uuidString: uuidString)
+                        self.manager = targetPod.manager
+                        targetPod.manager.delegate = self
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.success(targetPod))
+                        timer.invalidate()
+                        return
+                    }
 
-                if elapsed > TimeInterval(seconds: 10) {
-                    self.log.default("No pods found while scanning")
-                    self.bluetoothManager.endPodDiscovery()
-                    completion(.failure(PodCommsError.noPodsFound))
-                    timer.invalidate()
+                    if elapsed > TimeInterval(seconds: 10) {
+                        self.log.default("No pods found while scanning")
+                        self.bluetoothManager.endPodDiscovery()
+                        completion(.failure(PodCommsError.noPodsFound))
+                        timer.invalidate()
+                    }
                 }
             }
         }
@@ -631,7 +651,27 @@ class BlePodComms: PodComms {
 
     func bleRunSession(withName name: String, _ block: @escaping (_ result: SessionRunResult) -> Void) {
 
-        guard let manager = manager, manager.peripheral.state == .connected else {
+        // In connect-on-demand mode the pod is normally disconnected, and self.manager (set only in
+        // omnipodPeripheralDidConnect / on restore) is nil on a fresh launch — nothing has connected
+        // yet. Adopt the pod's PeripheralManager from the device list (it exists while disconnected)
+        // so configureAndRun can bootstrap the first on-demand connect. Without this, every command
+        // failed with podNotConnected and the connect could never start.
+        if manager == nil, BluetoothManager.connectOnDemandEnabled, let bleId = podState?.bleIdentifier {
+            self.manager = bluetoothManager.peripheralManager(forIdentifier: bleId)
+            if self.manager != nil {
+                log.default("[connectOnDemand] adopted PeripheralManager for %{public}@ while disconnected", bleId)
+            }
+        }
+
+        guard let manager = manager else {
+            log.default("[connectOnDemand] no PeripheralManager for pod yet (not discovered) — podNotConnected")
+            block(.failure(PodCommsError.podNotConnected))
+            return
+        }
+        // In connect-on-demand mode the pod is normally disconnected; manager.runSession ->
+        // configureAndRun connects on demand before the session block runs. Only require an existing
+        // connection here in the classic "held connected" mode.
+        if !BluetoothManager.connectOnDemandEnabled, manager.peripheral.state != .connected {
             block(.failure(PodCommsError.podNotConnected))
             return
         }
@@ -670,6 +710,24 @@ class BlePodComms: PodComms {
 // MARK: - OmniConnectionDelegate
 
 extension BlePodComms: OmniConnectionDelegate {
+    func omnipodLogDeviceEvent(_ message: String) {
+        delegate?.omnipodLogDeviceEvent(message)
+    }
+
+    func omnipodHeartbeatDidFire() {
+        delegate?.omnipodHeartbeatDidFire()
+    }
+
+    func omnipodDidDetectAlert(slots: AlertSet) {
+        delegate?.omnipodDidDetectAlert(slots: slots)
+    }
+
+    /// Lift the fault-listener re-wake suppression once all pod alerts have cleared (OmniPumpManager
+    /// calls this from a connected status read).
+    func resumeAlarmScanAfterAlertsCleared() {
+        bluetoothManager?.resumeAlarmScanAfterAlertsCleared()
+    }
+
     func omnipodPeripheralWasRestored(manager: PeripheralManager) {
         if let podState = podState, manager.peripheral.identifier.uuidString == podState.bleIdentifier {
             log.bleDebug("omnipodPeripheralWasRestored for %@", manager.peripheral.identifier.uuidString)

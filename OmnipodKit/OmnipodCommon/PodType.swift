@@ -68,6 +68,7 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
+    // Used for internal logging purposes
     var briefName: String {
         switch podType {
         case .productIdUnknown:
@@ -81,18 +82,6 @@ struct PodType: CustomStringConvertible, Equatable {
         default:
             return "Unknown"
         }
-    }
-
-    var fullName: String {
-        if let podType = podType {
-            switch podType {
-            case .productIdEros, .productIdDash, .productIdOmnipod5:
-                return String(format: "Product ID %d %@", rawValue, description)
-            default:
-                break
-            }
-        }
-        return String(format: "Unknown Omnipod Product ID %d", rawValue)
     }
 
     // DASH uses a blue tab while both Eros and 05 pods use a clear tab
@@ -115,21 +104,13 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
-    // Only Eros pods uses RileyLinks
-    var usesRileyLink: Bool {
+    // Does pod type possibly use a RileyLink
+    var mayUseRileyLink: Bool {
         switch podType {
         case .productIdEros:
-            return true
-        default:
-            return false
-        }
-    }
-
-    // Only Eros pods reports the RSSI value in the DetailedStatus
-    var reportsRSSI: Bool {
-        switch podType {
-        case .productIdEros:
-            return true
+            return true // always needed for basic pod connection
+        case .productIdDash:
+            return true // only needed for the PodKeepAlive RileyLink option
         default:
             return false
         }

@@ -11,16 +11,15 @@ import SwiftUI
 import LoopKit
 import LoopKitUI
 import RileyLinkBLEKit
-import HealthKit
 
 
 struct OmniSettingsView: View  {
     
     @ObservedObject var viewModel: OmniSettingsViewModel
 
-    @ObservedObject var rileyLinkListDataSource: RileyLinkListDataSource // Eros only
+    @ObservedObject var rileyLinkListDataSource: RileyLinkListDataSource
 
-    var handleRileyLinkSelection: (RileyLinkDevice) -> Void // Eros only
+    var handleRileyLinkSelection: (RileyLinkDevice) -> Void
 
     @State private var o5CertLoaded = false
 
@@ -211,7 +210,7 @@ struct OmniSettingsView: View  {
         .sheet(isPresented: $showManualTempBasalOptions) {
             ManualTempBasalEntryView(
                 enactBasal: { rate, duration, completion in
-                    viewModel.runTemporaryBasalProgram(unitsPerHour: rate, for: duration) { error in
+                    viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: rate, for: duration) { error in
                         completion(error)
                         if error == nil {
                             showManualTempBasalOptions = false
@@ -399,9 +398,9 @@ struct OmniSettingsView: View  {
                 }
             }
 
-            if self.viewModel.podType.usesRileyLink {
+            if self.viewModel.podType.isEros {
                 Section(header: HStack {
-                    FrameworkLocalText("Devices", comment: "Header for devices section of RileyLinkSetupView")
+                    FrameworkLocalText("Devices", comment: "Header for devices section of OmniSettingsView")
                     Spacer()
                     ProgressView()
                 }) {
@@ -410,7 +409,6 @@ struct OmniSettingsView: View  {
                             HStack {
                                 Text(device.name ?? "Unknown")
                                 Spacer()
-
                                 if rileyLinkListDataSource.autoconnectBinding(for: device).wrappedValue {
                                     if device.isConnected {
                                         Text(formatRSSI(rssi:device.rssi)).foregroundColor(.secondary)
@@ -428,8 +426,6 @@ struct OmniSettingsView: View  {
                         }
                     }
                 }
-                .onAppear { rileyLinkListDataSource.isScanningEnabled = true }
-                .onDisappear { rileyLinkListDataSource.isScanningEnabled = false }
             }
 
             Section() {
@@ -607,7 +603,7 @@ struct OmniSettingsView: View  {
             }
 
             if self.viewModel.podType.isDash {
-                Section() {
+                Section {
                     let localizedPodKeepAliveStr = LocalizedString("Pod Keep Alive",
                         comment: "Title for the pod keep alive row and page")
                     NavigationLink(destination: PodKeepAliveView(title: localizedPodKeepAliveStr,
@@ -620,6 +616,31 @@ struct OmniSettingsView: View  {
                             Spacer()
                             Text(viewModel.podKeepAlivePreference.title)
                                 .foregroundColor(Color.secondary)
+                        }
+                    }
+
+                    if viewModel.podKeepAlivePreference == .rileyLink {
+                        ForEach(rileyLinkListDataSource.devices, id: \.peripheralIdentifier) { device in
+                            Toggle(isOn: rileyLinkListDataSource.autoconnectBinding(for: device)) {
+                                HStack {
+                                    Text(device.name ?? "Unknown")
+                                    Spacer()
+                                    if rileyLinkListDataSource.autoconnectBinding(for: device).wrappedValue {
+                                        if device.isConnected {
+                                            Text(formatRSSI(rssi: device.rssi))
+                                                .foregroundColor(.secondary)
+                                        } else {
+                                            Image(systemName: "wifi.exclamationmark")
+                                                .imageScale(.large)
+                                                .foregroundColor(guidanceColors.warning)
+                                        }
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    handleRileyLinkSelection(device)
+                                }
+                            }
                         }
                     }
                 }
@@ -673,6 +694,15 @@ struct OmniSettingsView: View  {
                     }
                 }
             }
+        }
+        .onAppear {
+            rileyLinkListDataSource.isScanningEnabled = (viewModel.podType.isEros || viewModel.podKeepAlivePreference == .rileyLink)
+        }
+        .onDisappear {
+            rileyLinkListDataSource.isScanningEnabled = false
+        }
+        .onChange(of: viewModel.podKeepAlivePreference) { oldValue, newValue in
+            rileyLinkListDataSource.isScanningEnabled = (newValue == .rileyLink)
         }
         .alert(isPresented: $viewModel.alertIsPresented, content: { alert(for: viewModel.activeAlert!) })
         .insetGroupedListStyle()
@@ -749,7 +779,7 @@ struct OmniSettingsView: View  {
 
     func cancelManualBasal() {
         cancelingTempBasal = true
-        viewModel.runTemporaryBasalProgram(unitsPerHour: 0, for: 0) { error in
+        viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: 0, for: 0) { error in
             cancelingTempBasal = false
             if let error = error {
                 self.viewModel.activeAlert = .cancelManualBasalError(error)

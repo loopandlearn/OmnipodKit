@@ -10,7 +10,7 @@
 import SwiftUI
 import LoopKit
 import LoopKitUI
-import HealthKit
+import LoopAlgorithm
 
 
 struct ExpirationReminderPickerView: View {
@@ -23,7 +23,7 @@ struct ExpirationReminderPickerView: View {
     
     @State var showingHourPicker: Bool = false
     
-    var expirationDefaultFormatter = QuantityFormatter(for: .hour())
+    var expirationDefaultFormatter = QuantityFormatter(for: .hour)
     
     var expirationDefaultString: String {
         return expirationReminderHourString(expirationReminderDefault.wrappedValue)
@@ -45,16 +45,21 @@ struct ExpirationReminderPickerView: View {
                 }
             }
             if showingHourPicker {
-                ResizeablePicker(selection: expirationReminderDefault,
-                                 data: Array(Self.expirationReminderHoursAllowed),
-                                 formatter: { expirationReminderHourString($0) })
+                Picker(selection: expirationReminderDefault) {
+                    ForEach(Array(Self.expirationReminderHoursAllowed), id: \.self) { value in
+                        Text(expirationReminderHourString(value))
+                    }
+                } label: {
+                    EmptyView()
+                }
+                .pickerStyle(.wheel)
             }
         }
     }
     
     private func expirationReminderHourString(_ value: Int) -> String {
         if value > 0 {
-            return expirationDefaultFormatter.string(from: HKQuantity(unit: .hour(), doubleValue: Double(value)))!
+            return expirationDefaultFormatter.string(from: LoopQuantity(unit: .hour, doubleValue: Double(value)))!
         } else {
             return LocalizedString("No Reminder", comment: "Value text for no expiration reminder")
         }

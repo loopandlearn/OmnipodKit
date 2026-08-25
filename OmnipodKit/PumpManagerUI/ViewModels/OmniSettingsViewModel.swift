@@ -10,7 +10,7 @@
 import SwiftUI
 import LoopKit
 import LoopKitUI
-import HealthKit
+import LoopAlgorithm
 import Combine
 
 
@@ -93,7 +93,7 @@ class OmniSettingsViewModel: ObservableObject {
 
     // Expiration reminder date for current pod
     @Published var expirationReminderDate: Date?
-    
+
     var allowedScheduledReminderDates: [Date]? {
         return pumpManager.allowedExpirationReminderDates
     }
@@ -204,7 +204,7 @@ class OmniSettingsViewModel: ObservableObject {
         switch basalDeliveryState {
         case .active(_), .initiatingTempBasal:
             return true
-        case .tempBasal(_), .cancelingTempBasal, .suspending, .suspended(_), .resuming, .none:
+        default:
             return false
         }
     }
@@ -250,7 +250,7 @@ class OmniSettingsViewModel: ObservableObject {
         return nil
     }
 
-    let reservoirVolumeFormatter = QuantityFormatter(for: .internationalUnit())
+    let reservoirVolumeFormatter = QuantityFormatter(for: .internationalUnit)
 
     var didFinish: (() -> Void)?
 
@@ -265,7 +265,7 @@ class OmniSettingsViewModel: ObservableObject {
 
     init(pumpManager: OmniPumpManager) {
         self.pumpManager = pumpManager
-        
+
         lifeState = pumpManager.lifeState
         activatedAt = pumpManager.podActivatedAt
         expiresAt = pumpManager.expiresAt
@@ -280,8 +280,8 @@ class OmniSettingsViewModel: ObservableObject {
         podCommState = pumpManager.podCommState
         beepPreference = pumpManager.beepPreference
         silencePodPreference = pumpManager.silencePod ? .enabled : .disabled
-        podKeepAlivePreference = Storage.shared.podKeepAlive.value
         silencePodEnd = pumpManager.silencePodEnd
+        podKeepAlivePreference = pumpManager.podKeepAlive
         hasConnection = pumpManager.hasConnection
         insulinType = pumpManager.insulinType
         podDetails = pumpManager.podDetails
@@ -293,12 +293,10 @@ class OmniSettingsViewModel: ObservableObject {
         pumpManager.addPodStateObserver(self, queue: DispatchQueue.main)
         pumpManager.addStatusObserver(self, queue: DispatchQueue.main)
 
-        pumpManager.setSyncSilencePodState(syncSilencePodState)
-
         // Trigger refresh
         pumpManager.getPodStatus() { _ in }
 
-        if pumpManager.podType.usesRileyLink {
+        if pumpManager.podType.isEros {
             pumpManager.updateRLConnectionStatus()
         }
     }
@@ -360,8 +358,8 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
-    func runTemporaryBasalProgram(unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
-        pumpManager.enactTempBasal(unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
+    func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
+        pumpManager.runTemporaryBasalProgram(decisionId: decisionId, unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
     }
 
     func saveScheduledExpirationReminder(_ selectedDate: Date?, _ completion: @escaping (Error?) -> Void) {
@@ -418,14 +416,6 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
-    /// Called by the Omni pump manager after the silencePodEnd reached and silence pod mode disabled.
-    func syncSilencePodState(_ silencePod: Bool, _ silencePodEnd: Date?) {
-        DispatchQueue.main.async {
-            self.silencePodPreference = silencePod ? .enabled : .disabled
-            self.silencePodEnd = silencePodEnd
-        }
-    }
-
     func setSilencePod(_ silencePodPreference: SilencePodPreference, silencePodEnd: Date?,
                        _ completion: @escaping (_ error: LocalizedError?) -> Void)
     {
@@ -443,6 +433,7 @@ class OmniSettingsViewModel: ObservableObject {
 
     func setPodKeepAlive(_ podKeepAlivePreference: PodKeepAlive) {
         self.podKeepAlivePreference = podKeepAlivePreference
+        pumpManager.podKeepAlive = podKeepAlivePreference
     }
 
     func deletePodSessionLogEntries(at offsets: IndexSet) {
@@ -510,13 +501,13 @@ class OmniSettingsViewModel: ObservableObject {
     func reservoirText(for level: ReservoirLevel) -> String {
         switch level {
         case .aboveThreshold:
-            let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: Pod.maximumReservoirReading)
+            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: Pod.maximumReservoirReading)
             let thresholdString = reservoirVolumeFormatter.string(from: quantity, includeUnit: false) ?? ""
             let unitString = reservoirVolumeFormatter.localizedUnitStringWithPlurality(forValue: Pod.maximumReservoirReading, avoidLineBreaking: true)
             return String(format: LocalizedString("%1$@+ %2$@", comment: "Format string for reservoir level above max measurable threshold. (1: measurable reservoir threshold) (2: units)"),
                           thresholdString, unitString)
         case .valid(let value):
-            let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: value)
+            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: value)
             return reservoirVolumeFormatter.string(from: quantity) ?? ""
         }
     }
@@ -606,6 +597,8 @@ extension OmniSettingsViewModel: PodStateObserver {
         expirationReminderDate = self.pumpManager.scheduledExpirationReminder
         podCommState = self.pumpManager.podCommState
         beepPreference = self.pumpManager.beepPreference
+        silencePodPreference = self.pumpManager.silencePod ? .enabled : .disabled
+        silencePodEnd = self.pumpManager.silencePodEnd
         insulinType = self.pumpManager.insulinType
         podDetails = self.pumpManager.podDetails
         previousPodDetails = self.pumpManager.previousPodDetails
