@@ -288,11 +288,14 @@ struct OmniSettingsView: View  {
                             .padding(.top,5)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    // Not gated on hasConnection: under connect-on-demand a disconnected pod is the
-                    // normal resting state, not a fault. The icon still greys out to show there is no
-                    // live link, but tapping it connects on demand and beeps — which is exactly the
-                    // check you want when the pod is unreachable. Every other action on this screen
-                    // gates on podOk for the same reason.
+                    // Not gated on hasConnection. That var means different things by pod type — the
+                    // pod link for BLE pods, whether ANY RileyLink is connected (independent of pod
+                    // availability) for Eros; see OmniPumpManager.hasConnection. In neither case does
+                    // "not connected right now" mean the command can't run: playTestBeeps goes through
+                    // the normal command path, which acquires the link itself. The icon still greys out
+                    // to show there is no live link, but the button stays tappable, so a beep can be
+                    // used to check whether the pod is actually reachable. Every other action on this
+                    // screen gates on podOk rather than on connectivity.
                     .disabled(sendingTestBeepsCommand)
 
                     headerImage
