@@ -11,7 +11,7 @@ import CoreBluetooth
 import Foundation
 import LoopKit
 import os.log
-import UIKit
+import UIKit  // only for UIDevice (see shouldUseEagerConnect); lifecycle goes through HostAppState
 
 enum BluetoothManagerError: Error {
     case bluetoothNotAvailable(CBManagerState)
@@ -641,7 +641,7 @@ class BluetoothManager: NSObject {
         // false) from a user-initiated open (foregrounds → everFg true). Log the transitions to the
         // persistent device log with PID for the timeline.
         let center = NotificationCenter.default
-        center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        center.addObserver(forName: HostAppState.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             let pid = ProcessInfo.processInfo.processIdentifier
             self?.managerQueue.async {
                 guard let self = self else { return }
@@ -651,13 +651,31 @@ class BluetoothManager: NSObject {
                 self.enterForeground()
             }
         }
-        center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+        center.addObserver(forName: HostAppState.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             let pid = ProcessInfo.processInfo.processIdentifier
             self?.managerQueue.async {
                 guard let self = self else { return }
                 self.log.default("[lifecycle] pid=%{public}d APP BACKGROUND", pid)
                 self.connectionDelegate?.omnipodLogDeviceEvent("[lifecycle] pid=\(pid) APP BACKGROUND")
                 self.enterBackground()
+            }
+        }
+
+        // Seed from the live application state. If this manager is constructed AFTER the app has
+        // already become active — a pump manager built lazily on a cold launch — the observer above
+        // never fires for that launch, so isAppForeground stays false for the whole foreground
+        // session. shouldHoldConnection is then false while the user is looking at the screen, and
+        // the idle-disconnect drops the link ~4s after each command (loopandlearn/OmnipodKit#133).
+        // If the notification wins the race instead, the isAppForeground guard makes this a no-op.
+        DispatchQueue.main.async { [weak self] in
+            guard HostAppState.isActive else { return }
+            let pid = ProcessInfo.processInfo.processIdentifier
+            self?.managerQueue.async {
+                guard let self = self, !self.isAppForeground else { return }
+                self.everForeground = true
+                self.log.default("[lifecycle] pid=%{public}d APP FOREGROUND (seeded at init)", pid)
+                self.connectionDelegate?.omnipodLogDeviceEvent("[lifecycle] pid=\(pid) APP FOREGROUND (seeded at init)")
+                self.enterForeground()
             }
         }
     }

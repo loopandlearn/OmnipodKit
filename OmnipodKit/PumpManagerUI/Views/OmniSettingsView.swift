@@ -288,7 +288,12 @@ struct OmniSettingsView: View  {
                             .padding(.top,5)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .disabled(!viewModel.hasConnection || sendingTestBeepsCommand)
+                    // Not gated on hasConnection: under connect-on-demand a disconnected pod is the
+                    // normal resting state, not a fault. The icon still greys out to show there is no
+                    // live link, but tapping it connects on demand and beeps — which is exactly the
+                    // check you want when the pod is unreachable. Every other action on this screen
+                    // gates on podOk for the same reason.
+                    .disabled(sendingTestBeepsCommand)
 
                     headerImage
 
