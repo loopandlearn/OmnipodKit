@@ -1509,27 +1509,41 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         // Connectionless alarm decode is DASH-specific (parses the DASH iBeacon status word). O5 encodes
         // state differently (see the capture) — never run the DASH decode against an O5 advert. Gated on
-        // isOwnPod so a foreign pod that matched the generic C00A filter can't drive detection/connect/probe.
+        // isOwnPod so a foreign pod that matched the generic C00A filter can't drive detection/probe.
         if isOwnPod && podType.isDash {
             detectPodAlertStatus(peripheral: peripheral, advertisementData: advertisementData)
-            // Fresh-discovery connect: we just heard the pod — stop scanning and connect NOW on this
-            // fresh advertisement (fast) instead of waiting out iOS's cold reacquisition (~16s).
-            if pendingFreshConnectID == peripheral.identifier.uuidString {
-                pendingFreshConnectID = nil
-                log.default("[connectOnDemand] fresh discovery -> connect %{public}@", peripheral.identifier.uuidString)
-                connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] pod heard -> connecting on fresh advert")
-                manager.stopScan()
-                // Defer the connect one managerQueue tick so the scan actually tears down first.
-                // Connecting synchronously here (still inside the scan's didDiscover) starved the
-                // connect -> it wedged in .connecting and timed out at 20s. Let iOS settle the
-                // stopScan, then connect on the just-heard advert. Direct connect (not freshConnect):
-                // the peripheral was just heard and is connectable, so skip the cancel+re-retrieve
-                // stale-flush (an In-Play stall workaround) that added a round-trip on the good pod.
-                managerQueue.async { [weak self] in
-                    self?.manager.connect(peripheral, options: nil)
-                }
+        }
+
+        // Fresh-discovery connect: we just heard the pod — stop scanning and connect NOW on this fresh
+        // advertisement (fast) instead of waiting out iOS's cold reacquisition (~16s).
+        //
+        // NOT pod-type specific: all this needs is a just-heard, connectable advert from our own pod.
+        // It used to sit inside the DASH-only branch above, so an O5 pod could never take it —
+        // connectViaFreshDiscovery armed pendingFreshConnectID and scanned for any pod type, the advert
+        // arrived, and nothing consumed it. Every O5 foreground connect therefore waited out the full 4s
+        // fresh-discovery window and fell back to a cold connect: measured 5.9s, against 0.4s for a DASH
+        // pod on the same code path. Still gated on isOwnPod so a stranger's pod can't pull us into a
+        // connect (the C00A fault filter is generic).
+        if isOwnPod, pendingFreshConnectID == peripheral.identifier.uuidString {
+            pendingFreshConnectID = nil
+            log.default("[connectOnDemand] fresh discovery -> connect %{public}@", peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] pod heard -> connecting on fresh advert")
+            manager.stopScan()
+            // Defer the connect one managerQueue tick so the scan actually tears down first.
+            // Connecting synchronously here (still inside the scan's didDiscover) starved the
+            // connect -> it wedged in .connecting and timed out at 20s. Let iOS settle the
+            // stopScan, then connect on the just-heard advert. Direct connect (not freshConnect):
+            // the peripheral was just heard and is connectable, so skip the cancel+re-retrieve
+            // stale-flush (an In-Play stall workaround) that added a round-trip on the good pod.
+            managerQueue.async { [weak self] in
+                self?.manager.connect(peripheral, options: nil)
             }
-            // Kick off / re-arm the delayed-connect probe once we know the pod is present + disconnected.
+        }
+
+        // Kick off / re-arm the delayed-connect probe once we know the pod is present + disconnected.
+        // Left DASH-only deliberately: this drives background wake scheduling, a separate concern from
+        // foreground connect latency, and is not what this change is about.
+        if isOwnPod && podType.isDash {
             issueDelayedConnectProbe(peripheral)
         }
 
