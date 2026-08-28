@@ -32,6 +32,10 @@ class BlePodComms: PodComms {
 
     private var bluetoothManager: BluetoothManager!
 
+    /// Whether a host has asked the pump to provide the BLE heartbeat (see
+    /// OmniPumpManager.bleHeartbeatUnsupportedForThisPod).
+    var isBLEHeartbeatRequested: Bool { bluetoothManager?.isBLEHeartbeatRequested ?? false }
+
     override init(podState: PodState?, podType: PodType, myId: UInt32 = 0, podId: UInt32 = 0) {
         super.init(podState: podState, podType: podType, myId: myId, podId: podId)
         bluetoothManager = BluetoothManager(podType: podType)
