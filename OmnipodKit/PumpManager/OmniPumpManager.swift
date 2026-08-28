@@ -1428,7 +1428,7 @@ extension OmniPumpManager {
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
 
-                            if self.usingInPlayPod == true && self.iPhoneWithPossibleInPlayIssues {
+                            if self.usingInPlayPod == true && UIDevice.hasPossibleInPlayBLEIssues {
                                 if self.state.podKeepAlive == .disabled {
                                     // Enable the most conservative pod keep alive mode
                                     // that should continue through the pod setup process.
@@ -2281,15 +2281,14 @@ extension OmniPumpManager {
         }
     }
 
-    // Running on any iPhone 16 or an iPhone 17e which are known
-    // to have BLE reconnect issues with InPlay BLE DASH pods?
-    var iPhoneWithPossibleInPlayIssues: Bool {
-
-        let iPhoneModel = UIDevice.modelName
-        if iPhoneModel.contains("iPhone 16") || iPhoneModel == "iPhone 17e" {
-            return true
+    // A host asked the pump to provide the BLE heartbeat on a combination needing the eager-connect
+    // mitigation. The usual StartDelay probe can't be used there, so wakes are driven by link drops
+    // instead (see BluetoothManager.isEagerHeartbeatMode) — workable, but less regular.
+    var bleHeartbeatDegradedForThisPod: Bool {
+        guard usingInPlayPod == true, UIDevice.hasPossibleInPlayBLEIssues else { return false }
+        if let blePodComms = podComms as? BlePodComms {
+            return blePodComms.isBLEHeartbeatRequested
         }
-
         return false
     }
 
@@ -2297,7 +2296,7 @@ extension OmniPumpManager {
     var usingInPlayPod: Bool? {
 
         if let blePodComms = podComms as? BlePodComms, let deviceBLEName = blePodComms.manager?.peripheral.name {
-            return deviceBLEName == "InPlay BLE"
+            return deviceBLEName == BluetoothManager.inPlayPeripheralName
         }
         return nil // don't know -- maybe not paired yet
     }
