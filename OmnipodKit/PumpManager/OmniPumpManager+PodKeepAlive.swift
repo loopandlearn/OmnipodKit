@@ -45,6 +45,7 @@ extension OmniPumpManager {
     func gotPodResponse() {
         if !state.podKeepAlive.usesTimerBasedKeepAlives {
             print("@@@ gotPodResponse disabling pod keep alive timer at \(timeStr(Date()))")
+            gotPodResponseSetup(nil) // callbacks on pod responses no longer needed
             podKeepAliveTimer?.invalidate()
             return
         }
@@ -56,8 +57,8 @@ extension OmniPumpManager {
     /// Handles all the setup and teardown for timer based pod keep alive modes
     func setPodKeepAliveTimerState(_ podKeepAlive: PodKeepAlive) {
         let now = Date()
-        if state.podKeepAlive.usesTimerBasedKeepAlives {
-            print("@@@ enabling pod keep alive timer for mode \(state.podKeepAlive) at \(timeStr(now))")
+        if podKeepAlive.usesTimerBasedKeepAlives {
+            print("@@@ enabling pod keep alive timer for mode \(podKeepAlive) at \(timeStr(now))")
 
             /// Set up the callback from PodCommSession.send() for each response received
             gotPodResponseSetup(gotPodResponse)
@@ -77,7 +78,7 @@ extension OmniPumpManager {
             }
         } else {
             print("@@@ disabling pod keep alive timer at \(timeStr(now))")
-            gotPodResponseSetup(nil) // callbacks on pod responses no longer neededpwd
+            gotPodResponseSetup(nil) // callbacks on pod responses no longer needed
             podKeepAliveTimer?.invalidate()
         }
     }

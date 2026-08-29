@@ -897,8 +897,12 @@ extension OmniPumpManager {
             return state.podKeepAlive
         }
         set {
-            log.debug("@@@ setting podKeepAlive to %{public}@ from %{public}@",
-                      String(describing: newValue), String(describing: state.podKeepAlive))
+            if newValue == state.podKeepAlive {
+                log.debug("@@@ initialzing podKeepAlive to %{public}@", String(describing: newValue))
+            } else {
+                log.debug("@@@ changing podKeepAlive from %{public}@ to %{public}@",
+                          String(describing: state.podKeepAlive), String(describing: newValue))
+            }
             if state.podKeepAlive == .rileyLink && newValue != .rileyLink {
                 /// Switching away from using RileyLinks, disconnect the devices
                 disconnectRileyLinkDevices()
@@ -968,7 +972,6 @@ extension OmniPumpManager {
                 imageName: "exclamationmark.circle.fill",
                 state: .critical)
         case .active:
-            let timeSinceLastResponse = date.timeIntervalSince(state.podState?.podTimeUpdated ?? .distantPast)
             if let reservoirPercent = state.reservoirLevel?.percentage, reservoirPercent == 0 {
                 return PumpStatusHighlight(
                     localizedMessage: LocalizedString("No Insulin", comment: "Status highlight that a pump is out of insulin."),

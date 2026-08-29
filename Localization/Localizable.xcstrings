@@ -9409,6 +9409,9 @@
         }
       }
     },
+    "Background wake-ups from the pod are less frequent on this pod and phone combination." : {
+      "comment" : "Subtitle of BLE heartbeat degraded notice row"
+    },
     "Basal initialized" : {
       "comment" : "Pod state when basal initialized",
       "extractionState" : "manual",
@@ -15900,6 +15903,9 @@
           }
         }
       }
+    },
+    "Connecting to the pod may sometimes take noticeably longer than usual — occasionally up to 30 seconds — while stalled attempts are detected and retried automatically. Commands still complete once the connection is made." : {
+      "comment" : "InPlay connection info: what to expect body 1"
     },
     "Continue" : {
       "comment" : "Action button description when deactivated\nAction button title for attach pod view\nButton title to continue\nCannula insertion button text when inserted\nPod pairing action button text when paired\nText for continue button\nText for continue button on PodSetupView\nTitle of button to continue discard",
@@ -31159,6 +31165,9 @@
         }
       }
     },
+    "Keeping your phone near the pod helps connections complete faster. Not every pod uses this radio — a future pod may connect normally." : {
+      "comment" : "InPlay connection info: guidance body 2"
+    },
     "Last connection: %@" : {
       "comment" : "A message indicating that the last connection to a device occurred at a specific time, and that the device is not responding.",
       "extractionState" : "manual",
@@ -35697,6 +35706,9 @@
           }
         }
       }
+    },
+    "No action is needed — this is not a pod fault, and insulin delivery is not affected. The pod continues its programmed delivery even while disconnected." : {
+      "comment" : "InPlay connection info: guidance body 1"
     },
     "No Alert" : {
       "comment" : "No Alert low reservoir value",
@@ -42023,6 +42035,9 @@
         }
       }
     },
+    "Pairing a new pod may also need extra time or an additional attempt." : {
+      "comment" : "InPlay connection info: what to expect body 2"
+    },
     "Pairing completed" : {
       "comment" : "Pod status when pairing completed",
       "extractionState" : "manual",
@@ -45917,6 +45932,9 @@
           }
         }
       }
+    },
+    "Pod Connections" : {
+      "comment" : "Navigation bar title for InPlay connection info view"
     },
     "Pod deactivated successfully. Continue." : {
       "comment" : "Deactivate pod action button accessibility label when deactivation complete",
@@ -53061,6 +53079,9 @@
         }
       }
     },
+    "Pump Heartbeat" : {
+      "comment" : "Section header on InPlay connection info view"
+    },
     "Pump Manager Details" : {
       "comment" : "Text for pump manager details navigation link\nnavigation title for pump manager details",
       "extractionState" : "manual",
@@ -55493,6 +55514,9 @@
           }
         }
       }
+    },
+    "Reduced Background Wake-Ups" : {
+      "comment" : "Title of BLE heartbeat degraded notice row"
     },
     "Ref: " : {
       "comment" : "PDM Ref string line",
@@ -62638,6 +62662,9 @@
         }
       }
     },
+    "Slower Connections Expected" : {
+      "comment" : "Title of InPlay connection notice row\nTitle on InPlay connection info view"
+    },
     "Starting…" : {
       "comment" : "O5 key fetch initial loading text"
     },
@@ -67203,6 +67230,9 @@
         }
       }
     },
+    "The usual method for the pod to wake the app on a timer can't be used on this combination. Instead, the app is woken when the pod's connection drops, and reconnects right away." : {
+      "comment" : "InPlay connection info: heartbeat body 1"
+    },
     "The window on the top of the Pod should be colored pink when the cannula is properly inserted into the skin." : {
       "comment" : "Description of proper cannula insertion",
       "extractionState" : "manual",
@@ -67851,8 +67881,14 @@
         }
       }
     },
+    "These wake-ups are less regular than usual — roughly every few minutes. If your CGM delivers readings to the app, it provides the wake-ups instead and looping continues normally." : {
+      "comment" : "InPlay connection info: heartbeat body 2"
+    },
     "This certificate will be permanently deleted." : {
       "comment" : "Confirmation message when forgetting a saved O5 certificate"
+    },
+    "This pod and phone combination can be slow to connect." : {
+      "comment" : "Subtitle of InPlay connection notice row"
     },
     "This PumpManager has not been configured with a maximum basal rate because it was added before manual temp basal was a feature. Please set a new maximum basal rate." : {
       "comment" : "Alert format string for missing temp basal configuration.",
@@ -73684,6 +73720,12 @@
         }
       }
     },
+    "What to Expect" : {
+      "comment" : "Section header on InPlay connection info view"
+    },
+    "What You Can Do" : {
+      "comment" : "Section header on InPlay connection info view"
+    },
     "When enabled and pod is within range, additional pod status requests are issued to minimize pod Bluetooth disconnects." : {
       "comment" : "Summary of the Pod Keep Alive concept",
       "extractionState" : "manual",
@@ -76284,6 +76326,9 @@
           }
         }
       }
+    },
+    "Your pod uses an “InPlay” Bluetooth radio, and your phone (%1$@) is a model known to trigger a bug in that radio’s firmware. When it happens, the Bluetooth connection silently stalls while being established." : {
+      "comment" : "InPlay connection info: what is happening (1: iPhone model name)"
     }
   },
   "version" : "1.1"
