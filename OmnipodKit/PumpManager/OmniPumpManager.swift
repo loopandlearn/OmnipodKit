@@ -254,8 +254,8 @@ public class OmniPumpManager: RileyLinkPumpManager {
             /// Call store() now in case this fault occured on some path that won't be calling store() on fault.
             /// There is no need to handle any store() errors here as this particular call doesn't remove doses.
             /// These doses will be re-stored again on the first path using dosesToStore() with store()
-            /// which if successful, will remove finalizeDoses and updates lastPumpDataReportDate.
-            if let finalizedDoses = state.podState?.finalizedDoses.compactMap ({ $0 }) {
+            /// which if successful, will remove finalizedDoses and updates lastPumpDataReportDate.
+            if let finalizedDoses = state.podState?.finalizedDoses {
                 store(doses: finalizedDoses, completion: { _ in })
             }
         }
