@@ -63,6 +63,14 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
     // for user review and manufacturer reporting.
     internal var previousPodState: PodState?
 
+    // Rolling log of completed pod sessions (deactivated, expired, or faulted),
+    // most recent first, for user review and manufacturer reporting without
+    // needing to rely on screenshots. Pruned according to podSessionLogRetention.
+    internal var podSessionLog: [PodState] = []
+
+    // How long completed pod sessions are kept in podSessionLog before being pruned.
+    var podSessionLogRetention: PodSessionLogRetention = .default
+
     // Indicates that the user has completed initial configuration
     // which means they have configured any parameters, but may not have paired a pod yet.
     var initialConfigurationCompleted: Bool = false
@@ -366,6 +374,19 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             self.previousPodState = nil
         }
 
+        if let rawSessionLog = rawValue["podSessionLog"] as? [PodState.RawValue] {
+            self.podSessionLog = rawSessionLog.compactMap { PodState(rawValue: $0) }
+        } else {
+            self.podSessionLog = []
+        }
+
+        if let rawRetention = rawValue["podSessionLogRetention"] as? Int,
+           let retention = PodSessionLogRetention(rawValue: rawRetention) {
+            self.podSessionLogRetention = retention
+        } else {
+            self.podSessionLogRetention = .default
+        }
+
         if podType.isEros {
             // Some more Eros specific values
             if let pairingAttemptAddress = rawValue["pairingAttemptAddress"] as? UInt32 {
@@ -407,12 +428,44 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         value["lastPumpDataReportDate"] = lastPumpDataReportDate
         value["silencePodEnd"] = silencePodEnd
         value["previousPodState"] = previousPodState?.rawValue
+        value["podSessionLog"] = podSessionLog.map { $0.rawValue }
+        value["podSessionLogRetention"] = podSessionLogRetention.rawValue
 
         return value
     }
 }
 
 extension OmniPumpManagerState {
+    // Records a just-completed pod session (call once, when a pod session ends)
+    // and prunes the log per the current retention setting.
+    mutating func recordCompletedPodSession(_ podState: PodState) {
+        podSessionLog.insert(podState, at: 0)
+        pruneSessionLog()
+    }
+
+    // Removes podSessionLog entries older than podSessionLogRetention allows.
+    // Safe to call any time, e.g. right after the user changes the retention setting.
+    mutating func pruneSessionLog() {
+        guard let retentionDays = podSessionLogRetention.days else {
+            return // .forever: keep everything
+        }
+        let cutoff = Date().addingTimeInterval(-.days(Double(retentionDays)))
+        podSessionLog.removeAll { session in
+            let sessionEndDate = session.deliveryStoppedAt ?? session.activatedAt ?? .distantPast
+            return sessionEndDate < cutoff
+        }
+    }
+
+    // Removes specific podSessionLog entries, e.g. from a swipe-to-delete action.
+    mutating func removeSessionLogEntries(at offsets: IndexSet) {
+        podSessionLog.remove(atOffsets: offsets)
+    }
+
+    // Empties the entire podSessionLog, e.g. from a "Clear Log" action.
+    mutating func clearSessionLog() {
+        podSessionLog.removeAll()
+    }
+
     var hasActivePod: Bool {
         return podState?.isActive == true
     }
@@ -458,6 +511,8 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             "* initialConfigurationCompleted: \(initialConfigurationCompleted)",
             "* podType: \(podType)",
             "* podKeepAlive: \(podKeepAlive)",
+            "* podSessionLogRetention: \(podSessionLogRetention)",
+            "* podSessionLog: \(podSessionLog.count) session(s)",
             "",
         ].joined(separator: "\n")
         if podType.isEros || podKeepAlive == .rileyLink {

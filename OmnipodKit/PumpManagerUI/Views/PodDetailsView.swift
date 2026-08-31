@@ -133,6 +133,7 @@ struct PodDetailsView: View {
                 } else {
                     row(LocalizedString("Deactivation", comment: "description label for deactivation pod details row"), value: dateFormatter.string(from: deliveryStoppedAt))
                 }
+                
             } else {
                 row(LocalizedString("Last Status", comment: "description label for last status date pod details row"), value: lastStatusText)
             }
