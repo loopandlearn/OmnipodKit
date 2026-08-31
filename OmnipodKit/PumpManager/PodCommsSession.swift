@@ -293,9 +293,11 @@ class PodCommsSession: MessageTransportDelegate {
                 recoverUnacknowledgedCommand(using: derivedStatusResponse)
             }
             podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: currentDate)
-            // Now that the cancel dosing is handled, save the fault so the doses and fault will be reported together.
-            podState.fault = fault
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
+
+            // Now that the cancel dosing *and* the lastInsulinMeasurements have all been updated,
+            // set the fault so the updated finalized doses are available when app is notified of the fault.
+            podState.fault = fault
         }
         log.error("Pod Fault: %@", String(describing: fault))
     }
