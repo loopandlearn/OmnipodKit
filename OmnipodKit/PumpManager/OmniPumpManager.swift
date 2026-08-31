@@ -248,18 +248,16 @@ public class OmniPumpManager: RileyLinkPumpManager {
         /// This block depends on handlePodFault() handling any interrupted
         /// dosing issues for a pod fault before actually setting podState.fault.
         if oldValue.podState?.fault == nil && newValue.podState?.fault != nil {
-            /// Transitioning to a faulted state. Store any unfinalized doses now so the app
-            /// will have the updated dosing info for IOB calculations immediately instead
-            /// of having to potentially wait for the next pod response to do the store.
-            let unfinalizedDoses = [
-                newValue.podState?.unfinalizedBolus,
-                newValue.podState?.unfinalizedTempBasal,
-                newValue.podState?.unfinalizedSuspend,
-                newValue.podState?.unfinalizedResume,
-            ].compactMap { $0 }
-            /// This won't do anything like move doses to finalizedDoses or handle
-            /// errors as things like this will all be handled automatically later.
-            store(doses: unfinalizedDoses, completion: { _ in })
+            /// Transitioning to a faulted state. With handlePodFault() now calling updateFromStatusResponse()
+            /// before setting podState.fault, any canceled doses are already finalized and self.lastSync used
+            /// for lastReconciliation has already been properly initialized by the PodState update mechanisms.
+            /// Call store() now in case this fault occured on some path that won't be calling store() on fault.
+            /// There is no need to handle any store() errors here as this particular call doesn't remove doses.
+            /// These doses will be re-stored again on the first path using dosesToStore() with store()
+            /// which if successful, will remove finalizedDoses and updates lastPumpDataReportDate.
+            if let finalizedDoses = state.podState?.finalizedDoses {
+                store(doses: finalizedDoses, completion: { _ in })
+            }
         }
 
         /// Notify podState observers of any podState or silencePod state changes
