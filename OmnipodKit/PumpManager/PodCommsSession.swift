@@ -188,7 +188,7 @@ extension PodCommsError: LocalizedError {
         case .setupNotComplete:
             return nil
         case .noCertificateFound:
-            return LocalizedString("Rebuild app with needed certificate data", comment: "Recovery suggestion with missing certificate")
+            return LocalizedString("Retrieve an Omnipod 5 Pod Certificate to continue.", comment: "Recovery suggestion with missing certificate")
         }
     }
 
@@ -227,6 +227,12 @@ extension PodCommsError: LocalizedError {
 
 protocol PodCommsSessionDelegate: AnyObject {
     func podCommsSession(_ podCommsSession: PodCommsSession, didChange state: PodState)
+}
+
+fileprivate var gotPodResponse: (() -> Void)? = nil
+
+func gotPodResponseSetup(_ gotPodResponseFunc: (() -> Void)?) {
+    gotPodResponse = gotPodResponseFunc
 }
 
 class PodCommsSession: MessageTransportDelegate {
@@ -386,8 +392,8 @@ class PodCommsSession: MessageTransportDelegate {
                 throw error
             }
 
-            // Inform the pod keep alive code that we just received a pod response.
-            gotPodResponse() // XXX move down to transport code?
+            /// If timer based pod keep alives are enabled, call the getPodResponse function.
+            gotPodResponse?()
 
             // Simulate fault
             //let podInfoResponse = try PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000000000ab6a038403ff03860000285708030d0000")!)

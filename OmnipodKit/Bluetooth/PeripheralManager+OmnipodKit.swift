@@ -123,7 +123,7 @@ extension PeripheralManager {
     }
     
     /// - Throws: PeripheralManagerError
-    func readMessagePacket() throws -> MessagePacket? {
+    func readMessagePacket(disconnectOnUnresponsivePod: Bool = true) throws -> MessagePacket? {
         dispatchPrecondition(condition: .onQueue(queue))
 
         var packet: MessagePacket?
@@ -182,7 +182,7 @@ extension PeripheralManager {
                       String(describing: error),
                       String(describing: peripheral.state))
             if let error = error as? PeripheralManagerError, error.isSymptomaticOfUnresponsivePod {
-                if peripheral.state == .connected {
+                if disconnectOnUnresponsivePod, peripheral.state == .connected {
                     log.error("[readMessagePacket] Disconnecting due to unresponsive pod error while reading")
                     central?.cancelPeripheralConnection(peripheral)
                 } else {

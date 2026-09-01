@@ -22,8 +22,13 @@ class OmnipodKitPlugin: NSObject, PumpManagerUIPlugin {
         return nil
     }
 
+    // Per-instance ID: distinct IDs (and object addresses) across the log = real multiple
+    // instantiations (Loop's plugin lookup does principalClass.init() per type query); one ID
+    // repeated = capture duplication of a single instance.
+    private let instanceID = String(UUID().uuidString.prefix(8))
+
     override init() {
         super.init()
-        log.default("OmnipodKitPlugin Instantiated")
+        log.default("OmnipodKitPlugin #%{public}@ Instantiated (%{public}@)", instanceID, self.debugDescription)
     }
 }

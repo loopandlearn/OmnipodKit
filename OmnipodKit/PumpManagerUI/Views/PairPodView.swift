@@ -22,12 +22,17 @@ struct PairPodView: View {
             VStack {
                 LeadingImage(self.viewModel.podType.podBottomTabImage)
 
+                let podTypeDescription = self.viewModel.podType.description
+                Text(podTypeDescription)
+                    .font(.title)
+                Spacer()
+                Spacer()
                 HStack {
-                    InstructionList(instructions: self.viewModel.podType.usesRileyLink ?
+                    InstructionList(instructions: self.viewModel.podType.isEros ?
                         [
                             String(format: LocalizedString("Fill a new %1$@ pod with U-100 Insulin (leave %2$@ needle cap on). Listen for 2 beeps.",
                                 comment: "Label text for step 1 of Eros pair pod instructions (1: pod type name) (2: pod tab color"),
-                                   self.viewModel.podType.description, self.viewModel.podType.tabColor),
+                                   podTypeDescription, self.viewModel.podType.tabColor),
                             LocalizedString("Keep the RileyLink about 6 inches from the pod during pairing.",
                                 comment: "Label text for step 2 of Eros pair pod instructions")
                         ]
@@ -35,7 +40,7 @@ struct PairPodView: View {
                         [
                             String(format: LocalizedString("Fill a new %1$@ pod with U-100 Insulin (leave %2$@ needle cap on).",
                                 comment: "Label text for step 1 of non-Eros pair pod instructions (1: pod type name) (2: pod tab color"),
-                                self.viewModel.podType.description, self.viewModel.podType.tabColor),
+                                   podTypeDescription, self.viewModel.podType.tabColor),
                             LocalizedString("Listen for 2 beeps.",
                                 comment: "Label text for step 2 of non-Eros pair pod instructions")
                         ]
@@ -90,19 +95,18 @@ struct PairPodView: View {
                     }
                     .disabled(self.viewModel.state.isProcessing)
                     .zIndex(1)
-                } else {
-                    // Some non-recoverable error occurred
-                    if (self.viewModel.error?.recoverable == false) {
-                        Button(action: {
-                            self.viewModel.continueButtonTapped()
-                        }) {
-                            Text("Abort")
-                                .actionButtonStyle(self.viewModel.podIsActivated ?
-                                    .destructive : .primary)
-                        }
-                        .disabled(false)
-                        .zIndex(1)
+                }
+
+                if (self.viewModel.error?.recoverable == false) {
+                    Button(action: {
+                        self.viewModel.continueButtonTapped()
+                    }) {
+                        Text("Abort")
+                            .actionButtonStyle(self.viewModel.podIsActivated ?
+                                .destructive : .primary)
                     }
+                    .disabled(false)
+                    .zIndex(1)
                 }
             }
             .transition(AnyTransition.opacity.combined(with: .move(edge: .bottom)))
@@ -110,7 +114,6 @@ struct PairPodView: View {
         }
         .alert(isPresented: $cancelModalIsPresented) { cancelPairingModal }
 
-        .navigationTitle(String(format: LocalizedString("Pair %1$@ Pod", comment: "Title for pod pairing screen (1: pod type brief name)"), self.viewModel.podType.briefName))
         .navigationBarTitleDisplayMode(.automatic)
         .navigationBarBackButtonHidden(self.viewModel.backButtonHidden)
         .navigationBarItems(trailing: self.viewModel.state.navBarVisible ? cancelButton : nil)

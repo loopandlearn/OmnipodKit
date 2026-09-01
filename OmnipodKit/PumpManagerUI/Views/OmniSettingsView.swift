@@ -18,9 +18,11 @@ struct OmniSettingsView: View  {
     
     @ObservedObject var viewModel: OmniSettingsViewModel
 
-    @ObservedObject var rileyLinkListDataSource: RileyLinkListDataSource // Eros only
+    @ObservedObject var rileyLinkListDataSource: RileyLinkListDataSource
 
-    var handleRileyLinkSelection: (RileyLinkDevice) -> Void // Eros only
+    var handleRileyLinkSelection: (RileyLinkDevice) -> Void
+
+    @State private var o5CertLoaded = false
 
     @State private var showingDeleteConfirmation = false
 
@@ -324,6 +326,17 @@ struct OmniSettingsView: View  {
                         Button(action: {
                             if self.viewModel.podType == unknownOmnipodType {
                                 self.viewModel.navigateTo?(.selectPodType)
+                            } else if self.viewModel.podType.isO5 &&
+                                !O5CertificateStore.contains(self.viewModel.controllerId)
+                            {
+                                if O5CertificateStore.isEmpty {
+                                    // No longer have any O5 Certificates,
+                                    // navigate to O5 Setup to download one.
+                                    self.viewModel.navigateTo?(.o5KeySetup)
+                                } else {
+                                    // Simply refresh to pick up another certificate
+                                    self.viewModel.refreshO5IdsFromCertStore()
+                                }
                             } else {
                                 self.viewModel.navigateTo?(.pairAndPrime)
                             }
@@ -386,9 +399,9 @@ struct OmniSettingsView: View  {
                 }
             }
 
-            if self.viewModel.podType.usesRileyLink {
+            if self.viewModel.podType.isEros {
                 Section(header: HStack {
-                    FrameworkLocalText("Devices", comment: "Header for devices section of RileyLinkSetupView")
+                    FrameworkLocalText("Devices", comment: "Header for devices section of OmniSettingsView")
                     Spacer()
                     ProgressView()
                 }) {
@@ -397,7 +410,6 @@ struct OmniSettingsView: View  {
                             HStack {
                                 Text(device.name ?? "Unknown")
                                 Spacer()
-
                                 if rileyLinkListDataSource.autoconnectBinding(for: device).wrappedValue {
                                     if device.isConnected {
                                         Text(formatRSSI(rssi:device.rssi)).foregroundColor(.secondary)
@@ -415,8 +427,6 @@ struct OmniSettingsView: View  {
                         }
                     }
                 }
-                .onAppear { rileyLinkListDataSource.isScanningEnabled = true }
-                .onDisappear { rileyLinkListDataSource.isScanningEnabled = false }
             }
 
             Section() {
@@ -583,7 +593,7 @@ struct OmniSettingsView: View  {
             }
 
             if self.viewModel.podType.isDash {
-                Section() {
+                Section {
                     let localizedPodKeepAliveStr = LocalizedString("Pod Keep Alive",
                         comment: "Title for the pod keep alive row and page")
                     NavigationLink(destination: PodKeepAliveView(title: localizedPodKeepAliveStr,
@@ -596,6 +606,31 @@ struct OmniSettingsView: View  {
                             Spacer()
                             Text(viewModel.podKeepAlivePreference.title)
                                 .foregroundColor(Color.secondary)
+                        }
+                    }
+
+                    if viewModel.podKeepAlivePreference == .rileyLink {
+                        ForEach(rileyLinkListDataSource.devices, id: \.peripheralIdentifier) { device in
+                            Toggle(isOn: rileyLinkListDataSource.autoconnectBinding(for: device)) {
+                                HStack {
+                                    Text(device.name ?? "Unknown")
+                                    Spacer()
+                                    if rileyLinkListDataSource.autoconnectBinding(for: device).wrappedValue {
+                                        if device.isConnected {
+                                            Text(formatRSSI(rssi: device.rssi))
+                                                .foregroundColor(.secondary)
+                                        } else {
+                                            Image(systemName: "wifi.exclamationmark")
+                                                .imageScale(.large)
+                                                .foregroundColor(guidanceColors.warning)
+                                        }
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    handleRileyLinkSelection(device)
+                                }
+                            }
                         }
                     }
                 }
@@ -611,6 +646,23 @@ struct OmniSettingsView: View  {
                 {
                     Text(localizedPodDiagnosticsStr)
                         .foregroundColor(Color.primary)
+                }
+            }
+
+            Section() {
+                NavigationLink(destination: Omnipod5SupportView(
+                    podType: viewModel.podType,
+                    controllerId: viewModel.controllerId,
+                    hasActivePod: !viewModel.noPod,
+                    refreshO5IdsFromCertStore: viewModel.refreshO5IdsFromCertStore,
+                    onCertStoreChanged: { o5CertLoaded = !O5RegistrationData.isEmpty }))
+                {
+                    HStack(spacing: 12) {
+                        Image(systemName: o5CertLoaded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(o5CertLoaded ? .green : guidanceColors.warning)
+                        FrameworkLocalText("Omnipod 5 Support", comment: "Text for Omnipod 5 Support navigation link in OmniSettingsView")
+                            .foregroundColor(Color.primary)
+                    }
                 }
             }
 
@@ -633,10 +685,25 @@ struct OmniSettingsView: View  {
                 }
             }
         }
+        .onAppear {
+            rileyLinkListDataSource.isScanningEnabled = (viewModel.podType.isEros || viewModel.podKeepAlivePreference == .rileyLink)
+        }
+        .onDisappear {
+            rileyLinkListDataSource.isScanningEnabled = false
+        }
+        .onChange(of: viewModel.podKeepAlivePreference) { newValue in
+            rileyLinkListDataSource.isScanningEnabled = (newValue == .rileyLink)
+        }
         .alert(isPresented: $viewModel.alertIsPresented, content: { alert(for: viewModel.activeAlert!) })
         .insetGroupedListStyle()
         .navigationBarItems(trailing: doneButton)
         .navigationBarTitle(self.viewModel.viewTitle)
+        .task {
+            // Ensure both built-in (dlsym) and Keychain-persisted certs are restored
+            // before reading the registry, then seed the status badge.
+            _ = O5CertificateStore.isEmpty
+            o5CertLoaded = !O5RegistrationData.isEmpty
+        }
     }
 
     var syncPumpTimeActionSheet: ActionSheet {

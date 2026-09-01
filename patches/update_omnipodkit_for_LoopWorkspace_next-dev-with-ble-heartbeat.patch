@@ -318,7 +318,7 @@ index 12857ac..0da35d7 100644
  
              switch result {
              case .success:
-@@ -2530,12 +2549,11 @@ extension OmniPumpManager: PumpManager {
+@@ -2530,11 +2549,10 @@ extension OmniPumpManager: PumpManager {
          }
      }
  
@@ -331,9 +331,8 @@ index 12857ac..0da35d7 100644
  
 -    public func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
 +    public func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
-
          if unitsPerHour > state.maxBasalRateUnitsPerHour {
-             /// The app is trying to set a TBR above the configured max basal.
+             /// The app is trying to set a TBR above the configured max basal. This can happen if the
 @@ -2661,7 +2679,7 @@ extension OmniPumpManager: PumpManager {
                  let scheduledRate = self.state.basalSchedule.currentRate(using: calendar, at: self.dateGenerator())
                  let isHighTemp = rate > scheduledRate

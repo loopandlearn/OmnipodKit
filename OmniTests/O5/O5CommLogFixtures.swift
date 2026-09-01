@@ -2,34 +2,7 @@
 //  O5CommLogFixtures.swift
 //  OmniTests
 //
-//  Send/receive payloads from Loop diagnostic report “Device Communication Log” (and the same
-//  hex in HealthKit Export DeviceLog.json). Not RF/BLE packet captures (cf. openomni / Eros).
-//
-//  Captured while EJ was running Loop with an Omnipod 5 pod.
-//
-//  Reports:
-//  - Loop Report 2026-05-31 10:22:22+02:00 EJ 0 insulin test.md  (pod activation, setup/prime)
-//  - Loop Report 2026-05-31 13:54:21+02:00 EJ O5 test.md           (activation + manual 1.0 U bolus)
-//  - Export-20260531T115736Z.zip / DeviceLog.json                  (cross-check; same hex)
-//
-//  Loop build at capture (from report Build Details):
-//  - Loop DEV v3.14.1 (57), workspace branch feat/omnipodkit @ dae26a6
-//  - OmnipodKit submodule: jwoglom/osaid-keymanager @ 9d58e05
-//    (PKI/App Attest paths are out of scope for these tests; AID/bolus payloads match main builders.)
-//
-//  Active pod in primary capture (002A1C6E, activated 2026-05-31 08:06:34 UTC):
-//  - Pod address / ID: 002A1C6E
-//  - Controller ID (PDM): 002A1C6C
-//  - Pod firmware: 9.0.3 (BLE 6.0.2), hardware 5
-//  - Lot (decimal from PodState): 244867377, sequence: 530595
-//  - Lot/TID in assign/version frames (hex): 0e986131 / 000818a3 (see comm log ffffffff0815… / …0c1d01…)
-//
-//  Secondary pod (002A1C6D, 2026-05-28): same AID/TDI/profile defaults; UTC timestamp differs;
-//  1.0 U bolus 0x12 block matches 002A1C6E (2026-05-28 15:33:22 UTC).
-//
-//  Encoding notes:
-//  - AID commands are UTF-8 ASCII in the comm log (not SLPE length-prefixed).
-//  - BolusExtraCommand O5 uses subtype 0x12; beep/options byte in log is 0x00 (not 0x7c in source comments).
+//  Hex command/response bodies from Loop device communication log exports.
 //
 
 import Foundation
@@ -44,7 +17,7 @@ enum O5CommLogFixtures {
         return data
     }
 
-    // MARK: - AID activation (2026-05-31 08:06:32 UTC, pod 002A1C6E)
+    // MARK: - AID activation
 
     static let utcSend = hex("53453235352e323d31373830323134373932")
     static let utcRecvBody = hex("30")
@@ -61,7 +34,6 @@ enum O5CommLogFixtures {
     static let insulinHistorySendPrefix = hex("5345322e313d00a8")
     static let insulinHistoryRecvBody = hex("30")
 
-    /// Unix timestamp ASCII embedded in `utcSend` (`SE255.2=…`).
     static let utcTimestamp: UInt64 = 1780214792
 
     static let egvValue = "3670015"
@@ -91,7 +63,16 @@ enum O5CommLogFixtures {
         return data
     }()
 
-    // MARK: - BolusExtraCommand 0x12 (20-byte block from comm log)
+    // MARK: - VersionResponse
+
+    static let assignVersionResponse = hex("011509000306000205020e986131000818a305a741afa203b8")
+    static let assignVersionResponseAddress: UInt32 = 0xA741AFA2
+    static let setupVersionResponse = hex("011b13881008340a5009000306000205030e986131000818a3002a1c6e02b5")
+    static let capturedLot: UInt32 = 0x0E986131
+    static let capturedTid: UInt32 = 0x000818A3
+    static let capturedPodAddress: UInt32 = 0x002A1C6E
+
+    // MARK: - BolusExtraCommand 0x12
 
     static let oneUnitBolusExtra = hex("17120000c800030d400000000000000100c80000")
     static let primeBolusExtra = hex("1712000208000186a00000000000000100000000")
