@@ -283,7 +283,7 @@ class PodCommsSession: MessageTransportDelegate {
     // Handles updating PodState on first pod fault seen
     private func handlePodFault(fault: DetailedStatus) {
         if podState.fault == nil {
-            podState.fault = fault // save the first fault returned
+            // First pod fault seen, handle the transition to a faulted state.
             setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
             if podState.unacknowledgedCommand != nil {
@@ -294,6 +294,10 @@ class PodCommsSession: MessageTransportDelegate {
             }
             podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: currentDate)
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
+
+            // Now that the cancel dosing *and* the lastInsulinMeasurements have all been updated,
+            // set the fault so the updated finalized doses are available when app is notified of the fault.
+            podState.fault = fault
         }
         log.error("Pod Fault: %@", String(describing: fault))
     }

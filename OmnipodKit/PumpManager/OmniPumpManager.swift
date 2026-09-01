@@ -237,6 +237,21 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
         }
 
+        /// This block depends on handlePodFault() handling any interrupted
+        /// dosing issues for a pod fault before actually setting podState.fault.
+        if oldValue.podState?.fault == nil && newValue.podState?.fault != nil {
+            /// Transitioning to a faulted state. With handlePodFault() now calling updateFromStatusResponse()
+            /// before setting podState.fault, any canceled doses are already finalized and self.lastSync used
+            /// for lastReconciliation has already been properly initialized by the PodState update mechanisms.
+            /// Call store() now in case this fault occured on some path that won't be calling store() on fault.
+            /// There is no need to handle any store() errors here as this particular call doesn't remove doses.
+            /// These doses will be re-stored again on the first path using dosesToStore() with store()
+            /// which if successful, will remove finalizedDoses and updates lastPumpDataReportDate.
+            if let finalizedDoses = state.podState?.finalizedDoses {
+                store(doses: finalizedDoses, completion: { _ in })
+            }
+        }
+
         /// Notify podState observers of any podState or silencePod state changes
         if oldValue.podState != newValue.podState || oldValue.silencePod != newValue.silencePod {
             podStateObservers.forEach { (observer) in
