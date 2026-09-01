@@ -69,6 +69,12 @@ class BlePodComms: PodComms {
         bluetoothManager = nil
     }
 
+    /// Sets bluetoothManager's podKeepAlive value to drive the pod connection policy.
+    func setPodKeepAliveKeepsConnectedInBackground(_ keepConnectedInBackground: Bool) {
+        print("@@@ setting bluetoothManager.podKeepAliveKeepsConnectedInBackground to \(keepConnectedInBackground)")
+        bluetoothManager.podKeepAliveKeepsConnectedInBackground = keepConnectedInBackground
+    }
+
     func connectToNewPod(_ completion: @escaping (Result<Omni, Error>) -> Void) {
         let discoveryStartTime = Date()
 

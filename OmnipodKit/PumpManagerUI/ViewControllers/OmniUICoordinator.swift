@@ -381,7 +381,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 fatalError("Pending command recovery UI attempted without pending command")
             }
 
-            let model = DeliveryUncertaintyRecoveryViewModel(appName: appName, uncertaintyStartedAt: pendingCommand.commandDate, usesRileyLink: self.pumpManager.podType.usesRileyLink)
+            let model = DeliveryUncertaintyRecoveryViewModel(appName: appName, uncertaintyStartedAt: pendingCommand.commandDate, usesRileyLink: self.pumpManager.podType.isEros)
             model.didRecover = { [weak self] in
                 self?.navigateTo(.uncertaintyRecovered)
             }
@@ -432,7 +432,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
             }
         }
         guard screen == .podTypeSelected else { return screen }
-        if pumpManager.podType.usesRileyLink {
+        if pumpManager.podType.isEros {
             return .rileyLinkSetup
         }
         return .pairAndPrime
