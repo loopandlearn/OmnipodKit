@@ -104,21 +104,13 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
-    // Only Eros pods uses RileyLinks
-    var usesRileyLink: Bool {
+    // Does pod type possibly use a RileyLink
+    var mayUseRileyLink: Bool {
         switch podType {
         case .productIdEros:
-            return true
-        default:
-            return false
-        }
-    }
-
-    // Only Eros pods reports the RSSI value in the DetailedStatus
-    var reportsRSSI: Bool {
-        switch podType {
-        case .productIdEros:
-            return true
+            return true // always needed for basic pod connection
+        case .productIdDash:
+            return true // only needed for the PodKeepAlive RileyLink option
         default:
             return false
         }
