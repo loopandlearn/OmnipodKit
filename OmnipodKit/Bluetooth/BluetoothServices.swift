@@ -45,6 +45,14 @@ func o5ServiceAdvertisementUUID(_ pdmId: UInt32) -> CBUUID {
     return CBUUID(string: uuidString)
 }
 
+// The faulted/attention O5 advertisement flips the trailing 1-byte status suffix from 00 (normal) to 02
+// — field-captured on an induced occlusion (see O5_ADVERTISING_FINDINGS.md). Like the healthy UUID it
+// embeds the pod's controllerId, so it is pod-specific: not a shared constant like DASH's C00A.
+func o5FaultAdvertisementUUID(_ pdmId: UInt32) -> CBUUID {
+    let uuidString = String(format: "CE1F923D-C539-48EA-7300-0A%08X02", pdmId)
+    return CBUUID(string: uuidString)
+}
+
 enum o5OmnipodServiceUUID: String, CBUUIDRawValue {
     case advertisement = "CE1F923D-C539-48EA-7300-0AFFFFFFFE00" // i.e., o5ServiceAdvertisementUUID(0xFFFFFFFE).uuidString
     case service =       "1A7E4024-E3ED-4464-8B7E-751E03D0DC5F" // Same as DASH
@@ -53,15 +61,4 @@ enum o5OmnipodServiceUUID: String, CBUUIDRawValue {
 enum o5OmnipodCharacteristicUUID: String, CBUUIDRawValue {
     case command = "1A7E2441-E3ED-4464-8B7E-751E03D0DC5F"       // Same as DASH
     case data =    "1A7E2443-E3ED-4464-8B7E-751E03D0DC5F"       // Similar to DASH, but with 2443 instead of 2442
-}
-
-// Omnipod 5 Heartbeat Service - used for O5 pod keep-alive
-enum o5Omnipod5HeartbeatServiceUUID: String, CBUUIDRawValue {
-    case advertisement = "ECF301E2-674B-4474-94D0-364F3AA653E6"
-    case service =       "7DED7A6C-CA72-46A7-A3A2-6061F6FDCAEB"
-}
-
-enum o5Omnipod5HeartbeatCharacteristicUUID: String, CBUUIDRawValue {
-    // The heartbeat characteristic UUID - to be confirmed via BLE service discovery
-    case heartbeat = "7DED7A6D-CA72-46A7-A3A2-6061F6FDCAEB"
 }

@@ -37,6 +37,7 @@ class O5CertificateStore {
     /// Randomly picks an available O5 controllerId with or 0 if none available
     static var pickControllerId: UInt32 {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         if let data = O5RegistrationData.allValues.randomElement() {
             return data.controllerId
         }
@@ -46,12 +47,14 @@ class O5CertificateStore {
     // Returns true if no O5RegistrationData is available
     static var isEmpty: Bool {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         return O5RegistrationData.isEmpty
     }
 
     // Returns true if O5RegistrationData exists for the specific controllerId
     static func contains(_ controllerId: UInt32) -> Bool {
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         return O5RegistrationData.get(controllerId) != nil
     }
 
@@ -62,6 +65,7 @@ class O5CertificateStore {
     init(controllerId: UInt32) throws {
 
         loadOptionalO5Data()
+        O5CertificateKeychain.restoreIntoRegistry()
         guard let data = O5RegistrationData.get(controllerId) else {
             log.debug("@@@ O5CertificateStore has no data for 0x%08X", controllerId)
             throw PodCommsError.noCertificateFound
@@ -214,17 +218,34 @@ class O5CertificateStore {
     }
 }
 
+// MARK: - Public availability helper
+
+/// Whether Omnipod 5 pairing should be presented as available in the UI.
+///
+/// O5 is surfaced unconditionally on this branch — the build is expected to ship
+/// with built-in registration data, or the user is expected to import / download
+/// a keypair as part of setup.
+public func isOmnipod5Enabled() -> Bool {
+    return true
+}
+
 // MARK: - Runtime Installer
 
-/// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast
+/// Load the data from the optional O5Data file if present by invoking its install() function using a unsafeBitCast.
+/// Any registry entries that appear as a result of the call are tagged with `.compiled`.
 fileprivate func loadOptionalO5Data() {
     // Use RTLD_DEFAULT (-2) to find the symbol if it was compiled into the binary
-    if let installSym = dlsym(
+    guard let installSym = dlsym(
         UnsafeMutableRawPointer(bitPattern: -2),
         "O5RegistrationDataInstall"
-    ) {
-        typealias InstallFunc = @convention(c) () -> Void
-        let install = unsafeBitCast(installSym, to: InstallFunc.self)
-        install()
+    ) else { return }
+
+    let before = Set(O5RegistrationData.allValues.map { $0.controllerId })
+    typealias InstallFunc = @convention(c) () -> Void
+    let install = unsafeBitCast(installSym, to: InstallFunc.self)
+    install()
+    let after = Set(O5RegistrationData.allValues.map { $0.controllerId })
+    for newId in after.subtracting(before) {
+        O5RegistrationData.markSource(newId, .compiled)
     }
 }

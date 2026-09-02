@@ -7,24 +7,29 @@ import Foundation
 
 // Constants
 let ProductCode: [UInt32: String] = [
+    0x02: "E1", // 'E' pod? U100
+    0x16: "E2", // 'E' pod? U200
+    0x34: "E5", // 'E' pod? U500
+
+    0x03: "A0", // Not "A1" for some unknown reason
+    0x17: "Ai", // probably reserved
+    0x35: "Aj", // probably reserved
+
     0x04: "D1", // 'D'ash (gen 4) U100
     0x18: "D2", // 'D'ash (gen 4) U200
     0x36: "D5", // 'D'ash (gen 4) U500
+
+    0x05: "P1", // 'P're-production? (Omnipod 5) U100
+    0x19: "P2", // 'P're-production? (Omnipod 5) U200
+    0x37: "P5", // 'P're-production? (Omnipod 5) U500
 
     0x07: "H1", // 'H'orizon (Omnipod 5) U100
     0x1B: "H2", // 'H'orizon (Omnipod 5) U200
     0x39: "H5", // 'H'orizon (Omnipod 5) U500
 
-    0x02: "E1", // 'E' pod (Omnipod 6?) U100
-    0x16: "E2", // 'E' pod (Omnipod 6?) U200
-    0x34: "E5", // 'E' pod (Omnipod 6?) U500
-
-    0x05: "P1", // 'P're-production? U100
-    0x19: "P2", // 'P're-production? U200
-    0x37: "P5", // 'P're-production? U500
-
-    0x03: "A0",
-    0x09: "R1",
+    0x09: "R1", // 'R'eworked? (Omnipod 5) U100
+    0x1D: "R2", // 'R'eworked? (Omnipod 5) U200
+    0x3B: "R5", // 'R'eworked? (Omnipod 5) U500
 ]
 
 let MfgLoc: [Int: String] = [

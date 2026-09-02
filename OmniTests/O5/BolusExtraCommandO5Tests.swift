@@ -2,8 +2,6 @@
 //  BolusExtraCommandO5Tests.swift
 //  OmniTests
 //
-//  O5 BolusExtraCommand (subtype 0x12 + bolusInfo). Expected 20-byte blocks from O5CommLogFixtures.
-//
 
 import XCTest
 @testable import OmnipodKit
@@ -23,14 +21,12 @@ class BolusExtraCommandO5Tests: XCTestCase {
     }
 
     func testErosStyleDecode_noBolusInfo() throws {
-        // Standard Eros/DASH 0x0d block (30 U example from BolusTests).
         let cmd = try BolusExtraCommand(encodedData: hex("170d7c177000030d40000000000000"))
         XCTAssertNil(cmd.bolusInfo)
         XCTAssertEqual(cmd.data[1], 0x0d)
     }
 
-    func testO5OneUnitBolusEncoding_commLog() throws {
-        // Matches PodCommsSession.bolus() for O5 manual 1.0 U (mealUnits == units).
+    func testO5OneUnitBolusEncoding() throws {
         let cmd = BolusExtraCommand(
             units: 1.0,
             timeBetweenPulses: TimeInterval(seconds: Pod.secondsPerBolusPulse),
@@ -47,8 +43,7 @@ class BolusExtraCommandO5Tests: XCTestCase {
         XCTAssertFalse(decoded.completionBeep)
     }
 
-    func testO5PrimeBolusEncoding_commLog() throws {
-        // Matches PodCommsSession.prime() for O5 (empty BolusInfo).
+    func testO5PrimeBolusEncoding() throws {
         let timeBetweenPulses = TimeInterval(seconds: Pod.secondsPerPrimePulse)
         let cmd = BolusExtraCommand(
             units: Pod.primeUnits,
@@ -62,7 +57,7 @@ class BolusExtraCommandO5Tests: XCTestCase {
         XCTAssertEqual(decoded.timeBetweenPulses, timeBetweenPulses)
     }
 
-    func testO5CannulaBolusEncoding_commLog() throws {
+    func testO5CannulaBolusEncoding() throws {
         let timeBetweenPulses = TimeInterval(seconds: Pod.secondsPerPrimePulse)
         let cmd = BolusExtraCommand(
             units: Pod.cannulaInsertionUnits,

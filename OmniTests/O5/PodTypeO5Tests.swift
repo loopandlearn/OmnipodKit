@@ -19,18 +19,4 @@ class PodTypeO5Tests: XCTestCase {
         XCTAssertEqual(layout.maxPayloadSize, 244)
         XCTAssertEqual(OmniTestFixtures.o5BlePacketLayout.maxPayloadSize, 244)
     }
-
-    func testBlePodProfileHeartbeatUUIDs() {
-        let profile = BlePodProfile.omnipod5
-        XCTAssertNotNil(profile.heartbeatServiceUUID)
-        XCTAssertNotNil(profile.heartbeatCharacteristicUUID)
-        XCTAssertEqual(
-            profile.heartbeatServiceUUID,
-            o5Omnipod5HeartbeatServiceUUID.service.cbUUID
-        )
-        XCTAssertEqual(
-            profile.heartbeatCharacteristicUUID,
-            o5Omnipod5HeartbeatCharacteristicUUID.heartbeat.cbUUID
-        )
-    }
 }

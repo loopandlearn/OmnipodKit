@@ -145,6 +145,7 @@ class OmniSettingsViewModel: ObservableObject {
 
     @Published var previousPodDetails: PodDetails?
 
+    @Published var controllerId: UInt32
 
     var timeZone: TimeZone {
         return pumpManager.status.timeZone
@@ -244,6 +245,11 @@ class OmniSettingsViewModel: ObservableObject {
 
     var navigateTo: ((OmniUIScreen) -> Void)?
 
+    func refreshO5IdsFromCertStore() {
+        pumpManager.refreshO5IdsFromCertStore()
+        controllerId = pumpManager.state.controllerId // save the updated controllerId
+    }
+
     private let pumpManager: OmniPumpManager
 
     init(pumpManager: OmniPumpManager) {
@@ -264,11 +270,12 @@ class OmniSettingsViewModel: ObservableObject {
         beepPreference = pumpManager.beepPreference
         silencePodPreference = pumpManager.silencePod ? .enabled : .disabled
         silencePodEnd = pumpManager.silencePodEnd
-        podKeepAlivePreference = Storage.shared.podKeepAlive.value
+        podKeepAlivePreference = pumpManager.podKeepAlive
         hasConnection = pumpManager.hasConnection
         insulinType = pumpManager.insulinType
         podDetails = pumpManager.podDetails
         previousPodDetails = pumpManager.previousPodDetails
+        controllerId = pumpManager.state.controllerId
 
         pumpManager.addPodStateObserver(self, queue: DispatchQueue.main)
         pumpManager.addStatusObserver(self, queue: DispatchQueue.main)
@@ -276,7 +283,7 @@ class OmniSettingsViewModel: ObservableObject {
         // Trigger refresh
         pumpManager.getPodStatus() { _ in }
 
-        if pumpManager.podType.usesRileyLink {
+        if pumpManager.podType.isEros {
             pumpManager.updateRLConnectionStatus()
         }
     }
@@ -413,6 +420,7 @@ class OmniSettingsViewModel: ObservableObject {
 
     func setPodKeepAlive(_ podKeepAlivePreference: PodKeepAlive) {
         self.podKeepAlivePreference = podKeepAlivePreference
+        pumpManager.podKeepAlive = podKeepAlivePreference
     }
 
     func didChangeInsulinType(_ newType: InsulinType?) {

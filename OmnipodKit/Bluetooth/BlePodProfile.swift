@@ -42,30 +42,19 @@ struct BlePodProfile {
     let serviceUUID: CBUUID
     let commandCharacteristicUUID: CBUUID
     let dataCharacteristicUUID: CBUUID
-    let heartbeatServiceUUID: CBUUID?
-    let heartbeatCharacteristicUUID: CBUUID?
     let commandWriteType: CBCharacteristicWriteType
     let packetLayout: BlePacketLayout
 
     func makePeripheralConfiguration() -> PeripheralManager.Configuration {
-        var serviceCharacteristics: [CBUUID: [CBUUID]] = [
+        let serviceCharacteristics: [CBUUID: [CBUUID]] = [
             serviceUUID: [commandCharacteristicUUID, dataCharacteristicUUID]
         ]
 
-        if let heartbeatServiceUUID = heartbeatServiceUUID,
-           let heartbeatCharacteristicUUID = heartbeatCharacteristicUUID {
-            serviceCharacteristics[heartbeatServiceUUID] = [heartbeatCharacteristicUUID]
-        }
-
-        var notifyingCharacteristics: [CBUUID: [CBUUID]] = [
+        let notifyingCharacteristics: [CBUUID: [CBUUID]] = [
             serviceUUID: []
         ]
-        if let heartbeatServiceUUID = heartbeatServiceUUID,
-           let heartbeatCharacteristicUUID = heartbeatCharacteristicUUID {
-            notifyingCharacteristics[heartbeatServiceUUID] = [heartbeatCharacteristicUUID]
-        }
 
-        var valueUpdateMacros: [CBUUID: (_ manager: PeripheralManager) -> Void] = [
+        let valueUpdateMacros: [CBUUID: (_ manager: PeripheralManager) -> Void] = [
             commandCharacteristicUUID: { (manager: PeripheralManager) in
                 guard let characteristic = manager.peripheral.getCommandCharacteristic(profile: manager.profile) else { return }
                 guard let value = characteristic.value else { return }
@@ -88,12 +77,6 @@ struct BlePodProfile {
             }
         ]
 
-        if let heartbeatCharacteristicUUID = heartbeatCharacteristicUUID {
-            valueUpdateMacros[heartbeatCharacteristicUUID] = { (manager: PeripheralManager) in
-                manager.handleHeartbeat()
-            }
-        }
-
         return PeripheralManager.Configuration(
             serviceCharacteristics: serviceCharacteristics,
             notifyingCharacteristics: notifyingCharacteristics,
@@ -109,8 +92,6 @@ extension BlePodProfile {
         serviceUUID: dashOmnipodServiceUUID.service.cbUUID,
         commandCharacteristicUUID: dashOmnipodCharacteristicUUID.command.cbUUID,
         dataCharacteristicUUID: dashOmnipodCharacteristicUUID.data.cbUUID,
-        heartbeatServiceUUID: nil,
-        heartbeatCharacteristicUUID: nil,
         commandWriteType: .withResponse,
         packetLayout: BlePacketLayout(
             maxPayloadSize: 20,
@@ -127,8 +108,6 @@ extension BlePodProfile {
         serviceUUID: o5OmnipodServiceUUID.service.cbUUID,
         commandCharacteristicUUID: o5OmnipodCharacteristicUUID.command.cbUUID,
         dataCharacteristicUUID: o5OmnipodCharacteristicUUID.data.cbUUID,
-        heartbeatServiceUUID: o5Omnipod5HeartbeatServiceUUID.service.cbUUID,
-        heartbeatCharacteristicUUID: o5Omnipod5HeartbeatCharacteristicUUID.heartbeat.cbUUID,
         commandWriteType: .withoutResponse,
         packetLayout: BlePacketLayout(
             maxPayloadSize: 244,

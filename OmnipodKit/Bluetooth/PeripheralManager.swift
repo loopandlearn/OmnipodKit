@@ -69,6 +69,9 @@ class PeripheralManager: NSObject {
 
     private(set) weak var central: CBCentralManager?
 
+    /// Owning BluetoothManager, for the fresh-discovery connect-on-demand path (it sees didDiscover).
+    weak var bluetoothManager: BluetoothManager?
+
     let profile: BlePodProfile
     let configuration: Configuration
 
@@ -126,7 +129,18 @@ extension PeripheralManager {
 
     func configureAndRun(_ block: @escaping (_ manager: PeripheralManager) -> Void) -> (() -> Void) {
         return {
-            if self.needsReconnection {
+            if BluetoothManager.connectOnDemandEnabled {
+                // "Normally disconnected" model: the pod isn't held connected, so connect on demand
+                // for this session (no forceful reconnect — that heuristic is what caused the ~28s
+                // disconnect-then-wait stalls). If already connected (burst of sessions), no-op.
+                if self.peripheral.state != .connected {
+                    do {
+                        try self.connectOnDemand(timeout: 20)
+                    } catch let error {
+                        self.log.error("[connectOnDemand] on-demand connect failed: %{public}@", String(describing: error))
+                    }
+                }
+            } else if self.needsReconnection {
                 self.log.default("Triggering forceful reconnect")
                 do {
                     try self.reconnect(timeout: 5)
@@ -212,10 +226,12 @@ extension PeripheralManager {
 // MARK: - Synchronous Commands
 extension PeripheralManager {
     /// - Throws: PeripheralManagerError
-    func runCommand(timeout: TimeInterval, command: () -> Void) throws {
+    func runCommand(timeout: TimeInterval, allowDisconnected: Bool = false, command: () -> Void) throws {
         // Prelude
         dispatchPrecondition(condition: .onQueue(queue))
-        guard central?.state == .poweredOn && peripheral.state == .connected else {
+        // allowDisconnected: for connect-on-demand, the command IS the connect — the peripheral is
+        // legitimately disconnected here and becomes connected via the .connect condition.
+        guard central?.state == .poweredOn && (allowDisconnected || peripheral.state == .connected) else {
             self.log.info("runCommand guard failed - bluetooth not running or peripheral not connected: peripheral %@", peripheral)
             self.log.info("runCommand guard failed - not ready: peripheral=%{public}@ centralState=%{public}@ peripheralState=%{public}@ queueDepth=%{public}d commandConditions=%{public}@",
                           peripheral,
@@ -312,6 +328,36 @@ extension PeripheralManager {
             addCondition(.connect)
             central?.cancelPeripheralConnection(peripheral)
         }
+    }
+
+    /// Connect-on-demand: issue a real connect() and wait for didConnect. Unlike reconnect(), this
+    /// does NOT cancel first — it connects a peripheral we're deliberately keeping disconnected
+    /// between commands. Logs the measured connect latency (the number that decides viability).
+    func connectOnDemand(timeout: TimeInterval) throws {
+        guard peripheral.state != .connected else { return }
+        log.default("[connectOnDemand] connecting on demand (state=%{public}d, timeout=%{public}ds)", peripheral.state.rawValue, Int(timeout))
+        // Go fully dark for the connect: ANY concurrent scan (even non-allowDuplicates wildcard)
+        // starves connection completion on iOS — connect-on-demand with a "helper" scan reliably
+        // TIMED OUT at 20s foreground, whereas a scan-free delayed connect always
+        // completed. So stop scanning and let iOS complete the connect; the alarm scan resumes on
+        // disconnect. (Latency without a scan is iOS's own reacquisition; measure it, optimize next.)
+        let start = Date()
+        do {
+            try runCommand(timeout: timeout, allowDisconnected: true) {
+                addCondition(.connect)
+                // Scan-free connect: the peripheral is a known/recovered CBPeripheral (via
+                // retrievePeripherals), so a plain connect() registers a pending connect and iOS
+                // reacquires the pod on its own — no scan needed. Route through BluetoothManager so
+                // the central call runs on managerQueue (see connectOnDemand helper).
+                bluetoothManager?.connectOnDemand(peripheral)
+            }
+        } catch {
+            // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
+            // instead of leaving it wedged in .connecting. Queue-correct cancel via BluetoothManager.
+            bluetoothManager?.disconnectOnDemand(peripheral)
+            throw error
+        }
+        log.default("[connectOnDemand] connected in %{public}@s", String(format: "%.3f", Date().timeIntervalSince(start)))
     }
 
     /// - Throws: PeripheralManagerError
@@ -461,7 +507,7 @@ extension PeripheralManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         commandLock.lock()
-        
+
         if let macro = configuration.valueUpdateMacros[characteristic.uuid] {
             macro(self)
         }
@@ -589,28 +635,6 @@ extension CBPeripheral {
 }
 
 
-// MARK: - O5 Heartbeat handling
-extension PeripheralManager {
-    /// Timestamp of the last heartbeat received from the O5 pod
-    private static var lastHeartbeatTime: Date?
-
-    static func mostRecentHeartbeatTime() -> Date? {
-        return lastHeartbeatTime
-    }
-
-    /// Handle a heartbeat notification from the O5 pod.
-    /// This resets the idle timer to keep the connection alive.
-    func handleHeartbeat() {
-        PeripheralManager.lastHeartbeatTime = Date()
-        log.debug("Received O5 heartbeat at %{public}@", String(describing: PeripheralManager.lastHeartbeatTime))
-
-        // Reset idle timer when we receive a heartbeat
-        self.queue.async {
-            self.idleStart = Date()
-        }
-    }
-}
-
 // MARK: - Command session management
 extension PeripheralManager {
     func runSession(withName name: String , _ block: @escaping () -> Void) {
@@ -623,7 +647,39 @@ extension PeripheralManager {
                 manager.log.default("------------------------ %{public}@ ---------------------------", name)
                 self?.idleStart = Date()
                 self?.log.default("Start of idle at %{public}@", String(describing: self?.idleStart))
+                self?.scheduleIdleDisconnectIfNeeded()
             }
         })
+    }
+
+    /// Connect-on-demand: after a session goes idle, if no further session is queued, disconnect
+    /// the pod so it's left "normally disconnected" (and advertising/observable) between commands.
+    /// The delay is kept SHORT (see `BluetoothManager.idleDisconnectSeconds`) so a background heartbeat-wake
+    /// cycle disconnects before iOS suspends the app — letting the StartDelay probe re-arm (it needs a
+    /// disconnected pod). The status→dose burst still shares one connection: each session resets `idleStart`,
+    /// so the disconnect only lands this many seconds after the LAST command. (Foreground / Pod Keep Alive
+    /// hold the connection separately via `shouldHoldConnection`, so this delay only bites while backgrounded.)
+    private func scheduleIdleDisconnectIfNeeded() {
+        guard BluetoothManager.connectOnDemandEnabled else { return }
+        let idleDelay: TimeInterval = BluetoothManager.idleDisconnectSeconds
+        let idleAt = idleStart
+        queue.asyncAfter(deadline: .now() + idleDelay) { [weak self] in
+            guard let self = self, BluetoothManager.connectOnDemandEnabled else { return }
+            // Keep-alive: skip the idle-disconnect whenever we want the pod held connected — while the app
+            // is active (foreground keep-alive: connection-gated UI live, in-app commands instant), OR when
+            // a background Pod Keep Alive mode (silentTune/rileyLink) is selected for phone/pod combos where
+            // a disconnect→reconnect is unreliable. When Pod Keep Alive is disabled this is just foreground.
+            if self.bluetoothManager?.shouldHoldConnection == true {
+                self.log.default("[connectOnDemand] holding connection (keep-alive) — skip idle-disconnect")
+                return
+            }
+            // Only disconnect if we're still idle (no newer session) and nothing is queued/running.
+            guard self.idleStart == idleAt, self.sessionQueue.operationCount == 0,
+                  self.peripheral.state == .connected else { return }
+            self.log.default("[connectOnDemand] idle ~%{public}ds, no queued session -> disconnecting", Int(idleDelay))
+            // Queue-correct cancel: route through BluetoothManager so it runs on managerQueue. Cancelling
+            // from this (PeripheralManager) queue raced CoreBluetooth's teardown and wedged the next connect.
+            self.bluetoothManager?.disconnectOnDemand(self.peripheral)
+        }
     }
 }
