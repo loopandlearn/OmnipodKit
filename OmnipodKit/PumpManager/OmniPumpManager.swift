@@ -1216,7 +1216,7 @@ extension OmniPumpManager {
         podState.fault = fault
 
         let podComms: PodComms
-        if state.podType.usesRileyLink {
+        if state.podType.isEros {
             let erosPodComms = ErosPodComms.init(podState: podState, podType: state.podType)
             podComms = erosPodComms
         } else {
