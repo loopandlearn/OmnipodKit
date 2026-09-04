@@ -447,6 +447,30 @@ class BluetoothManager: NSObject {
     /// disconnected state via connect-on-demand. managerQueue-isolated.
     private var pendingHeartbeatFire = false
 
+    /// Number of pod command sessions currently executing. Sessions run on PeripheralManager's
+    /// sessionQueue/`perform` queues rather than managerQueue, so this is lock-guarded rather than
+    /// queue-isolated. Maintained by `PeripheralManager.runSession`.
+    ///
+    /// Backgrounding mid-exchange used to cancel the connection out from under an in-flight write,
+    /// which surfaced to the user as "Unable To Clear Alert / Message IO Exception ... timeout" even
+    /// though the pod had already received the command and replied — only our trailing ACK was lost.
+    /// `enterBackground()` consults this and defers the disconnect to the session's own
+    /// idle-disconnect instead.
+    private let lockedActiveCommandSessions = Locked<Int>(0)
+
+    /// True while at least one pod command session is executing. See `lockedActiveCommandSessions`.
+    var hasActiveCommandSession: Bool {
+        return lockedActiveCommandSessions.value > 0
+    }
+
+    func beginCommandSession() {
+        lockedActiveCommandSessions.mutate { $0 += 1 }
+    }
+
+    func endCommandSession() {
+        lockedActiveCommandSessions.mutate { $0 = max(0, $0 - 1) }
+    }
+
     /// True while the app is foregrounded. While foreground we keep the pod connected (skip the
     /// idle-disconnect, reconnect on an unintended drop) so connection-gated UI (test beeps, etc.) is
     /// live and in-app commands are instant. On background we disconnect and resume the heartbeat probe.
@@ -1170,6 +1194,16 @@ class BluetoothManager: NSObject {
                 // We want it held connected but it's currently down — reconnect so keep-alive can refresh it.
                 beginCommandConnect(peripheral)
             }
+            return
+        }
+        // A command exchange is mid-flight: cancelling now kills the pending write and the caller
+        // reports a failure for work the pod has usually already done (the ACK is written *after* the
+        // response is parsed). Leave the link up — `scheduleIdleDisconnectIfNeeded()` runs at the end
+        // of every session and will disconnect a moment later, which is the same teardown this path
+        // would have performed.
+        if hasActiveCommandSession {
+            log.default("[connectOnDemand] background — command session in flight, deferring disconnect to idle")
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] background — command in flight, deferring disconnect")
             return
         }
         commandConnectInFlight = false   // deliberate disconnect: let the probe re-arm
