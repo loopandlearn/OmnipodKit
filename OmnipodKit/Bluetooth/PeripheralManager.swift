@@ -642,6 +642,8 @@ extension PeripheralManager {
 
         sessionQueue.addOperation({ [weak self] in
             self?.perform { (manager) in
+                manager.bluetoothManager?.beginCommandSession()
+                defer { manager.bluetoothManager?.endCommandSession() }
                 manager.log.default("======================== %{public}@ ===========================", name)
                 block()
                 manager.log.default("------------------------ %{public}@ ---------------------------", name)
