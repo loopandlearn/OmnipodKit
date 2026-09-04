@@ -86,7 +86,7 @@ class SessionEstablisher {
         let challenge = try eapAkaChallenge()
         let sendResult = manager.sendMessagePacket(challenge)
         guard case .sentWithAcknowledgment = sendResult else {
-            throw SessionEstablishmentException.CommunicationError("Could not send the EAP AKA challenge: $sendResult")
+            throw SessionEstablishmentException.CommunicationError("Could not send the EAP AKA challenge: \(sendResult)")
         }
         guard let challengeResponse = try manager.readMessagePacket() else {
             throw SessionEstablishmentException.CommunicationError("Could not establish session")
@@ -302,8 +302,8 @@ class SessionEstablisher {
 
     private func assertIdentifier(msg: EapMessage) throws {
         if (msg.identifier != identifier) {
-            log.debug("EAP-AKA: got incorrect identifier ${msg.identifier} expected: $identifier")
-            throw SessionEstablishmentException.CommunicationError("Received incorrect EAP identifier: ${msg.identifier}")
+            log.debug("EAP-AKA: got incorrect identifier %{public}d expected: %{public}d", msg.identifier, identifier)
+            throw SessionEstablishmentException.CommunicationError("Received incorrect EAP identifier: \(msg.identifier)")
         }
     }
 
@@ -325,14 +325,14 @@ class SessionEstablisher {
                 if (milenage.res != attr.payload) {
                     throw SessionEstablishmentException.CommunicationError(
                         "RES mismatch." +
-                            "Expected: ${milenage.res.toHex()}." +
-                            "Actual: ${attr.payload.toHex()}."
+                            "Expected: \(milenage.res.hexadecimalString)." +
+                            "Actual: \(attr.payload.hexadecimalString)."
                     )
                 }
             case is EapAkaAttributeCustomIV:
                 nodeIV = attr.payload.subdata(in: 0..<SessionEstablisher.IV_SIZE)
             default:
-                throw SessionEstablishmentException.CommunicationError("Unknown attribute received: $attr")
+                throw SessionEstablishmentException.CommunicationError("Unknown attribute received: \(attr)")
             }
         }
         return nil
@@ -340,13 +340,13 @@ class SessionEstablisher {
 
     private func assertValidAkaMessage(eapMsg: EapMessage) throws {
         if (eapMsg.attributes.count != 2) {
-            log.debug("EAP-AKA: got incorrect: $eapMsg")
+            log.debug("EAP-AKA: got incorrect: %{public}@", String(describing: eapMsg))
             if (eapMsg.attributes.count == 1 && eapMsg.attributes[0] is EapAkaAttributeClientErrorCode) {
                 throw SessionEstablishmentException.CommunicationError(
-                    "Received CLIENT_ERROR_CODE for EAP-AKA challenge: ${eapMsg.attributes[0].toByteArray().toHex()}"
+                    "Received CLIENT_ERROR_CODE for EAP-AKA challenge: \(eapMsg.attributes[0].toData().hexadecimalString)"
                 )
             }
-        throw SessionEstablishmentException.CommunicationError("Expecting two attributes, got: ${eapMsg.attributes.count}")
+        throw SessionEstablishmentException.CommunicationError("Expecting two attributes, got: \(eapMsg.attributes.count)")
         }
     }
 
@@ -377,8 +377,8 @@ class SessionEstablisher {
         if (newSqnMilenage.macS != newSqnMilenage.receivedMacS) {
             throw SessionEstablishmentException.CommunicationError(
                 "MacS mismatch. " +
-                    "Expected: ${newSqnMilenage.macS.toHex()}. " +
-                    "Received: ${newSqnMilenage.receivedMacS.toHex()}"
+                    "Expected: \(newSqnMilenage.macS.hexadecimalString). " +
+                    "Received: \(newSqnMilenage.receivedMacS.hexadecimalString)"
             )
         }
         return try EapSqn(data: autsMilenage.synchronizationSqn)
