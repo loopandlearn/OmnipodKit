@@ -347,7 +347,7 @@ class BlePodMessageTransport: MessageTransport {
         guard case .sentWithAcknowledgment = ackResult else {
             log.error("[transport] failed phase=ack-write msgSeq=%{public}d nonceSeq=%{public}d messageNumber=%{public}d ackResult=%{public}@",
                       msgSeq, nonceSeq, messageNumber, String(describing: ackResult))
-            throw PodProtocolError.messageIOException("Could not write $msgType: \(ackResult)")
+            throw PodProtocolError.messageIOException("Could not write ACK: \(ackResult)")
         }
 
         // verify that the Omnipod message # matches the expected value

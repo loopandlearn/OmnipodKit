@@ -1122,7 +1122,7 @@ class PodCommsSession: MessageTransportDelegate {
                 self.log.default("Unacknowledged command was received by pump")
                 unacknowledgedCommandWasReceived(pendingCommand: pendingCommand, podStatus: status)
             } else if checkCommandAgainstStatus(pendingCommand: pendingCommand, podStatus: status) {
-                self.log.default("Accepted unacknowledged command was received based on pod delivery status of ${public}@", String(describing: status.deliveryStatus))
+                self.log.default("Accepted unacknowledged command was received based on pod delivery status of %{public}@", String(describing: status.deliveryStatus))
             } else {
                 self.log.default("Unacknowledged command was not received by pump")
             }
