@@ -725,8 +725,8 @@ class BluetoothManager: NSObject {
             // Disconnect from all devices not in our connection list
             for device in devices {
                 let peripheral = device.manager.peripheral
-                if !autoConnectIDs.contains(peripheral.identifier.uuidString) &&
-                   (peripheral.state == .connected || peripheral.state == .connecting)
+                if peripheral.state == .connecting ||
+                   (peripheral.state == .connected && !autoConnectIDs.contains(peripheral.identifier.uuidString))
                 {
                     log.default("Disconnecting from peripheral: %{public}@", peripheral)
                     manager.cancelPeripheralConnection(peripheral)
@@ -833,9 +833,15 @@ class BluetoothManager: NSObject {
         manager.stopScan()
         for device in devices {
             let peripheral = device.manager.peripheral
-            if peripheral.state == .disconnected || peripheral.state == .disconnecting {
+            switch peripheral.state {
+            case .connecting where !isConnectWatchdogActive(peripheral):
+                log.info("discoverPods: Cancelling stale connect: %{public}@", peripheral)
+                manager.cancelPeripheralConnection(peripheral)
+            case .disconnected, .disconnecting:
                 log.info("discoverPods: Connecting to peripheral: %{public}@", peripheral)
-                timedConnect(peripheral)  // pairing/discovery — an explicit connect, not auto-reconnect
+                timedConnect(peripheral)
+            default:
+                break
             }
         }
         startScanning()
@@ -1570,30 +1576,13 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 connectionDelegate?.omnipodLogDeviceEvent("[pairing] heard pod \(peripheral.identifier.uuidString) pairable=\(podAdvertisement.pairable) state=\(peripheral.state.rawValue)")
             }
             if discoveryModeEnabled && podAdvertisement.pairable {
-                // We've heard our target pairable pod — stop the discovery scan so it doesn't starve the
-                // connect (an active allowDuplicates scan wedges the connect in .connecting, which is
-                // what stalled pairing), then connect if it's disconnected. A watchdog-managed connect
-                // in flight is left alone (it's supervised and will retry itself).
+                // Stop the scan so it doesn't starve the connect, then connect if disconnected.
+                // Anything already .connecting is ours: discoverPods cancels stale connects first.
                 if manager.isScanning { manager.stopScan() }
                 if peripheral.state == .disconnected {
                     log.default("Connecting to pairable device %{public}@ in discovery mode", peripheral)
                     connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString)")
-                    timedConnect(peripheral)  // pairing — an explicit connect, not auto-reconnect
-                } else if peripheral.state == .connecting && !isConnectWatchdogActive(peripheral) {
-                    // ZOMBIE pending connect: we just HEARD this pod advertise, so it is not in a live
-                    // connection — a stale, unsupervised connect request (e.g. from an abandoned pairing
-                    // attempt) is pinning it in .connecting. Field failure mode: every rescan reported
-                    // "heard pod ... state=1" and then declined to connect, so pairing never succeeded.
-                    // Cancel the zombie and connect fresh (re-arming the watchdog) once teardown lands.
-                    log.default("[pairing] pairable pod %{public}@ stuck in .connecting with no watchdog — cancelling zombie connect", peripheral.identifier.uuidString)
-                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] zombie connect on pairable pod — cancelling and reconnecting")
-                    manager.cancelPeripheralConnection(peripheral)
-                    managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectTeardownSeconds) { [weak self] in
-                        guard let self = self, self.discoveryModeEnabled, peripheral.state != .connected else { return }
-                        self.log.default("[pairing] reconnecting to pairable pod %{public}@ after zombie teardown", peripheral.identifier.uuidString)
-                        self.connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString) (post-zombie)")
-                        self.timedConnect(peripheral)
-                    }
+                    timedConnect(peripheral)
                 }
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
                 log.debug("Reconnecting to autoconnect device")
