@@ -333,15 +333,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         let mustProvide = request != nil
         let desc = request.map { "last=\($0.lastCGMReadingDate.map { String(describing: $0) } ?? "nil") interval=\(Int($0.expectedCGMReadingInterval))s" } ?? "nil"
         logDeviceCommunication("[heartbeat] pid=\(pid) setBLEHeartbeatRequest(\(desc))", type: .connection)
-        // `mayUseRileyLink` is true for DASH as well as Eros, because DASH *can* use a RileyLink
-        // under the Pod Keep Alive option. That is the wrong question here: what matters is whether
-        // a RileyLink is actually in the loop to tick. A DASH pod on direct BLE with Pod Keep Alive
-        // off took the RileyLink branch, so `provideHeartbeat` was never set and the BLE pod never
-        // got its heartbeat request -- Loop asked for a heartbeat, we logged it, and dropped it.
-        // Only bites when the CGM cannot provide the heartbeat itself (a remote/networked CGM such
-        // as Nightscout); a BLE Dexcom masks it, which is why it went unnoticed.
-        let rileyLinkIsInUse = self.state.podType.isEros
-            || (self.state.podType.mayUseRileyLink && self.state.podKeepAlive == .rileyLink)
+        let rileyLinkIsInUse = self.state.podType.isEros || self.state.podKeepAlive == .rileyLink
         if rileyLinkIsInUse {
             rileyLinkDeviceProvider.timerTickEnabled =
                 self.state.isPumpDataStale || mustProvide || /// RL ticks needed for traditional BLE wakeups
