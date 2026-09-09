@@ -447,6 +447,21 @@ class BluetoothManager: NSObject {
     /// disconnected state via connect-on-demand. managerQueue-isolated.
     private var pendingHeartbeatFire = false
 
+    /// Lock-guarded: sessions run on PeripheralManager's queues, not managerQueue.
+    private let lockedActiveCommandSessions = Locked<Int>(0)
+
+    var hasActiveCommandSession: Bool {
+        return lockedActiveCommandSessions.value > 0
+    }
+
+    func beginCommandSession() {
+        lockedActiveCommandSessions.mutate { $0 += 1 }
+    }
+
+    func endCommandSession() {
+        lockedActiveCommandSessions.mutate { $0 = max(0, $0 - 1) }
+    }
+
     /// True while the app is foregrounded. While foreground we keep the pod connected (skip the
     /// idle-disconnect, reconnect on an unintended drop) so connection-gated UI (test beeps, etc.) is
     /// live and in-app commands are instant. On background we disconnect and resume the heartbeat probe.
@@ -1170,6 +1185,12 @@ class BluetoothManager: NSObject {
                 // We want it held connected but it's currently down — reconnect so keep-alive can refresh it.
                 beginCommandConnect(peripheral)
             }
+            return
+        }
+        // Mid-command: leave the link up; scheduleIdleDisconnectIfNeeded() disconnects after the session.
+        if hasActiveCommandSession {
+            log.default("[connectOnDemand] background — command session in flight, deferring disconnect to idle")
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] background — command in flight, deferring disconnect")
             return
         }
         commandConnectInFlight = false   // deliberate disconnect: let the probe re-arm

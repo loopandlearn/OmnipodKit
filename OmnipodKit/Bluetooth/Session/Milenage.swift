@@ -42,8 +42,8 @@ class Milenage {
         guard (sqn.count == Milenage.SQN) else { throw MilenageError.Error("Milenage SQN has to be \(Milenage.SQN) long. Received: \(sqn.hexadecimalString)") }
         guard (auts.count == Milenage.AUTS_SIZE) else { throw MilenageError.Error("Milenage AUTS has to be \(Milenage.AUTS_SIZE) long. Received: \(auts.hexadecimalString)") }
         guard (amf.count == Milenage.MILENAGE_AMF.count) else {
-                throw MilenageError.Error("Milenage AMF has to be ${MILENAGE_AMF.count} long." +
-                    "Received: ${amf.toHex()}")
+                throw MilenageError.Error("Milenage AMF has to be \(Milenage.MILENAGE_AMF.count) long." +
+                    "Received: \(amf.hexadecimalString)")
             }
         self.k = k
         self.sqn = sqn

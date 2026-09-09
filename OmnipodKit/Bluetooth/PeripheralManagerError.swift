@@ -23,8 +23,8 @@ enum PeripheralManagerError: Error {
 extension PeripheralManagerError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .cbPeripheralError(let error):
-            return error.localizedDescription
+        case .cbPeripheralError:
+            return LocalizedString("Bluetooth error", comment: "Error message description for PeripheralManagerError.cbPeripheralError")
         case .notReady:
             return LocalizedString("Peripheral Not Ready", comment: "Error message description for PeripheralManagerError.notReady")
         case .incorrectResponse:
@@ -39,6 +39,22 @@ extension PeripheralManagerError: LocalizedError {
             return LocalizedString("Nack", comment: "Error message description for PeripheralManagerError.nack")
         case .unknownPodType:
             return LocalizedString("Unknown Pod Type", comment: "Error message description for PeripheralManagerError.unknownPodType")
+        }
+    }
+
+    var failureReason: String? {
+        if case .cbPeripheralError(let error) = self {
+            return error.localizedDescription
+        }
+        return nil
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .cbPeripheralError, .timeout, .notReady:
+            return LocalizedString("Try adjusting pod position or toggle Bluetooth off and then on in iPhone Settings", comment: "Recovery suggestion for possible bluetooth issue")
+        default:
+            return nil
         }
     }
 }
