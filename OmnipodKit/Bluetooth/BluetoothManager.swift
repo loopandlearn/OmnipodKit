@@ -275,15 +275,6 @@ class BluetoothManager: NSObject {
         (UserDefaults.standard.object(forKey: "OmnipodKit.eagerPairingBudgetSeconds") as? Double) ?? 40.0
     }
 
-    /// How long a pairing connect we issued ourselves is left alone before hearing the pod advertise
-    /// while it is still `.connecting` counts as a zombie. A peripheral keeps advertising until the link
-    /// is actually established and CoreBluetooth reports `.connecting` from the moment `connect()` is
-    /// called, so an advert inside the first second or two is the normal case, not a stale connect.
-    /// Well past the ~1s a healthy connect takes, well inside `eagerPairingBudgetSeconds`.
-    static var pairingConnectZombieSeconds: TimeInterval {
-        (UserDefaults.standard.object(forKey: "OmnipodKit.pairingConnectZombieSeconds") as? Double) ?? 5.0
-    }
-
     /// EXPERIMENT: pass CBConnectPeripheralOptionEnableAutoReconnect (iOS 17+) on eager connects, to
     /// probe whether it changes the low-level stack's reacquisition behavior on wedge-prone pods.
     /// With it, an unexpected post-establishment drop is auto-reconnected by the system, reported via
@@ -414,11 +405,6 @@ class BluetoothManager: NSObject {
 
     /// Connect-request timestamps (by peripheral UUID) for measuring connect latency in didConnect.
     private var connectRequestedAt: [String: Date] = [:]
-
-    /// When the CURRENT pairing connect was issued (by peripheral UUID), overwritten on every
-    /// `timedConnect`, so the zombie check in didDiscover can tell a connect we just made from a
-    /// stale one. Distinct from `connectRequestedAt`, which is kept across retries for the latency metric.
-    private var pairingConnectIssuedAt: [String: Date] = [:]
 
     /// Delayed-connect probe: true while a StartDelay connect is in flight (issued, awaiting didConnect),
     /// so didDiscover doesn't re-issue during the wait; the issue timestamp measures the true delay.
@@ -569,7 +555,6 @@ class BluetoothManager: NSObject {
         if connectRequestedAt[peripheral.identifier.uuidString] == nil {
             connectRequestedAt[peripheral.identifier.uuidString] = Date()
         }
-        pairingConnectIssuedAt[peripheral.identifier.uuidString] = Date()
         let cm: CBCentralManager = manager
         cm.connect(peripheral, options: nil)
         // Pairing/discovery connect: without a watchdog, a wedged connect was abandoned on the discovery
@@ -740,8 +725,8 @@ class BluetoothManager: NSObject {
             // Disconnect from all devices not in our connection list
             for device in devices {
                 let peripheral = device.manager.peripheral
-                if !autoConnectIDs.contains(peripheral.identifier.uuidString) &&
-                   (peripheral.state == .connected || peripheral.state == .connecting)
+                if peripheral.state == .connecting ||
+                   (peripheral.state == .connected && !autoConnectIDs.contains(peripheral.identifier.uuidString))
                 {
                     log.default("Disconnecting from peripheral: %{public}@", peripheral)
                     manager.cancelPeripheralConnection(peripheral)
@@ -848,9 +833,15 @@ class BluetoothManager: NSObject {
         manager.stopScan()
         for device in devices {
             let peripheral = device.manager.peripheral
-            if peripheral.state == .disconnected || peripheral.state == .disconnecting {
+            switch peripheral.state {
+            case .connecting where !isConnectWatchdogActive(peripheral):
+                log.info("discoverPods: Cancelling stale connect: %{public}@", peripheral)
+                manager.cancelPeripheralConnection(peripheral)
+            case .disconnected, .disconnecting:
                 log.info("discoverPods: Connecting to peripheral: %{public}@", peripheral)
-                timedConnect(peripheral)  // pairing/discovery — an explicit connect, not auto-reconnect
+                timedConnect(peripheral)
+            default:
+                break
             }
         }
         startScanning()
@@ -1585,39 +1576,13 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 connectionDelegate?.omnipodLogDeviceEvent("[pairing] heard pod \(peripheral.identifier.uuidString) pairable=\(podAdvertisement.pairable) state=\(peripheral.state.rawValue)")
             }
             if discoveryModeEnabled && podAdvertisement.pairable {
-                // We've heard our target pairable pod — stop the discovery scan so it doesn't starve the
-                // connect (an active allowDuplicates scan wedges the connect in .connecting, which is
-                // what stalled pairing), then connect if it's disconnected. A watchdog-managed connect
-                // in flight is left alone (it's supervised and will retry itself).
+                // Stop the scan so it doesn't starve the connect, then connect if disconnected.
+                // Anything already .connecting is ours: discoverPods cancels stale connects first.
                 if manager.isScanning { manager.stopScan() }
                 if peripheral.state == .disconnected {
                     log.default("Connecting to pairable device %{public}@ in discovery mode", peripheral)
                     connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString)")
-                    timedConnect(peripheral)  // pairing — an explicit connect, not auto-reconnect
-                } else if peripheral.state == .connecting && !isConnectWatchdogActive(peripheral),
-                          let pending = pairingConnectIssuedAt[peripheral.identifier.uuidString].map({ Date().timeIntervalSince($0) }),
-                          pending < BluetoothManager.pairingConnectZombieSeconds {
-                    // A connect WE issued moments ago (discoverPods pre-connect, or the post-zombie
-                    // reconnect below) is still completing. Hearing an advert now is normal — the pod
-                    // advertises until the link is up. Leave it alone. Without this gate, on a phone
-                    // where the watchdog does not arm, every advert cancelled the in-flight connect and
-                    // pairing looped forever at the advert interval (~1.6s), never completing.
-                    log.debug("[pairing] pairable pod %{public}@ connect in flight %.1fs — leaving it to complete", peripheral.identifier.uuidString, pending)
-                } else if peripheral.state == .connecting && !isConnectWatchdogActive(peripheral) {
-                    // ZOMBIE pending connect: we just HEARD this pod advertise, so it is not in a live
-                    // connection — a stale, unsupervised connect request (e.g. from an abandoned pairing
-                    // attempt) is pinning it in .connecting. Field failure mode: every rescan reported
-                    // "heard pod ... state=1" and then declined to connect, so pairing never succeeded.
-                    // Cancel the zombie and connect fresh (re-arming the watchdog) once teardown lands.
-                    log.default("[pairing] pairable pod %{public}@ stuck in .connecting with no watchdog — cancelling zombie connect", peripheral.identifier.uuidString)
-                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] zombie connect on pairable pod — cancelling and reconnecting")
-                    manager.cancelPeripheralConnection(peripheral)
-                    managerQueue.asyncAfter(deadline: .now() + BluetoothManager.eagerConnectTeardownSeconds) { [weak self] in
-                        guard let self = self, self.discoveryModeEnabled, peripheral.state != .connected else { return }
-                        self.log.default("[pairing] reconnecting to pairable pod %{public}@ after zombie teardown", peripheral.identifier.uuidString)
-                        self.connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString) (post-zombie)")
-                        self.timedConnect(peripheral)
-                    }
+                    timedConnect(peripheral)
                 }
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
                 log.debug("Reconnecting to autoconnect device")
@@ -1696,7 +1661,6 @@ extension BluetoothManager: CBCentralManagerDelegate {
             return
         }
 
-        pairingConnectIssuedAt.removeValue(forKey: peripheral.identifier.uuidString)
         if let requestedAt = connectRequestedAt.removeValue(forKey: peripheral.identifier.uuidString) {
             let latency = String(format: "%.3f", Date().timeIntervalSince(requestedAt))
             log.default("[#%{public}@] CONNECTED: %{public}@ — connect latency %{public}@s (known device: %{public}@)",
@@ -1844,7 +1808,6 @@ extension BluetoothManager: CBCentralManagerDelegate {
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
         log.error("[#%{public}@] FAILED TO CONNECT: %{public}@ error=%{public}@", instanceID, peripheral, String(describing: error))
-        pairingConnectIssuedAt.removeValue(forKey: peripheral.identifier.uuidString)
 
         connectionDelegate?.omnipodPeripheralDidFailToConnect(peripheral: peripheral, error: error)
 
