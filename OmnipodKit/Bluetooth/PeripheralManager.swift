@@ -645,8 +645,6 @@ extension PeripheralManager {
 
         sessionQueue.addOperation({ [weak self] in
             self?.perform { (manager) in
-                // Mark the session in-flight so a backgrounding app doesn't cancel the connection out
-                // from under the exchange. See BluetoothManager.hasActiveCommandSession.
                 manager.bluetoothManager?.beginCommandSession()
                 defer { manager.bluetoothManager?.endCommandSession() }
                 manager.log.default("======================== %{public}@ ===========================", name)

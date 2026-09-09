@@ -19,9 +19,6 @@ enum PodProtocolError: Error {
 }
 
 extension PodProtocolError: LocalizedError {
-    /// User-facing. These reach alert dialogs verbatim (e.g. Loop's "Unable To Clear Alert"), so they
-    /// must read as plain English -- the protocol detail belongs in `failureReason` and the device
-    /// communication log, not in front of someone holding a beeping pod.
     var errorDescription: String? {
         switch self {
         case .invalidLTKKey:
@@ -35,8 +32,6 @@ extension PodProtocolError: LocalizedError {
         }
     }
 
-    /// Diagnostic detail. Not shown by Loop's acknowledgement-failure dialog (which renders
-    /// `errorDescription` + `recoverySuggestion`), but preserved for logs and issue reports.
     var failureReason: String? {
         switch self {
         case .invalidLTKKey(let message):
@@ -57,8 +52,6 @@ extension PodProtocolError: LocalizedError {
     var recoverySuggestion: String? {
         switch self {
         case .messageIOException, .couldNotParseMessageException, .incorrectPacketException, .invalidCrc:
-            // These are usually a dropped link rather than a pod problem, and the command is retried
-            // automatically -- so lead with "no action needed" rather than alarming the user.
             return LocalizedString("This usually resolves on its own. If it keeps happening, move your iPhone closer to the pod.", comment: "Recovery suggestion for a transient pod communication error")
         case .invalidLTKKey, .pairingException:
             return LocalizedString("Move your iPhone closer to the pod and try again.", comment: "Recovery suggestion for a pod pairing error")

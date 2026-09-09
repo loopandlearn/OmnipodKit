@@ -447,18 +447,9 @@ class BluetoothManager: NSObject {
     /// disconnected state via connect-on-demand. managerQueue-isolated.
     private var pendingHeartbeatFire = false
 
-    /// Number of pod command sessions currently executing. Sessions run on PeripheralManager's
-    /// sessionQueue/`perform` queues rather than managerQueue, so this is lock-guarded rather than
-    /// queue-isolated. Maintained by `PeripheralManager.runSession`.
-    ///
-    /// Backgrounding mid-exchange used to cancel the connection out from under an in-flight write,
-    /// which surfaced to the user as "Unable To Clear Alert / Message IO Exception ... timeout" even
-    /// though the pod had already received the command and replied — only our trailing ACK was lost.
-    /// `enterBackground()` consults this and defers the disconnect to the session's own
-    /// idle-disconnect instead.
+    /// Lock-guarded: sessions run on PeripheralManager's queues, not managerQueue.
     private let lockedActiveCommandSessions = Locked<Int>(0)
 
-    /// True while at least one pod command session is executing. See `lockedActiveCommandSessions`.
     var hasActiveCommandSession: Bool {
         return lockedActiveCommandSessions.value > 0
     }
@@ -1196,11 +1187,7 @@ class BluetoothManager: NSObject {
             }
             return
         }
-        // A command exchange is mid-flight: cancelling now kills the pending write and the caller
-        // reports a failure for work the pod has usually already done (the ACK is written *after* the
-        // response is parsed). Leave the link up — `scheduleIdleDisconnectIfNeeded()` runs at the end
-        // of every session and will disconnect a moment later, which is the same teardown this path
-        // would have performed.
+        // Mid-command: leave the link up; scheduleIdleDisconnectIfNeeded() disconnects after the session.
         if hasActiveCommandSession {
             log.default("[connectOnDemand] background — command session in flight, deferring disconnect to idle")
             connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] background — command in flight, deferring disconnect")
