@@ -333,15 +333,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         let mustProvide = request != nil
         let desc = request.map { "last=\($0.lastCGMReadingDate.map { String(describing: $0) } ?? "nil") interval=\(Int($0.expectedCGMReadingInterval))s" } ?? "nil"
         logDeviceCommunication("[heartbeat] pid=\(pid) setBLEHeartbeatRequest(\(desc))", type: .connection)
-        // `mayUseRileyLink` is true for DASH as well as Eros, because DASH *can* use a RileyLink
-        // under the Pod Keep Alive option. That is the wrong question here: what matters is whether
-        // a RileyLink is actually in the loop to tick. A DASH pod on direct BLE with Pod Keep Alive
-        // off took the RileyLink branch, so `provideHeartbeat` was never set and the BLE pod never
-        // got its heartbeat request -- Loop asked for a heartbeat, we logged it, and dropped it.
-        // Only bites when the CGM cannot provide the heartbeat itself (a remote/networked CGM such
-        // as Nightscout); a BLE Dexcom masks it, which is why it went unnoticed.
-        let rileyLinkIsInUse = self.state.podType.isEros
-            || (self.state.podType.mayUseRileyLink && self.state.podKeepAlive == .rileyLink)
+        let rileyLinkIsInUse = self.state.podType.isEros || self.state.podKeepAlive == .rileyLink
         if rileyLinkIsInUse {
             rileyLinkDeviceProvider.timerTickEnabled =
                 self.state.isPumpDataStale || mustProvide || /// RL ticks needed for traditional BLE wakeups
@@ -1420,7 +1412,7 @@ extension OmniPumpManager {
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
 
-                            if self.usingInPlayPod == true && self.iPhoneWithPossibleInPlayIssues {
+                            if self.usingInPlayPod == true && UIDevice.hasPossibleInPlayBLEIssues {
                                 if self.state.podKeepAlive == .disabled {
                                     // Enable the most conservative pod keep alive mode
                                     // that should continue through the pod setup process.
@@ -2273,15 +2265,14 @@ extension OmniPumpManager {
         }
     }
 
-    // Running on any iPhone 16 or an iPhone 17e which are known
-    // to have BLE reconnect issues with InPlay BLE DASH pods?
-    var iPhoneWithPossibleInPlayIssues: Bool {
-
-        let iPhoneModel = UIDevice.modelName
-        if iPhoneModel.contains("iPhone 16") || iPhoneModel == "iPhone 17e" {
-            return true
+    // A host asked the pump to provide the BLE heartbeat on a combination needing the eager-connect
+    // mitigation. The usual StartDelay probe can't be used there, so wakes are driven by link drops
+    // instead (see BluetoothManager.isEagerHeartbeatMode) — workable, but less regular.
+    var bleHeartbeatDegradedForThisPod: Bool {
+        guard usingInPlayPod == true, UIDevice.hasPossibleInPlayBLEIssues else { return false }
+        if let blePodComms = podComms as? BlePodComms {
+            return blePodComms.isBLEHeartbeatRequested
         }
-
         return false
     }
 
@@ -2289,7 +2280,7 @@ extension OmniPumpManager {
     var usingInPlayPod: Bool? {
 
         if let blePodComms = podComms as? BlePodComms, let deviceBLEName = blePodComms.manager?.peripheral.name {
-            return deviceBLEName == "InPlay BLE"
+            return deviceBLEName == BluetoothManager.inPlayPeripheralName
         }
         return nil // don't know -- maybe not paired yet
     }
