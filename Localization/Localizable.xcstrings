@@ -6489,6 +6489,9 @@
         }
       }
     },
+    "1 Year" : {
+      "comment" : "Title string for PodSessionLogRetention.days365"
+    },
     "2 hours" : {
       "comment" : "Button text for 2 hour suspend duration",
       "extractionState" : "manual",
@@ -6651,6 +6654,9 @@
         }
       }
     },
+    "30 Days" : {
+      "comment" : "Title string for PodSessionLogRetention.days30"
+    },
     "30 minutes" : {
       "comment" : "Button text for 30 minute suspend duration",
       "extractionState" : "manual",
@@ -6812,6 +6818,12 @@
           }
         }
       }
+    },
+    "90 Days" : {
+      "comment" : "Title string for PodSessionLogRetention.days90"
+    },
+    "180 Days" : {
+      "comment" : "Title string for PodSessionLogRetention.days180"
     },
     "A new certificate will be used for the next Omnipod 5 Pod pairing." : {
       "comment" : "Confirmation message when a new certificate will be used"
@@ -19483,6 +19495,9 @@
         }
       }
     },
+    "Each completed pod is recorded here with its fault code and ref string, if any, so you can report it to your supplier without needing a screenshot." : {
+      "comment" : "Footer explanation for the pod session log"
+    },
     "Downloaded" : {
       "comment" : "O5 cert source: downloaded"
     },
@@ -24514,6 +24529,12 @@
         }
       }
     },
+    "Fault %1$@ · %2$@" : {
+      "comment" : "Format string for pod session log row summary: (1: fault code) (2: fault description)"
+    },
+    "Fault %1$@ · Ref %2$@" : {
+      "comment" : "Format string for pod session log row summary with a ref string: (1: fault code) (2: pdm ref string)"
+    },
     "Fault event occurred" : {
       "comment" : "Pod state when fault event has occurred",
       "extractionState" : "manual",
@@ -26295,6 +26316,9 @@
           }
         }
       }
+    },
+    "Forever" : {
+      "comment" : "Title string for PodSessionLogRetention.forever"
     },
     "Generating App Attest key…" : {
       "comment" : "O5 fetch progress: generate key"
@@ -31003,6 +31027,9 @@
         }
       }
     },
+    "Keep Log For" : {
+      "comment" : "Label for pod session log retention picker"
+    },
     "Keep the RileyLink about 6 inches from the pod during pairing." : {
       "comment" : "Label text for step 2 of Eros pair pod instructions",
       "extractionState" : "manual",
@@ -31653,6 +31680,9 @@
           }
         }
       }
+    },
+    "Log Settings" : {
+      "comment" : "Section header for pod session log settings"
     },
     "Load custom certificate" : {
       "comment" : "Menu action to import an o5keypair file"
@@ -36520,6 +36550,9 @@
         }
       }
     },
+    "No fault" : {
+      "comment" : "Pod session log row summary when the pod had no fault"
+    },
     "No faults" : {
       "comment" : "Description for Fault Event Code .noFaults",
       "extractionState" : "manual",
@@ -37167,6 +37200,9 @@
           }
         }
       }
+    },
+    "No pod sessions recorded yet." : {
+      "comment" : "Text shown when the pod session log is empty"
     },
     "No pods found" : {
       "comment" : "Error message for PodCommsError.noPodsFound",
@@ -50645,6 +50681,12 @@
           }
         }
       }
+    },
+    "Pod Session Log" : {
+      "comment" : "Navigation title for the pod session log screen\nText for Pod Session Log row and page"
+    },
+    "Pod Sessions" : {
+      "comment" : "Section header for pod session log entries"
     },
     "Pod Setup" : {
       "comment" : "Title for PodSetupView",
@@ -72099,6 +72141,9 @@
           }
         }
       }
+    },
+    "Unknown Date" : {
+      "comment" : "Pod session log row date when no date is available"
     },
     "Unknown Omnipod Pod Type" : {
       "comment" : "Description for an unknown Omnipod pod type",
