@@ -1119,6 +1119,11 @@ extension OmniPumpManager {
         }
     }
 
+    // Currently running with an Omnipod 5 "black dot" pod
+    var noSilentBeep: Bool {
+        return state.podState?.noSilentBeep == true
+    }
+
     // Reset all the per pod state kept in pump manager state which doesn't span pods
     fileprivate func resetPerPodPumpManagerState() {
 
@@ -2171,6 +2176,12 @@ extension OmniPumpManager {
             return nil // no in progress manual insulin delivery, no updates needed
         }
 
+        if noSilentBeep && !enabled {
+            /// Can't use the beepConfig command to silently change the completion beep
+            /// state on black dot O5 pods since noBeepNonCancel is non-silent on these pods.
+            return nil /// better to do punt instead of using a command that will beep
+        }
+
         let result = session.beepConfig(
             beepType: enabled ?  .bipBip : .noBeepNonCancel,
             tempBasalCompletionBeep: enabled && self.hasUnfinalizedManualTempBasal,
@@ -2242,32 +2253,51 @@ extension OmniPumpManager {
                                  silencePodEnd: Date?,
                                  completion: @escaping (OmniPumpManagerError?) -> Void)
     {
-        guard let configuredAlerts = self.state.podState?.configuredAlerts,
-              let activeAlertSlots = self.state.podState?.activeAlertSlots,
-              let reservoirLevel = self.state.podState?.lastInsulinMeasurements?.reservoirLevel?.rawValue else
+        guard let configuredAlerts = state.podState?.configuredAlerts,
+              let activeAlertSlots = state.podState?.activeAlertSlots,
+              let reservoirLevel = state.podState?.lastInsulinMeasurements?.reservoirLevel?.rawValue else
         {
-            self.log.error("Missing pod state!") // should never happen
+            log.error("Missing pod state!") // should never happen
             completion(OmniPumpManagerError.noPodPaired)
             return
         }
 
         let beepBlock: MessageBlock?
-        if !self.beepPreference.shouldBeepForManualCommand {
-            // No enabled completion beeps to worry about for any in-progress manual delivery
-            beepBlock = nil
-        } else if silencePod {
-            // Disable completion beeps for any in-progress manual delivery w/o beeping
-            beepBlock = BeepConfigCommand(beepType: .noBeepNonCancel)
+        if silencePod {
+            /// Would like to try to disable completion beeps for any in-progress manual delivery w/o any beeping
+            if noSilentBeep {
+                /// Argh, .noBeepNonCancel is not silent for black dot O5 pods!
+                /// Need to punt on trying to adjusting any in-progress manual delivery
+                /// beep state or we'd incorrectly beep trying to update these values.
+                beepBlock = nil
+            } else {
+                /// Disable completion beeps for any in-progress manual delivery w/o beeping
+                beepBlock = BeepConfigCommand(beepType: .noBeepNonCancel)
+            }
         } else {
-            // Emit a confirmation beep and enable completion beeps for any in-progress manual delivery
-            beepBlock = BeepConfigCommand(
-                beepType: .bipBip,
-                tempBasalCompletionBeep: self.hasUnfinalizedManualTempBasal,
-                bolusCompletionBeep: self.hasUnfinalizedManualBolus
-            )
+            /// Switching out of silencePod mode, beeping behavior is now governed
+            /// by the current beepPreference.shouldBeepForManualCommand value.
+            let enabled = beepPreference.shouldBeepForManualCommand
+            if noSilentBeep && !enabled {
+                /// Argh, .noBeepNonCancel is not silent for black dot O5 pods!
+                /// Need to punt on trying to adjusting any in-progress manual delivery
+                /// beep state or we'd incorrectly beep trying to update these values.
+                beepBlock = nil
+            } else {
+                /// Create a properly configured beepBlock that will optionally provide any needed command
+                /// beeping as well as to enable/disable completion beeping for any in-progress manual delivery.
+                beepBlock = BeepConfigCommand(
+                    beepType: enabled ? .bipBip : .noBeepNonCancel,
+                    tempBasalCompletionBeep: enabled && hasUnfinalizedManualTempBasal,
+                    bolusCompletionBeep: enabled && hasUnfinalizedManualBolus
+                )
+            }
         }
 
-        let podAlerts = regeneratePodAlerts(silent: silencePod, configuredAlerts: configuredAlerts, activeAlertSlots: activeAlertSlots, currentPodTime: self.podTime, currentReservoirLevel: reservoirLevel)
+        /// Don't actually use silent pod alerts on "black dot" pods as they will emit a bipBip instead of being silent
+        let silentAlerts = silencePod && state.podState?.noSilentBeep == false
+
+        let podAlerts = regeneratePodAlerts(silent: silentAlerts, configuredAlerts: configuredAlerts, activeAlertSlots: activeAlertSlots, currentPodTime: podTime, currentReservoirLevel: reservoirLevel)
 
         do {
             // Since non-responsive pod comms are currently only resolved for insulin related commands,
@@ -2275,18 +2305,13 @@ extension OmniPumpManager {
             // and thus the alert won't get reset here when reconfiguring pod alerts with a new silence pod state.
             let acknowledgeAll = true   // protect against lost alert configuration response related issues
             try session.configureAlerts(podAlerts, acknowledgeAll: acknowledgeAll, beepBlock: beepBlock)
-            self.setState { (state) in
+            setState { (state) in
                 state.silencePod = silencePod
                 state.silencePodEnd = silencePodEnd
             }
-            /// If beepPreference is currently set to beep for manual commands, update the internal pod beep completion
-            /// state for any in progress manual insulin delivery based on the value of the new Silence Pod state just set.
-            if self.beepPreference.shouldBeepForManualCommand {
-                _ = updateManualInsulinBeepState(session: session, enabled: !silencePod)
-            }
             completion(nil)
         } catch {
-            self.log.error("Configure alerts %{public}@ failed: %{public}@", String(describing: podAlerts), String(describing: error))
+            log.error("Configure alerts %{public}@ failed: %{public}@", String(describing: podAlerts), String(describing: error))
             completion(.communication(error))
         }
     }

@@ -576,7 +576,8 @@ struct OmniSettingsView: View  {
 
                 NavigationLink(destination: SilencePodSelectionView(initialValue: viewModel.silencePodPreference,
                                                                     initialSilenceTimeEndTime: viewModel.silencePodEnd,
-                                                                    onSave: viewModel.setSilencePod))
+                                                                    onSave: viewModel.setSilencePod,
+                                                                    noSilentBeep: viewModel.noSilentBeep))
                 {
                     HStack {
                         /// If we have a silence pod end time, use an alternate row title and display this time.

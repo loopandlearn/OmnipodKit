@@ -30,4 +30,13 @@ enum SilencePodPreference: Int, CaseIterable {
             return LocalizedString("All Pod alerts use no beeps and confirmation reminder beeps are suppressed. The Pod will only beep for fatal Pod faults and when playing test beeps.\n\n⚠️Warning - If your phone is out of range of the pod while this feature is enabled, you will not receive any in-app notifications; and the pod will not beep to alert you.", comment: "Description for SilencePodPreference.enabled")
         }
     }
+
+    var altDescription: String {
+        switch self {
+        case .disabled:
+            return self.description
+        case .enabled:
+            return LocalizedString("All confirmation reminder beeps are suppressed, but other audible Pod alert beeping cannot be silenced for this Pod.", comment: "Alternate black dot description for SilencePodPreference.disabled")
+        }
+    }
 }

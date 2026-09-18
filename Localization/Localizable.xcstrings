@@ -6165,6 +6165,9 @@
         }
       }
     },
+    "⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!" : {
+
+    },
     "1 hour" : {
       "comment" : "Button text for 1 hour suspend duration",
       "extractionState" : "manual",
@@ -8273,6 +8276,9 @@
           }
         }
       }
+    },
+    "All confirmation reminder beeps are suppressed, but other audible Pod alert beeping cannot be silenced for this Pod." : {
+      "comment" : "Alternate black dot description for SilencePodPreference.disabled"
     },
     "All Pod alerts use no beeps and confirmation reminder beeps are suppressed. The Pod will only beep for fatal Pod faults and when playing test beeps.\n\n⚠️Warning - If your phone is out of range of the pod while this feature is enabled, you will not receive any in-app notifications; and the pod will not beep to alert you." : {
       "comment" : "Description for SilencePodPreference.enabled",
@@ -61205,6 +61211,9 @@
           }
         }
       }
+    },
+    "Silence Pod mode can only suppress confirmation reminder beeping with this Pod." : {
+      "comment" : "Help text for Silence Pod view for black dot pods"
     },
     "Silence Pod mode suppresses all Pod alert and confirmation reminder beeping." : {
       "comment" : "Help text for Silence Pod view",
