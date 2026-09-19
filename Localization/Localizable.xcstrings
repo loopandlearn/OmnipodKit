@@ -31605,6 +31605,9 @@
         }
       }
     },
+    "Issues status requests to minimize Bluetooth disconnects. The default When Open selection should be sufficient for all iPhone and Pod combinations." : {
+      "comment" : "Summary of the Pod Keep Alive concept"
+    },
     "Keep the RileyLink about 6 inches from the pod during pairing." : {
       "comment" : "Label text for step 2 of Eros pair pod instructions",
       "extractionState" : "manual",
@@ -50010,6 +50013,7 @@
     },
     "Pod keep alive disabled. Additional pod status requests are not issued to prevent pod disconnects (nominal behavior)." : {
       "comment" : "Description for PodKeepAlive.disabled",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -75381,6 +75385,7 @@
     },
     "When enabled, additional pod status requests are issued to minimize pod Bluetooth disconnects." : {
       "comment" : "Summary of the Pod Keep Alive concept",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

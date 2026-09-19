@@ -104,18 +104,6 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
-    // Does pod type possibly use a RileyLink
-    var mayUseRileyLink: Bool {
-        switch podType {
-        case .productIdEros:
-            return true // always needed for basic pod connection
-        case .productIdDash:
-            return true // only needed for the PodKeepAlive RileyLink option
-        default:
-            return false
-        }
-    }
-
     // non-Eros pods using a nearZeroBasalRate for pulse timing for zero basal rates
     var zeroBasalRate: Double {
         let nearZeroBasalRate = 0.01

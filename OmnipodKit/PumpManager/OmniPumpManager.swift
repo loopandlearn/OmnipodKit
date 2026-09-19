@@ -81,8 +81,8 @@ extension OmniPumpManagerError: LocalizedError {
     }
 }
 
-// OmniPumpManager is declared as a derived class RileyLinkPumpManager
-// even though for non-Eros pods the RileyLink code will not be used.
+/// OmniPumpManager is derived from RileyLinkPumpManager and not just DeviceManager.
+/// The RileyLinkPumpManager will be used for basic Eros pod comms and the PKA RileyLink option.
 public class OmniPumpManager: RileyLinkPumpManager {
 
     // This string should match the PumpManagerIdentifier string.
@@ -127,16 +127,14 @@ public class OmniPumpManager: RileyLinkPumpManager {
         self.podComms.messageLogger = self
 
         /// Register for RL device notifications for Eros and DASH (possibly needed for the Pod Keep Alive RileyLink option)
-        if podType.mayUseRileyLink {
-            NotificationCenter.default.publisher(for: .DeviceConnectionStateDidChange)
-                .sink { [weak self] _ in
-                    self?.updateRLConnectionStatus()
-                }
-                .store(in: &cancellables)
-        }
+        NotificationCenter.default.publisher(for: .DeviceConnectionStateDidChange)
+            .sink { [weak self] _ in
+                self?.updateRLConnectionStatus()
+            }
+            .store(in: &cancellables)
 
-        /// Register for app foreground / background notifications needed for DASH Pod Keep Alive non-RL options
-        if podType.isDash {
+        /// Register for app foreground / background notifications needed for at least Pod Keep Alive timer based options
+        if !podType.isEros {
             let nc = NotificationCenter.default
             nc.addObserver(
                 self,
@@ -876,34 +874,44 @@ extension OmniPumpManager {
         return state.podState?.expiresAt
     }
 
+    /// Enforces the base Pod Keep Alive mode for all BLE pods
     var podKeepAlive: PodKeepAlive {
         get {
             return state.podKeepAlive
         }
         set {
-            if newValue == state.podKeepAlive {
-                log.debug("@@@ initialzing podKeepAlive to %{public}@", String(describing: newValue))
+            let newValueToSet: PodKeepAlive
+            let defaultPKA = defaultPodKeepAliveValue(podType: self.state.podType)
+            if newValue == .disabled && defaultPKA != .disabled {
+                log.debug("@@@ Setting podKeepAlive to default %{public}@", String(describing: defaultPKA))
+                newValueToSet = defaultPKA
+            } else {
+                newValueToSet = newValue /// set podKeepAlive to the requested value
+            }
+
+            if newValueToSet == state.podKeepAlive {
+                log.debug("@@@ initializing podKeepAlive to %{public}@", String(describing: newValueToSet))
             } else {
                 log.debug("@@@ changing podKeepAlive from %{public}@ to %{public}@",
-                          String(describing: state.podKeepAlive), String(describing: newValue))
+                          String(describing: state.podKeepAlive), String(describing: newValueToSet))
             }
-            if state.podKeepAlive == .rileyLink && newValue != .rileyLink {
+            if state.podKeepAlive == .rileyLink && newValueToSet != .rileyLink {
                 /// Switching away from using RileyLinks, disconnect the devices
                 disconnectRileyLinkDevices()
             }
 
-            /// Handle all the setup/teardown for timer based pod keep alive modes
-            setPodKeepAliveTimerState(newValue)
-
-            /// Reset the BluetoothManager podKeepAliveKeepsConnectedInBackground var for managing pod connections
-            (podComms as? BlePodComms)?.setPodKeepAliveKeepsConnectedInBackground(newValue.keepsPodConnectedInBackground)
-
             setState { (state) in
-                state.podKeepAlive = newValue
+                state.podKeepAlive = newValueToSet
             }
 
+            /// Now handle all the setup/teardown for timer based pod keep alive modes for the new value
+            setPodKeepAliveTimerState()
+
+            /// Reset the BluetoothManager podKeepAliveKeepsConnectedInBackground var for managing pod connections
+            (podComms as? BlePodComms)?.setPodKeepAliveKeepsConnectedInBackground(newValueToSet.keepsPodConnectedInBackground)
+
             /// If pod keep alive value is now rileyLink, update our RL connections
-            if newValue == .rileyLink {
+            if newValueToSet == .rileyLink {
                 updateRLConnectionStatus()
             }
         }
@@ -1200,7 +1208,7 @@ extension OmniPumpManager {
         if let blePodComms = self.lockedPodComms.value as? BlePodComms {
             blePodComms.forgetBluetoothManager()
         }
-        if state.podType.mayUseRileyLink {
+        if state.podType.isEros || state.podKeepAlive == .rileyLink {
             disconnectRileyLinkDevices()
         }
     }
@@ -1417,13 +1425,11 @@ extension OmniPumpManager {
                             // Have new podState, reset all the per pod pump manager state
                             self.resetPerPodPumpManagerState()
 
-                            if self.usingInPlayPod == true && UIDevice.hasPossibleInPlayBLEIssues {
-                                if self.state.podKeepAlive == .disabled {
-                                    // Enable the most conservative pod keep alive mode
-                                    // that should continue through the pod setup process.
-                                    self.log.debug("@@@ Enabling pod keep alives")
-                                    self.podKeepAlive = .whenOpen
-                                }
+                            // Set the default Pod Keep Alive for all BLE pods
+                            let defaultPKA = defaultPodKeepAliveValue(podType: self.state.podType)
+                            if self.state.podKeepAlive == .disabled && defaultPKA != .disabled {
+                                self.log.debug("@@@ Setting default pod keep alive to %{public}@", String(describing: defaultPKA))
+                                self.podKeepAlive = defaultPKA
                             }
 
                             self.pumpDelegate.notify { (delegate) in
@@ -2581,7 +2587,7 @@ extension OmniPumpManager: PumpManager {
             return state.isPumpDataStale
         }
 
-        if state.podType.mayUseRileyLink {
+        if state.podType.isEros || state.podKeepAlive == .rileyLink {
             checkRileyLinkBattery()
         }
 
@@ -2602,13 +2608,10 @@ extension OmniPumpManager: PumpManager {
         }
     }
 
-    // RL only
     private func checkRileyLinkBattery() {
-        if state.podType.mayUseRileyLink {
-            rileyLinkDeviceProvider.getDevices { devices in
-                for device in devices {
-                    device.updateBatteryLevel()
-                }
+        rileyLinkDeviceProvider.getDevices { devices in
+            for device in devices {
+                device.updateBatteryLevel()
             }
         }
     }

@@ -29,8 +29,10 @@ extension OmniPumpManager {
         /// Create a timer to trigger a getPodStatus call after the specified time from now.
         podKeepAliveTimer?.invalidate()
         podKeepAliveTimer = Timer(timeInterval: when, repeats: false) { _ in
-            print("@@@ timer expired, reading pod status to stay connected at \(self.timeStr(Date()))")
-            self.getPodStatus(canOptimize: false) { _ in }
+            if self.hasActivePod {
+                print("@@@ timer expired, reading pod status to stay connected at \(self.timeStr(Date()))")
+                self.getPodStatus(canOptimize: false) { _ in }
+            }
         }
 
         if state.podKeepAlive.usesTimerBasedKeepAlives {
@@ -54,10 +56,11 @@ extension OmniPumpManager {
         setup_podKeepAliveTimer(when: podKeepAliveRefreshInterval)
     }
 
-    /// Handles all the setup and teardown for timer based pod keep alive modes
-    func setPodKeepAliveTimerState(_ podKeepAlive: PodKeepAlive) {
+    /// Handles all the setup and teardown for timer based pod keep alive modes.
+    /// Must be called whenever state.podKeepAlive is value is updated.
+    func setPodKeepAliveTimerState() {
         let now = Date()
-        if podKeepAlive.usesTimerBasedKeepAlives {
+        if state.podKeepAlive.usesTimerBasedKeepAlives {
             print("@@@ enabling pod keep alive timer for mode \(podKeepAlive) at \(timeStr(now))")
 
             /// Set up the callback from PodCommSession.send() for each response received
@@ -68,8 +71,10 @@ extension OmniPumpManager {
             let minPodKeepAliveTimerInterval: TimeInterval = .seconds(30)
 
             if timeSinceLastResponse > podKeepAliveRefreshInterval - minPodKeepAliveTimerInterval {
-                print("@@@ doing getPodStatus now with timeSinceLastResponse of \(timeSinceLastResponse.timeIntervalStr)")
-                getPodStatus(canOptimize: false) { _ in }
+                if self.hasActivePod {
+                    print("@@@ doing getPodStatus with timeSinceLastResponse of \(timeSinceLastResponse.timeIntervalStr)")
+                    getPodStatus(canOptimize: false) { _ in }
+                }
             } else {
                 /// Reduce the initial podKeepAliveTimer interval based on the time since the last response.
                 let when = podKeepAliveRefreshInterval - timeSinceLastResponse
@@ -84,7 +89,7 @@ extension OmniPumpManager {
     }
 
     func rileyLinkTimerDidTick() {
-        guard self.hasSetupPod else {
+        guard self.hasActivePod else {
             return
         }
 

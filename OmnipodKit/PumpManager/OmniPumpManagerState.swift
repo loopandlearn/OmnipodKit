@@ -82,10 +82,9 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
     var podType: PodType
 
-    // Currently only available for DASH
+    // Only settable for BLE pod types
     var podKeepAlive: PodKeepAlive
 
-    // Eros / PodKeepAlive-RileyLink only state
     var rileyLinkConnectionManagerState: RileyLinkConnectionState? = nil
     var pairingAttemptAddress: UInt32? = nil
     var rileyLinkBatteryAlertLevel: Int? = nil
@@ -124,7 +123,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         maxBolusUnits: Double,
         insulinType: InsulinType?,
         podType: PodType,
-        podKeepAlive: PodKeepAlive = .disabled, /// currently only available for DASH
+        podKeepAlive: PodKeepAlive,
         rileyLinkConnectionManagerState: RileyLinkConnectionState? = nil, /// Eros or PodKeepAlive RileyLink option
         controllerId: UInt32? = nil, // BLE
         podId: UInt32? = nil) // BLE
@@ -150,9 +149,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         self.podType = podType
         self.podKeepAlive = podKeepAlive
 
-        if podType.mayUseRileyLink {
-            self.rileyLinkConnectionManagerState = rileyLinkConnectionManagerState
-        }
+        self.rileyLinkConnectionManagerState = rileyLinkConnectionManagerState
 
         if podType.isEros {
             self.controllerId = 0
@@ -269,15 +266,16 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             }
         }
 
-        var podKeepAlive: PodKeepAlive
+        let podKeepAlive: PodKeepAlive
+        let defaultPKA = defaultPodKeepAliveValue(podType: podType)
         if let rawPodKeepAlive = rawValue["podKeepAlive"] as? PodKeepAlive.RawValue {
-            podKeepAlive = PodKeepAlive(rawValue: rawPodKeepAlive) ?? .disabled
+            podKeepAlive = PodKeepAlive(rawValue: rawPodKeepAlive) ?? defaultPKA
         } else {
-            podKeepAlive = .disabled
+            podKeepAlive = defaultPKA
         }
 
         let rileyLinkConnectionManagerState: RileyLinkConnectionState?
-        if podType.mayUseRileyLink {
+        if podType.isEros || podKeepAlive == .rileyLink {
             if let rileyLinkConnectionManagerStateRaw = rawValue["rileyLinkConnectionManagerState"] as? RileyLinkConnectionState.RawValue {
                 rileyLinkConnectionManagerState = RileyLinkConnectionState(rawValue: rileyLinkConnectionManagerStateRaw)
             } else {
@@ -296,10 +294,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             maxBolusUnits: maxBolusUnits,
             insulinType: insulinType ?? .novolog,
             podType: podType,
-            podKeepAlive: podKeepAlive, // currently only available for DASH
-            rileyLinkConnectionManagerState: rileyLinkConnectionManagerState, // Eros only
-            controllerId: controllerId, // non-Eros only
-            podId: podId // non-Eros only
+            podKeepAlive: podKeepAlive,
+            rileyLinkConnectionManagerState: rileyLinkConnectionManagerState,
+            controllerId: controllerId,
+            podId: podId
         )
 
         if let rawUnstoredDoses = rawValue["unstoredDoses"] as? [UnfinalizedDose.RawValue] {
