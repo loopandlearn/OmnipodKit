@@ -31009,6 +31009,9 @@
         }
       }
     },
+    "Issues status requests to minimize Bluetooth disconnects. The default When Open selection should be sufficient for all iPhone and Pod combinations." : {
+      "comment" : "Summary of the Pod Keep Alive concept"
+    },
     "Keep the RileyLink about 6 inches from the pod during pairing." : {
       "comment" : "Label text for step 2 of Eros pair pod instructions",
       "extractionState" : "manual",
@@ -49183,7 +49186,40 @@
       }
     },
     "Pod keep alive disabled. Additional pod status requests are not issued to prevent pod disconnects (nominal behavior)." : {
-      "comment" : "Description for PodKeepAlive.disabled"
+      "comment" : "Description for PodKeepAlive.disabled",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod-Überwachung deaktiviert. Es werden keine zusätzlichen Pod-Statusabfragen gesendet, um eine Unterbrechung der Pod-Verbindung zu verhindern (normales Verhalten)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파드 연결 유지가 비활성화됩니다. 파드 연결 끊김 방지를 위한 추가 파드 상태 요청이 전송되지 않습니다(정상 동작)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod keep alive er deaktivert. Det sendes ikke ut ytterligere forespørsler om pod-status for å forhindre at pod-forbindelser brytes (normalt oppførsel)."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menținerea în viață a pompei dezactivată. Pompa se deconectează la 3 minute după ultimul schimb de mesaje (comportament nominal)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod 保活已禁用。不再发送额外的 Pod 状态请求，以防止 Pod 断开连接（正常行为）。"
+          }
+        }
+      }
     },
     "Pod keep alive disabled. Pod disconnects 3 minutes after last message exchange (nominal behavior)." : {
       "comment" : "Description for PodKeepAlive.disabled",
@@ -73898,7 +73934,40 @@
       }
     },
     "When enabled, additional pod status requests are issued to minimize pod Bluetooth disconnects." : {
-      "comment" : "Summary of the Pod Keep Alive concept"
+      "comment" : "Summary of the Pod Keep Alive concept",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn aktiviert, werden zusätzliche Pod-Statusabfragen gesendet, um das Trennen der Bluetoothverbindung möglichst zu vermeiden."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기능을 활성화하면 파드의 블루투스 연결 끊김을 최소화하기 위해 추가적인 파드 상태 요청이 전송됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Når aktiviert, sendes det flere forespørsler om pod-status for å minimere antall avbrud på grunn av tapt Bluetooth tilkoblinger."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Când este activat, sunt emise solicitări suplimentare de stare a pompei pentru a minimiza deconectările Bluetooth ale pompei."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，系统将发出额外的 Pod 状态请求，以减少 Pod 蓝牙断开连接的情况。"
+          }
+        }
+      }
     },
     "When Open" : {
       "comment" : "Title string for PodKeepAlive.whenOpen",

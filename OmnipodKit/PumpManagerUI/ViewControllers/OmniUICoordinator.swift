@@ -470,7 +470,9 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 maxBasalRateUnitsPerHour: pumpManagerSettings.maxBasalRateUnitsPerHour,
                 maxBolusUnits: pumpManagerSettings.maxBolusUnits,
                 insulinType: nil,
-                podType: unknownOmnipodType)
+                podType: unknownOmnipodType,
+                podKeepAlive: .disabled,
+            )
 
             self.pumpManager = OmniPumpManager(state: pumpManagerState, rileyLinkDeviceProvider: deviceProvider)
         } else {
