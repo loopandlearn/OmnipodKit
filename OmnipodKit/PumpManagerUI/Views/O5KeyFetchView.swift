@@ -32,16 +32,16 @@ struct O5KeyFetchView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
-                        .foregroundColor(.red)
+                        .foregroundColor(.pink)
                     Text("\(errorMessage)")
-                        .foregroundColor(.red)
+                        .foregroundColor(.pink)
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
                     if let errorDetail = errorDetail {
                         Text(errorDetail)
-                            .foregroundColor(.red)
+                            .foregroundColor(.pink)
                             .font(.subheadline)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
