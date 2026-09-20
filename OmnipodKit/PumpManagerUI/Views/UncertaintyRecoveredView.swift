@@ -31,7 +31,6 @@ struct UncertaintyRecoveredView: View {
                 }
             }
         }
-        .navigationTitle(LocalizedString("Comms Recovered", comment: "navigation title for comms recovered"))
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)
     }
