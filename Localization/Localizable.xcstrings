@@ -7846,7 +7846,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Werkzame Tijd"
+            "value" : "Werkzame tijd"
           }
         },
         "pl" : {
@@ -8332,7 +8332,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pomptijd Aanpassen..."
+            "value" : "Pomptijd aanpassen..."
           }
         },
         "pl" : {
@@ -8981,7 +8981,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Aanbrengen"
+            "value" : "Pod aanbrengen"
           }
         },
         "pl" : {
@@ -9823,7 +9823,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "BLE Firmwareversie"
+            "value" : "BLE firmwareversie"
           }
         },
         "pl" : {
@@ -11947,7 +11947,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Annuleer Handmatige Basaal"
+            "value" : "Annuleer handmatige basaal"
           }
         },
         "pl" : {
@@ -13081,7 +13081,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Controleer Canule"
+            "value" : "Controleer canule"
           }
         },
         "pl" : {
@@ -13440,7 +13440,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Controleer Inbrengen Canule"
+            "value" : "Controleer inbrengen canule"
           }
         },
         "pl" : {
@@ -14500,7 +14500,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comms Hersteld"
+            "value" : "Comms hersteld"
           }
         },
         "pl" : {
@@ -16511,7 +16511,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kritieke Meldingen"
+            "value" : "Kritieke meldingen"
           }
         },
         "pl" : {
@@ -20250,7 +20250,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reservoir Leeg"
+            "value" : "Reservoir leeg"
           }
         },
         "pl" : {
@@ -20574,7 +20574,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lege Waarde"
+            "value" : "Lege waarde"
           }
         },
         "pl" : {
@@ -21743,7 +21743,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Standaard Herinnering"
+            "value" : "Standaard herinnering"
           }
         },
         "pl" : {
@@ -22715,7 +22715,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handmatig Basaal Annuleren Mislukt"
+            "value" : "Handmatig basaal annuleren mislukt"
           }
         },
         "pl" : {
@@ -23849,7 +23849,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulinetoediening Hervatten Mislukt"
+            "value" : "Insulinetoediening hervatten mislukt"
           }
         },
         "pl" : {
@@ -24011,7 +24011,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pomptijd Instellen Mislukt"
+            "value" : "Pomptijd instellen mislukt"
           }
         },
         "pl" : {
@@ -24173,7 +24173,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulinetoediening Onderbreken Mislukt"
+            "value" : "Insulinetoediening onderbreken mislukt"
           }
         },
         "pl" : {
@@ -24659,7 +24659,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bijwerken Reservoir Bijna Leeg Herinnering Mislukt"
+            "value" : "Bijwerken reservoir bijna leeg herinnering mislukt"
           }
         },
         "pl" : {
@@ -26117,7 +26117,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voltooi Installatie"
+            "value" : "Voltooi installatie"
           }
         },
         "pl" : {
@@ -27680,7 +27680,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onjuiste Reactie"
+            "value" : "Onjuiste reactie"
           }
         },
         "pl" : {
@@ -28004,7 +28004,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Breng Canule In"
+            "value" : "Breng canule in"
           }
         },
         "pl" : {
@@ -29624,7 +29624,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insuline Onderbroken"
+            "value" : "Insuline onderbroken"
           }
         },
         "pl" : {
@@ -30110,7 +30110,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne Podfout %1$@"
+            "value" : "Interne podfout %1$@"
           }
         },
         "pl" : {
@@ -30272,7 +30272,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne Podfout %1$03d"
+            "value" : "Interne podfout %1$03d"
           }
         },
         "pl" : {
@@ -31406,7 +31406,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ongeldige Instelling"
+            "value" : "Ongeldige instelling"
           }
         },
         "pl" : {
@@ -32060,7 +32060,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Laatste Status"
+            "value" : "Laatste status"
           }
         },
         "pl" : {
@@ -32905,7 +32905,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reservoir Bijna Leeg"
+            "value" : "Reservoir bijna leeg"
           }
         },
         "pl" : {
@@ -33229,7 +33229,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Laag Reservoir Standaard"
+            "value" : "Laag reservoir standaard"
           }
         },
         "pl" : {
@@ -33391,7 +33391,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Herinnering Reservoir Bijna Leeg"
+            "value" : "Herinnering reservoir bijna leeg"
           }
         },
         "pl" : {
@@ -33553,7 +33553,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batterij RileyLink Bijna Leeg"
+            "value" : "Batterij RileyLink bijna leeg"
           }
         },
         "pl" : {
@@ -34525,7 +34525,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Handmatig Basaal"
+            "value" : "Handmatig basaal"
           }
         },
         "pl" : {
@@ -35173,7 +35173,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configuratie Niet Compleet"
+            "value" : "Configuratie niet compleet"
           }
         },
         "pl" : {
@@ -36634,7 +36634,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen Waarschuwingen"
+            "value" : "Geen waarschuwingen"
           }
         },
         "pl" : {
@@ -37444,7 +37444,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen Insuline"
+            "value" : "Geen insuline"
           }
         },
         "pl" : {
@@ -38092,7 +38092,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen Herinnering"
+            "value" : "Geen herinnering"
           }
         },
         "pl" : {
@@ -38578,7 +38578,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nee, Ga Verder Met Pod"
+            "value" : "Nee, ga verder met Pod"
           }
         },
         "pl" : {
@@ -39226,7 +39226,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onvoldoende Gegevens"
+            "value" : "Onvoldoende gegevens"
           }
         },
         "pl" : {
@@ -40196,7 +40196,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verstopping Gedetecteerd"
+            "value" : "Verstopping gedetecteerd"
           }
         },
         "pl" : {
@@ -41273,7 +41273,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Omnipod Klassiek"
+            "value" : "Omnipod klassiek"
           }
         },
         "pl" : {
@@ -41921,7 +41921,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Omnipod Herinneringen"
+            "value" : "Omnipod herinneringen"
           }
         },
         "pl" : {
@@ -43704,7 +43704,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apparaat Niet Gereed"
+            "value" : "Apparaat niet gereed"
           }
         },
         "pl" : {
@@ -46407,7 +46407,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Geactiveerd"
+            "value" : "Pod geactiveerd"
           }
         },
         "pl" : {
@@ -47868,7 +47868,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Verlopen"
+            "value" : "Pod verlopen"
           }
         },
         "pl" : {
@@ -48030,7 +48030,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Verloopt"
+            "value" : "Pod verloopt"
           }
         },
         "pl" : {
@@ -48516,7 +48516,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Storing"
+            "value" : "Pod storing"
           }
         },
         "pl" : {
@@ -49002,7 +49002,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Foutgegevens"
+            "value" : "Pod foutgegevens"
           }
         },
         "pl" : {
@@ -49326,7 +49326,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod Uren"
+            "value" : "Pod uren"
           }
         },
         "pl" : {
@@ -55823,7 +55823,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pulse Log Plus lezen..."
+            "value" : "Pulse log plus lezen..."
           }
         },
         "pl" : {
@@ -58043,7 +58043,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hervat Insuline"
+            "value" : "Hervat insuline"
           }
         },
         "pl" : {
@@ -58205,7 +58205,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hervat Insulinetoediening"
+            "value" : "Hervat insulinetoediening"
           }
         },
         "pl" : {
@@ -58888,7 +58888,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opnieuw Proberen"
+            "value" : "Opnieuw proberen"
           }
         },
         "pl" : {
@@ -60022,7 +60022,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ingesteld Basaal"
+            "value" : "Ingesteld basaal"
           }
         },
         "pl" : {
@@ -60184,7 +60184,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geplande Herinnering"
+            "value" : "Geplande herinnering"
           }
         },
         "pl" : {
@@ -60994,7 +60994,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijk Basaal Instellen"
+            "value" : "Tijdelijk basaal instellen"
           }
         },
         "pl" : {
@@ -61156,7 +61156,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijke Basaalsnelheid Instellen"
+            "value" : "Tijdelijke basaalsnelheid instellen"
           }
         },
         "pl" : {
@@ -63206,7 +63206,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Omnipod Onboarding Overslaan?"
+            "value" : "Omnipod onboarding overslaan?"
           }
         },
         "pl" : {
@@ -64263,7 +64263,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onderbreek Toediening"
+            "value" : "Onderbreek toediening"
           }
         },
         "pl" : {
@@ -64425,7 +64425,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onderbreking in Uitvoering Herinnering"
+            "value" : "Onderbreking in uitvoering herinnering"
           }
         },
         "pl" : {
@@ -64587,7 +64587,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onderbreek Insulinetoediening"
+            "value" : "Onderbreek insulinetoediening"
           }
         },
         "pl" : {
@@ -65397,7 +65397,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulinetoediening Onderbreken..."
+            "value" : "Insulinetoediening onderbreken..."
           }
         },
         "pl" : {
@@ -66560,7 +66560,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijk Basaal"
+            "value" : "Tijdelijk basaal"
           }
         },
         "pl" : {
@@ -67208,7 +67208,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijke Basaal"
+            "value" : "Tijdelijke basaal"
           }
         },
         "pl" : {
@@ -67370,7 +67370,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdelijk Basaal Mislukt"
+            "value" : "Tijdelijk basaal mislukt"
           }
         },
         "pl" : {
@@ -69996,7 +69996,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tijdsverschil Ontdekt"
+            "value" : "Tijdsverschil ontdekt"
           }
         },
         "pl" : {
@@ -70642,7 +70642,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Totaal Toegediend"
+            "value" : "Totaal toegediend"
           }
         },
         "pl" : {
@@ -71614,7 +71614,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kan Pod Niet Bereiken"
+            "value" : "Kan Pod niet bereiken"
           }
         },
         "pl" : {
@@ -72910,7 +72910,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onverwachte Podwissel"
+            "value" : "Onverwachte podwissel"
           }
         },
         "pl" : {
@@ -73234,7 +73234,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onvoltooide Activering"
+            "value" : "Onvoltooide activering"
           }
         },
         "pl" : {
@@ -73882,7 +73882,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onbekende Podfout %1$@"
+            "value" : "Onbekende podfout %1$@"
           }
         },
         "pl" : {
@@ -74044,7 +74044,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onbekende Podfout %1$03d"
+            "value" : "Onbekende podfout %1$03d"
           }
         },
         "pl" : {
@@ -76030,7 +76030,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ja, Synchroniseer met Huidige Tijd"
+            "value" : "Ja, synchroniseer met huidige tijd"
           }
         },
         "pl" : {
