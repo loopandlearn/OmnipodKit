@@ -88,9 +88,9 @@ struct PodType: CustomStringConvertible, Equatable {
     var tabColor: String {
         switch podType {
         case .productIdDash:
-            return "blue"
+            return LocalizedString("blue", comment: "Pod tab color: DASH's needle cap tab")
         default:
-            return "clear"
+            return LocalizedString("clear", comment: "Pod tab color: Eros and Omnipod 5's needle cap tab")
         }
     }
 

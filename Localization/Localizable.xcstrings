@@ -6261,9 +6261,7 @@
         }
       }
     },
-    "⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!" : {
-
-    },
+    "⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!" : {},
     "1 hour" : {
       "comment" : "Button text for 1 hour suspend duration",
       "extractionState" : "manual",
@@ -17354,6 +17352,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为活动 Pod 配置的当前提醒。"
+          }
+        }
+      }
+    },
+    "blue" : {
+      "comment" : "Pod tab color: DASH's needle cap tab",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blue"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blauw"
+          }
+        }
+      }
+    },
+    "clear" : {
+      "comment" : "Pod tab color: Eros and Omnipod 5's needle cap tab",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "clear"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "doorzichtig"
           }
         }
       }
