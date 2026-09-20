@@ -4986,7 +4986,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ kan sinds %@ niet meer communiceren met de pod op je lichaam.\n\nGooi de Pod niet weg zonder te scrollen om dit hele scherm te lezen.\n\nDe communicatie werd op een kritiek moment onderbroken. Informatie over actieve insuline / basale hoeveelheid pod temp is onzeker.\n\nU kunt op het scherm Toegang tot Omnipod tikken om diagnostische pod-commando's te proberen om opnieuw verbinding te maken met de pod%@; of gebruik de iPhone-instellingen om Bluetooth van de telefoon uit en in te schakelen, en/of sluit de app af en start deze opnieuw op. (Wacht tot 30 seconden voor herstel).\n\nAls u besluit het op te geven omdat de communicatie niet kan worden hersteld, tikt u op de knop Pod weggooien, volgt u de stappen en start u een nieuwe pod. Houd uw glucose gedurende de komende 6 uur goed in de gaten, want er kan al dan niet insuline actief zijn in uw lichaam die %@ niet kan weergeven."
+            "value" : "%@ kan sinds %@ niet meer communiceren met de Pod op je lichaam.\n\nGooi de Pod niet weg zonder dit hele scherm te hebben gelezen.\n\nDe communicatie is op een kritiek moment onderbroken. Informatie over actieve insuline / de tijdelijke basaalstand van de Pod is onzeker.\n\nJe kunt tikken op Toegang tot Omnipod om diagnostische Pod-commando's te proberen en opnieuw verbinding te maken met de Pod%@; of gebruik de iPhone-instellingen om Bluetooth uit en weer aan te zetten, en/of sluit de app af en start deze opnieuw op. (Wacht tot 30 seconden voor herstel.)\n\nAls je besluit het op te geven omdat de communicatie niet kan worden hersteld, tik dan op de knop Pod weggooien, volg de stappen en start een nieuwe Pod. Houd je glucose de komende 6 uur goed in de gaten, want er kan nog insuline actief zijn in je lichaam die %@ niet kan weergeven."
           }
         },
         "pl" : {
@@ -5148,7 +5148,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ heeft de communicatie met de pod op je lichaam hersteld. \n\nDe gegevens over insulinetoediening zijn bijgewerkt en moeten overeenkomen met wat daadwerkelijk is toegediend. \n\nJe kunt %@ nu weer normaal gebruiken."
+            "value" : "%@ heeft de communicatie met de Pod op je lichaam hersteld. \n\nDe gegevens over insulinetoediening zijn bijgewerkt en moeten overeenkomen met wat daadwerkelijk is toegediend. \n\nJe kunt %@ nu weer normaal gebruiken."
           }
         },
         "pl" : {
@@ -8497,7 +8497,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alle Pod alarmen gebruiken geen biepen en bevestigingspunten worden onderdrukt. De Pod zal alleen piepen bij fatale Pod gebreken en bij het spelen van testpiepen.\n\n⚠️Waarschuwing - Als je telefoon buiten bereik is als deze functie is ingeschakeld, krijg je geen in-app meldingen; en de pod zal niet piepen om je te waarschuwen"
+            "value" : "Alle Pod alarmen gebruiken geen biepen en bevestigingspunten worden onderdrukt. De Pod zal alleen piepen bij fatale Pod gebreken en bij het spelen van testpiepen.\n\n⚠️Waarschuwing - Als je telefoon buiten bereik is als deze functie is ingeschakeld, krijg je geen in-app meldingen; en de Pod zal niet piepen om je te waarschuwen"
           }
         },
         "pl" : {
@@ -9890,6 +9890,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "BLE Firmware Version"
+          }
+        }
+      }
+    },
+    "blue" : {
+      "comment" : "Pod tab color: DASH's needle cap tab",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blue"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blauw"
           }
         }
       }
@@ -13225,7 +13243,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Controleer de pod, breng aan op de site en bevestig de bevestiging van de pod."
+            "value" : "Controleer de Pod, breng aan op de site en bevestig de bevestiging van de Pod."
           }
         },
         "pl" : {
@@ -13721,6 +13739,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查中..."
+          }
+        }
+      }
+    },
+    "clear" : {
+      "comment" : "Pod tab color: Eros and Omnipod 5's needle cap tab",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "clear"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "doorzichtig"
           }
         }
       }
@@ -15951,7 +15987,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type pod bevestigen"
+            "value" : "Type Pod bevestigen"
           }
         },
         "pl" : {
@@ -17123,7 +17159,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Huidige pod waarschuwingen"
+            "value" : "Huidige Pod waarschuwingen"
           }
         },
         "pl" : {
@@ -17352,42 +17388,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为活动 Pod 配置的当前提醒。"
-          }
-        }
-      }
-    },
-    "blue" : {
-      "comment" : "Pod tab color: DASH's needle cap tab",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "blue"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "blauw"
-          }
-        }
-      }
-    },
-    "clear" : {
-      "comment" : "Pod tab color: Eros and Omnipod 5's needle cap tab",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "clear"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "doorzichtig"
           }
         }
       }
@@ -20412,7 +20412,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen reactie van pod"
+            "value" : "Geen reactie van Pod"
           }
         },
         "pl" : {
@@ -24497,7 +24497,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vervaldatumherinnering Bijwerken Mislukt"
+            "value" : "Vervaldatumherinnering. Bijwerken mislukt"
           }
         },
         "pl" : {
@@ -24983,7 +24983,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stille pod-voorkeur niet bijgewerkt"
+            "value" : "Stille Pod-voorkeur niet bijgewerkt"
           }
         },
         "pl" : {
@@ -25469,7 +25469,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vul een nieuwe %@ pod met U-100 insuline (laat de %@ naaldkap erop)."
+            "value" : "Vul een nieuwe %@ Pod met U-100 insuline (laat de %@ naaldkap erop)."
           }
         },
         "pl" : {
@@ -25631,7 +25631,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vul een nieuwe %@ pod met U-100 insuline (laat de %@ naaldkap erop). Luister naar 2 piepjes."
+            "value" : "Vul een nieuwe %@ Pod met U-100 insuline (laat de %@ naaldkap erop). Luister naar 2 piepjes."
           }
         },
         "pl" : {
@@ -25955,7 +25955,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voltooi Deactivering"
+            "value" : "Voltooi deactivering"
           }
         },
         "pl" : {
@@ -26765,7 +26765,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voor gebruik met iPhone 16 of iPhone 17e bij gebruik met InPlay BLE (Atlas) DASH-pods; anders uitgeschakeld laten."
+            "value" : "Voor gebruik met iPhone 16 of iPhone 17e bij gebruik met InPlay BLE (Atlas) DASH-Pods; anders uitgeschakeld laten."
           }
         },
         "pl" : {
@@ -30110,7 +30110,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne podfout %1$@"
+            "value" : "Interne Podfout %1$@"
           }
         },
         "pl" : {
@@ -30272,7 +30272,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interne podfout %1$03d"
+            "value" : "Interne Podfout %1$03d"
           }
         },
         "pl" : {
@@ -31733,7 +31733,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Houd de RileyLink ongeveer 6 inch van de peul tijdens het koppelen."
+            "value" : "Houd de RileyLink ongeveer 6 inch van de Pod tijdens het koppelen."
           }
         },
         "pl" : {
@@ -33715,7 +33715,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zorg ervoor dat iPhone zich in de buurt van de actieve pod bevindt"
+            "value" : "Zorg ervoor dat iPhone zich in de buurt van de actieve Pod bevindt"
           }
         },
         "pl" : {
@@ -33877,7 +33877,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zorg ervoor dat je telefoon en pod zich dicht bij elkaar bevinden. Als de communicatieproblemen aanhouden, ga dan naar een andere plek."
+            "value" : "Zorg ervoor dat je telefoon en Pod zich dicht bij elkaar bevinden. Als de communicatieproblemen aanhouden, ga dan naar een andere plek."
           }
         },
         "pl" : {
@@ -34039,7 +34039,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zorg ervoor dat je pod gevuld is en in de buurt is"
+            "value" : "Zorg ervoor dat je Pod gevuld is en in de buurt is"
           }
         },
         "pl" : {
@@ -34201,7 +34201,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zorg ervoor dat je pod in de buurt is en probeer het opnieuw"
+            "value" : "Zorg ervoor dat je Pod in de buurt is en probeer het opnieuw"
           }
         },
         "pl" : {
@@ -35335,7 +35335,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ga naar een nieuw gebied uit de buurt van andere pods en probeer het opnieuw."
+            "value" : "Ga naar een nieuw gebied uit de buurt van andere Pods en probeer het opnieuw."
           }
         },
         "pl" : {
@@ -37768,7 +37768,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen pod gekoppeld"
+            "value" : "Geen Pod gekoppeld"
           }
         },
         "pl" : {
@@ -37930,7 +37930,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen pods gevonden"
+            "value" : "Geen Pods gevonden"
           }
         },
         "pl" : {
@@ -38254,7 +38254,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geen reactie van pod"
+            "value" : "Geen reactie van Pod"
           }
         },
         "pl" : {
@@ -42569,7 +42569,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Koppel pod."
+            "value" : "Koppel Pod."
           }
         },
         "pl" : {
@@ -44028,7 +44028,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Test beeps commando met succes verzonden.\n\nAls je geen beeps vanuit je pod hebt gehoord is het goed mogelijk dat de speaker van de pod kapot is."
+            "value" : "Test beeps commando met succes verzonden.\n\nAls je geen beeps vanuit je Pod hebt gehoord is het goed mogelijk dat de speaker van de Pod kapot is."
           }
         },
         "pl" : {
@@ -44352,7 +44352,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Breng alleen de oude pod binnen bereik of deactiveer de originele pod"
+            "value" : "Breng alleen de oude Pod binnen bereik of deactiveer de originele Pod"
           }
         },
         "pl" : {
@@ -44746,7 +44746,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deactiveer de pod. Wanneer de deactivering voltooid is, kun je een nieuwe pod koppelen."
+            "value" : "Deactiveer de Pod. Wanneer de deactivering voltooid is, kun je een nieuwe Pod koppelen."
           }
         },
         "pl" : {
@@ -44908,7 +44908,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deactiveer de pod. Wanneer de deactivering voltooid is, kun je deze verwijderen en een nieuwe pod koppelen."
+            "value" : "Deactiveer de Pod. Wanneer de deactivering voltooid is, kun je deze verwijderen en een nieuwe Pod koppelen."
           }
         },
         "pl" : {
@@ -45232,7 +45232,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voltooi het koppelen van je pod."
+            "value" : "Voltooi het koppelen van je Pod."
           }
         },
         "pl" : {
@@ -45394,7 +45394,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Koppel een nieuwe pod"
+            "value" : "Koppel een nieuwe Pod"
           }
         },
         "pl" : {
@@ -45556,7 +45556,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Plaats de RileyLink verder van de pod"
+            "value" : "Plaats de RileyLink verder van de Pod"
           }
         },
         "pl" : {
@@ -45718,7 +45718,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verplaats de RileyLink ten opzichte van de pod"
+            "value" : "Verplaats de RileyLink ten opzichte van de Pod"
           }
         },
         "pl" : {
@@ -45880,7 +45880,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecteer als u wilt overschakelen van het gebruik van %1@ pods naar een ander podtype of naar een ander pomptype."
+            "value" : "Selecteer of je wilt overschakelen van het gebruik van %1@ Pods naar een ander Pod-type of naar een ander pomptype."
           }
         },
         "pl" : {
@@ -46083,7 +46083,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Probeer de pod of de RileyLink te herpositioneren en probeer het opnieuw"
+            "value" : "Probeer de Pod of de RileyLink te herpositioneren en probeer het opnieuw"
           }
         },
         "pl" : {
@@ -50334,7 +50334,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod keep alive ingeschakeld wanneer app op de voorgrond staat met ontgrendelde telefoon. Extra pod-statusverzoek uitgegeven na 2 minuten, 40 seconden."
+            "value" : "Pod keep alive ingeschakeld wanneer app op de voorgrond staat met ontgrendelde telefoon. Extra Pod-statusverzoek uitgegeven na 2 minuten, 40 seconden."
           }
         },
         "pl" : {
@@ -50531,7 +50531,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod keep alive ingeschakeld. Extra pod-statusverzoek uitgegeven na 2 minuten, 40 seconden.\n\nProbeer pod verbonden te houden, zelfs als de telefoon is vergrendeld, door een stille melodie te gebruiken die op de achtergrond wordt afgespeeld. De stille melodie kan worden onderbroken door andere apps. Als de stille melodie wordt onderbroken, stopt de werking van de pod keep alive. De stille melodie verbruikt extra batterij van de iPhone."
+            "value" : "Pod keep alive ingeschakeld. Extra Pod-statusverzoek uitgegeven na 2 minuten, 40 seconden.\n\nProbeer Pod verbonden te houden, zelfs als de telefoon is vergrendeld, door een stille melodie te gebruiken die op de achtergrond wordt afgespeeld. De stille melodie kan worden onderbroken door andere apps. Als de stille melodie wordt onderbroken, stopt de werking van de Pod keep alive. De stille melodie verbruikt extra batterij van de iPhone."
           }
         },
         "pl" : {
@@ -50728,7 +50728,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pod keep alive ingeschakeld. Extra pod-statusverzoek na 2 minuten.\n\nVereist een RileyLink-compatibel apparaat binnen Bluetooth-bereik. Pod keep alive-berichten zijn mogelijk wanneer de app op de achtergrond is. Deze methode gebruikt minder iPhone-batterij en iets meer DASH-batterij dan de Silent Tune-methode. Het RileyLink-compatibele apparaat moet zijn geselecteerd en verbonden."
+            "value" : "Pod keep alive ingeschakeld. Extra Pod-statusverzoek na 2 minuten.\n\nVereist een RileyLink-compatibel apparaat binnen Bluetooth-bereik. Pod keep alive-berichten zijn mogelijk wanneer de app op de achtergrond is. Deze methode gebruikt minder iPhone-batterij en iets meer DASH-batterij dan de Silent Tune-methode. Het RileyLink-compatibele apparaat moet zijn geselecteerd en verbonden."
           }
         },
         "pl" : {
@@ -52383,7 +52383,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type peul"
+            "value" : "Type Pod"
           }
         },
         "pl" : {
@@ -56242,7 +56242,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klaar om te worden gekoppeld aan een Omnipod 5-pod."
+            "value" : "Klaar om te worden gekoppeld aan een Omnipod 5-Pod."
           }
         },
         "ro" : {
@@ -57487,7 +57487,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verwijder Pod van Lichaam"
+            "value" : "Verwijder Pod van lichaam"
           }
         },
         "pl" : {
@@ -60346,7 +60346,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecteer het specifieke Omnipod Pod-type voor gebruik met %@. Zorg ervoor dat u het juiste Pod-type selecteert, anders kan %@ er niet mee communiceren."
+            "value" : "Selecteer het specifieke Omnipod Pod-type voor gebruik met %@. Zorg ervoor dat je het juiste Pod-type selecteert, anders kan %@ er niet mee communiceren."
           }
         },
         "pl" : {
@@ -60508,7 +60508,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecteer het type insuline dat je in deze pod gaat gebruiken."
+            "value" : "Selecteer het type insuline dat je in deze Pod gaat gebruiken."
           }
         },
         "pl" : {
@@ -65883,7 +65883,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type switch pod"
+            "value" : "Type switch Pod"
           }
         },
         "pl" : {
@@ -66207,7 +66207,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Overschakelen naar een andere pod of een ander pomptype"
+            "value" : "Overschakelen naar een andere Pod of een ander pomptype"
           }
         },
         "pl" : {
@@ -68815,7 +68815,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Het venster aan de bovenkant van de pod moet roze gekleurd zijn wanneer de canule correct in de huid is ingebracht."
+            "value" : "Het venster aan de bovenkant van de Pod moet roze gekleurd zijn wanneer de canule correct in de huid is ingebracht."
           }
         },
         "pl" : {
@@ -68977,7 +68977,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er is een communicatieprobleem opgetreden met de pod. Als dit probleem zich blijft voordoen, tik op Pod Verwijderen. Je kunt dan een nieuwe Pod activeren."
+            "value" : "Er is een communicatieprobleem opgetreden met de Pod. Als dit probleem zich blijft voordoen, tik op Pod Verwijderen. Je kunt dan een nieuwe Pod activeren."
           }
         },
         "pl" : {
@@ -69139,7 +69139,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deze waarschuwingen klinken niet op uw apparaat wanneer het in de modus Stil of Niet storen staat. Er zijn andere kritieke Pod-waarschuwingen die op uw apparaat klinken, zelfs wanneer het is ingesteld op de modus Stil of Niet storen.\n\nDe Pod gebruikt ook geluidssignalen voor alle Pod-waarschuwingen, behalve wanneer de Pod is uitgeschakeld."
+            "value" : "Deze waarschuwingen klinken niet op je apparaat wanneer het in de modus Stil of Niet storen staat. Er zijn andere kritieke Pod-waarschuwingen die wel op je apparaat klinken, zelfs wanneer het op Stil of Niet storen staat.\n\nDe Pod gebruikt ook hoorbare piepjes voor alle Pod-waarschuwingen, behalve wanneer de Pod gedempt is."
           }
         },
         "pl" : {
@@ -70480,7 +70480,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Te veel pods gevonden"
+            "value" : "Te veel Pods gevonden"
           }
         },
         "pl" : {
@@ -70804,7 +70804,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Probeer de positie van de pod aan te passen of schakel Bluetooth uit en aan in de iPhone-instellingen."
+            "value" : "Probeer de positie van de Pod aan te passen of schakel Bluetooth uit en aan in de iPhone-instellingen."
           }
         },
         "pl" : {
@@ -72748,7 +72748,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onverwachte pod waarschuwing #%1@!"
+            "value" : "Onverwachte Pod waarschuwing #%1@!"
           }
         },
         "pl" : {
@@ -72910,7 +72910,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onverwachte podwissel"
+            "value" : "Onverwachte Podwissel"
           }
         },
         "pl" : {
@@ -73072,7 +73072,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onverwachte reactie van pod"
+            "value" : "Onverwachte reactie van Pod"
           }
         },
         "pl" : {
@@ -73882,7 +73882,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onbekende podfout %1$@"
+            "value" : "Onbekende Podfout %1$@"
           }
         },
         "pl" : {
@@ -74044,7 +74044,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Onbekende podfout %1$03d"
+            "value" : "Onbekende Podfout %1$03d"
           }
         },
         "pl" : {
@@ -74206,7 +74206,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type peul onbekend"
+            "value" : "Type Pod onbekend"
           }
         },
         "pl" : {
@@ -75346,7 +75346,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wanneer dit is ingeschakeld en de pod binnen bereik is, worden extra pod-statusaanvragen verzonden om de Bluetooth-verbrekingen van de pod tot een minimum te beperken."
+            "value" : "Wanneer dit is ingeschakeld en de Pod binnen bereik is, worden extra Pod-statusaanvragen verzonden om de Bluetooth-verbrekingen van de Pod tot een minimum te beperken."
           }
         },
         "pl" : {
@@ -76192,7 +76192,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U kunt optioneel een melding krijgen wanneer de hoeveelheid insuline in de huidige Pod daalt tot een geselecteerd niveau onder de huidige reservoirwaarde van %@ eenheden.\n\nStel het waarschuwingsniveau voor laag reservoir in voor de huidige Pod."
+            "value" : "Je kunt optioneel een melding krijgen wanneer de hoeveelheid insuline in de huidige Pod daalt tot een geselecteerd niveau onder de huidige reservoirwaarde van %@ eenheden.\n\nStel het waarschuwingsniveau voor laag reservoir in voor de huidige Pod."
           }
         },
         "pl" : {
@@ -76354,7 +76354,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %1$@ eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat u wilt configureren wanneer u een Pod koppelt."
+            "value" : "Je kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %1$@ eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat je wilt configureren bij het koppelen van een Pod."
           }
         },
         "pl" : {
@@ -76516,7 +76516,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %1$d eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat u wilt configureren wanneer u een Pod koppelt."
+            "value" : "Je kunt optioneel een melding krijgen wanneer de resterende hoeveelheid insuline in het reservoir een geselecteerd niveau bereikt (1 - %1$d eenheden).\n\nStel het standaard waarschuwingsniveau voor laag reservoir in dat je wilt configureren bij het koppelen van een Pod."
           }
         },
         "pl" : {
@@ -77097,7 +77097,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je kunt geen verbinding maken met een nieuwe Omnipod 5-pod totdat je opnieuw verbinding hebt gemaakt met het internet om een nieuw certificaat te downloaden."
+            "value" : "Je kunt geen verbinding maken met een nieuwe Omnipod 5-Pod totdat je opnieuw verbinding hebt gemaakt met het internet om een nieuw certificaat te downloaden."
           }
         },
         "ro" : {
@@ -77205,7 +77205,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U begint nu met het configureren van uw herinneringen, het selecteren van uw insulinetype, het selecteren van het Omnipod pod-type dat u gaat gebruiken, het vullen van uw Pod met insuline, het koppelen aan uw apparaat en het plaatsen op uw lichaam."
+            "value" : "Je begint nu met het configureren van je herinneringen, het selecteren van je insulinetype, het selecteren van het Omnipod Pod-type dat je gaat gebruiken, het vullen van je Pod met insuline, het koppelen aan je apparaat en het plaatsen op je lichaam."
           }
         },
         "pl" : {
@@ -77570,7 +77570,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uw Pod is klaar voor gebruik.\n\nDe standaardwaarschuwingen voor vervaldatum en laag reservoir zijn geconfigureerd. U kunt de waarschuwingen voor de huidige Pod wijzigen in de Meldingsinstellingen."
+            "value" : "Je Pod is klaar voor gebruik.\n\nDe standaardwaarschuwingen voor vervaldatum en laag reservoir zijn geconfigureerd. Je kunt de waarschuwingen voor de huidige Pod wijzigen in de Meldingsinstellingen."
           }
         },
         "pl" : {
