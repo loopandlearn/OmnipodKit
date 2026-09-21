@@ -93,7 +93,7 @@ class BlePodComms: PodComms {
             // would hang without ever timing out. Always schedule on the main run loop.
             DispatchQueue.main.async {
                 Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                    let devices = self.bluetoothManager.getConnectedPairableDevices()
+                    let devices = self.bluetoothManager.getConnectedPairingCandidates()
 
                     if devices.count > 1 {
                         self.log.default("Multiple pods found while scanning")

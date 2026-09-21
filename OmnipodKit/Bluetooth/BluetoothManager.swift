@@ -846,7 +846,7 @@ class BluetoothManager: NSObject {
         delayedProbeInFlight = false
         alarmScanSuppressed = false
         manager.stopScan()
-        for device in devices {
+        for device in devices where autoConnectIDs.contains(device.manager.peripheral.identifier.uuidString) {
             let peripheral = device.manager.peripheral
             switch peripheral.state {
             case .connecting where !isConnectWatchdogActive(peripheral):
@@ -1302,11 +1302,12 @@ class BluetoothManager: NSObject {
 
     // MARK: - Accessors
 
-    func getConnectedPairableDevices() -> [Omni] {
+    func getConnectedPairingCandidates() -> [Omni] {
         var connected: [Omni] = []
         managerQueue.sync {
             connected = self.devices.filter {
-                $0.manager.peripheral.state == .connected && $0.advertisement?.pairable == true
+                $0.manager.peripheral.state == .connected &&
+                ($0.advertisement?.pairable == true || self.autoConnectIDs.contains($0.manager.peripheral.identifier.uuidString))
             }
         }
         return connected
