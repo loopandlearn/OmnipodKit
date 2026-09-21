@@ -1302,10 +1302,12 @@ class BluetoothManager: NSObject {
 
     // MARK: - Accessors
 
-    func getConnectedDevices() -> [Omni] {
+    func getConnectedPairableDevices() -> [Omni] {
         var connected: [Omni] = []
         managerQueue.sync {
-            connected = self.devices.filter { $0.manager.peripheral.state == .connected }
+            connected = self.devices.filter {
+                $0.manager.peripheral.state == .connected && $0.advertisement?.pairable == true
+            }
         }
         return connected
     }
