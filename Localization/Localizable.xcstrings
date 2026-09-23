@@ -9742,6 +9742,9 @@
         }
       }
     },
+    "Bluetooth error" : {
+      "comment" : "Error message description for PeripheralManagerError.cbPeripheralError"
+    },
     "Bluetooth is powered off" : {
       "comment" : "Error description for BluetoothManagerError.bluetoothNotAvailable(.poweredOff)",
       "extractionState" : "manual",
@@ -14449,6 +14452,9 @@
         }
       }
     },
+    "Communication with the pod was interrupted." : {
+      "comment" : "Error description for messageIOException"
+    },
     "Compiled" : {
       "comment" : "O5 cert source: compiled"
     },
@@ -16074,6 +16080,12 @@
           }
         }
       }
+    },
+    "Could not establish a secure connection to the pod." : {
+      "comment" : "Error description for invalidLTKKey"
+    },
+    "Could not pair with the pod." : {
+      "comment" : "Error description for pairingException"
     },
     "Couldn’t look up the key-management server." : {
       "comment" : "O5 fetch failure: DNS resolution failed, primary line"
@@ -34743,6 +34755,9 @@
           }
         }
       }
+    },
+    "Move your iPhone closer to the pod and try again." : {
+      "comment" : "Recovery suggestion for a pod pairing error"
     },
     "NA" : {
       "comment" : "String shown on pod details for last status date when not available.\nString shown on pod details for total delivery when not available.",
@@ -55395,6 +55410,9 @@
         }
       }
     },
+    "Received an unexpected response from the pod." : {
+      "comment" : "Error description for a malformed or unparseable pod response"
+    },
     "Reconnecting..." : {
       "comment" : "A label displayed when a device is connecting.",
       "extractionState" : "manual",
@@ -68096,6 +68114,9 @@
           }
         }
       }
+    },
+    "This usually resolves on its own. If it keeps happening, move your iPhone closer to the pod." : {
+      "comment" : "Recovery suggestion for a transient pod communication error"
     },
     "threeNotUsed" : {
       "comment" : "Pod state threeNotUsed",
