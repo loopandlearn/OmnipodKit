@@ -6165,6 +6165,9 @@
         }
       }
     },
+    "⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!" : {
+
+    },
     "1 hour" : {
       "comment" : "Button text for 1 hour suspend duration",
       "extractionState" : "manual",
@@ -8274,6 +8277,9 @@
         }
       }
     },
+    "All confirmation reminder beeps are suppressed, but other audible Pod alert beeping cannot be silenced for this Pod." : {
+      "comment" : "Alternate black dot description for SilencePodPreference.disabled"
+    },
     "All Pod alerts use no beeps and confirmation reminder beeps are suppressed. The Pod will only beep for fatal Pod faults and when playing test beeps.\n\n⚠️Warning - If your phone is out of range of the pod while this feature is enabled, you will not receive any in-app notifications; and the pod will not beep to alert you." : {
       "comment" : "Description for SilencePodPreference.enabled",
       "extractionState" : "manual",
@@ -9735,6 +9741,9 @@
           }
         }
       }
+    },
+    "Bluetooth error" : {
+      "comment" : "Error message description for PeripheralManagerError.cbPeripheralError"
     },
     "Bluetooth is powered off" : {
       "comment" : "Error description for BluetoothManagerError.bluetoothNotAvailable(.poweredOff)",
@@ -14443,6 +14452,9 @@
         }
       }
     },
+    "Communication with the pod was interrupted." : {
+      "comment" : "Error description for messageIOException"
+    },
     "Compiled" : {
       "comment" : "O5 cert source: compiled"
     },
@@ -16068,6 +16080,12 @@
           }
         }
       }
+    },
+    "Could not establish a secure connection to the pod." : {
+      "comment" : "Error description for invalidLTKKey"
+    },
+    "Could not pair with the pod." : {
+      "comment" : "Error description for pairingException"
     },
     "Couldn’t look up the key-management server." : {
       "comment" : "O5 fetch failure: DNS resolution failed, primary line"
@@ -31003,6 +31021,9 @@
         }
       }
     },
+    "Issues status requests to minimize Bluetooth disconnects. The default When Open selection should be sufficient for all iPhone and Pod combinations." : {
+      "comment" : "Summary of the Pod Keep Alive concept"
+    },
     "Keep the RileyLink about 6 inches from the pod during pairing." : {
       "comment" : "Label text for step 2 of Eros pair pod instructions",
       "extractionState" : "manual",
@@ -34734,6 +34755,9 @@
           }
         }
       }
+    },
+    "Move your iPhone closer to the pod and try again." : {
+      "comment" : "Recovery suggestion for a pod pairing error"
     },
     "NA" : {
       "comment" : "String shown on pod details for last status date when not available.\nString shown on pod details for total delivery when not available.",
@@ -49177,7 +49201,40 @@
       }
     },
     "Pod keep alive disabled. Additional pod status requests are not issued to prevent pod disconnects (nominal behavior)." : {
-      "comment" : "Description for PodKeepAlive.disabled"
+      "comment" : "Description for PodKeepAlive.disabled",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod-Überwachung deaktiviert. Es werden keine zusätzlichen Pod-Statusabfragen gesendet, um eine Unterbrechung der Pod-Verbindung zu verhindern (normales Verhalten)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파드 연결 유지가 비활성화됩니다. 파드 연결 끊김 방지를 위한 추가 파드 상태 요청이 전송되지 않습니다(정상 동작)."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod keep alive er deaktivert. Det sendes ikke ut ytterligere forespørsler om pod-status for å forhindre at pod-forbindelser brytes (normalt oppførsel)."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menținerea în viață a pompei dezactivată. Pompa se deconectează la 3 minute după ultimul schimb de mesaje (comportament nominal)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod 保活已禁用。不再发送额外的 Pod 状态请求，以防止 Pod 断开连接（正常行为）。"
+          }
+        }
+      }
     },
     "Pod keep alive disabled. Pod disconnects 3 minutes after last message exchange (nominal behavior)." : {
       "comment" : "Description for PodKeepAlive.disabled",
@@ -55353,6 +55410,9 @@
         }
       }
     },
+    "Received an unexpected response from the pod." : {
+      "comment" : "Error description for a malformed or unparseable pod response"
+    },
     "Reconnecting..." : {
       "comment" : "A label displayed when a device is connecting.",
       "extractionState" : "manual",
@@ -61205,6 +61265,9 @@
           }
         }
       }
+    },
+    "Silence Pod mode can only suppress confirmation reminder beeping with this Pod." : {
+      "comment" : "Help text for Silence Pod view for black dot pods"
     },
     "Silence Pod mode suppresses all Pod alert and confirmation reminder beeping." : {
       "comment" : "Help text for Silence Pod view",
@@ -68052,6 +68115,9 @@
         }
       }
     },
+    "This usually resolves on its own. If it keeps happening, move your iPhone closer to the pod." : {
+      "comment" : "Recovery suggestion for a transient pod communication error"
+    },
     "threeNotUsed" : {
       "comment" : "Pod state threeNotUsed",
       "extractionState" : "manual",
@@ -73889,7 +73955,40 @@
       }
     },
     "When enabled, additional pod status requests are issued to minimize pod Bluetooth disconnects." : {
-      "comment" : "Summary of the Pod Keep Alive concept"
+      "comment" : "Summary of the Pod Keep Alive concept",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn aktiviert, werden zusätzliche Pod-Statusabfragen gesendet, um das Trennen der Bluetoothverbindung möglichst zu vermeiden."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 기능을 활성화하면 파드의 블루투스 연결 끊김을 최소화하기 위해 추가적인 파드 상태 요청이 전송됩니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Når aktiviert, sendes det flere forespørsler om pod-status for å minimere antall avbrud på grunn av tapt Bluetooth tilkoblinger."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Când este activat, sunt emise solicitări suplimentare de stare a pompei pentru a minimiza deconectările Bluetooth ale pompei."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，系统将发出额外的 Pod 状态请求，以减少 Pod 蓝牙断开连接的情况。"
+          }
+        }
+      }
     },
     "When Open" : {
       "comment" : "Title string for PodKeepAlive.whenOpen",

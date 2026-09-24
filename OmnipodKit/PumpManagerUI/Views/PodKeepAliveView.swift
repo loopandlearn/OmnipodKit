@@ -39,21 +39,15 @@ struct PodKeepAliveView: View {
             List {
                 Section {
                     VStack(alignment: .center, spacing: 4) {
-                        Text("For use with iPhone 16 or iPhone 17e when used with InPlay BLE (Atlas) DASH pods; otherwise leave disabled.", comment: "Hardware which benefits from Pod Keep Alive")
-                            .font(.body)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("When enabled, additional pod status requests are issued to minimize pod Bluetooth disconnects.", comment: "Summary of the Pod Keep Alive concept")
+                        Text("Issues status requests to minimize Bluetooth disconnects. The default When Open selection should be sufficient for all iPhone and Pod combinations.", comment: "Summary of the Pod Keep Alive concept")
                             .font(.body)
                             .foregroundColor(.primary)
                     }
                 }
 
                 Section {
-                    ForEach(PodKeepAlive.allCases, id: \.self) { preference in
+                    /// Skip displaying internal only Pod Keep Alives modes without a description
+                    ForEach(PodKeepAlive.allCases.filter { !$0.description.isEmpty }, id: \.self) { preference in
                         HStack {
                             CheckmarkListItem(
                                 title: Text(preference.title),

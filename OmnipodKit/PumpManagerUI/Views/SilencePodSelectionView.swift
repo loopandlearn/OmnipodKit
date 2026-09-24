@@ -30,13 +30,16 @@ struct SilencePodSelectionView: View {
     @State private var error: LocalizedError?
     @State private var saving: Bool = false
 
+    private var noSilentBeep: Bool = false
+
     init(
         initialValue: SilencePodPreference,
         initialSilenceTimeEndTime: Date?,
         onSave: @escaping (_ selectedValue: SilencePodPreference,
                            _ selectedSilenceEnd: Date?,
-                           _ completion: @escaping (_ error: LocalizedError?) -> Void) -> Void)
-    {
+                           _ completion: @escaping (_ error: LocalizedError?) -> Void) -> Void,
+        noSilentBeep: Bool
+    ) {
         self.initialValue = initialValue
         self._preference = State(initialValue: initialValue)
 
@@ -44,6 +47,7 @@ struct SilencePodSelectionView: View {
         self._endTimeValue = State(initialValue: initialSilenceTimeEndTime)
 
         self.onSave = onSave
+        self.noSilentBeep = noSilentBeep
     }
 
     var body: some View {
@@ -52,17 +56,36 @@ struct SilencePodSelectionView: View {
 
     var content: some View {
         VStack {
+            let instructions: String = self.noSilentBeep ?
+                LocalizedString("Silence Pod mode can only suppress confirmation reminder beeping with this Pod.",
+                                comment: "Help text for Silence Pod view for black dot pods") :
+                LocalizedString("Silence Pod mode suppresses all Pod alert and confirmation reminder beeping.",
+                                comment: "Help text for Silence Pod view")
             List {
                 Section {
-                    Text(LocalizedString("Silence Pod mode suppresses all Pod alert and confirmation reminder beeping.", comment: "Help text for Silence Pod view")).fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 10)
+                    if self.noSilentBeep {
+                        VStack(alignment: .center, spacing: 4) {
+                            Text("⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!")
+                                .padding(.vertical, 10)
+                                .font(.body)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(instructions)
+                            .padding(.vertical, 10)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                    }
                 }
                 Section {
                     ForEach(SilencePodPreference.allCases, id: \.self) { preference in
                         HStack {
                             CheckmarkListItem(
                                 title: Text(preference.title),
-                                description: Text(preference.description),
+                                description: Text(self.noSilentBeep ? preference.altDescription : preference.description),
                                 isSelected: Binding(
                                     get: { self.preference == preference },
                                     set: { isSelected in
@@ -100,7 +123,7 @@ struct SilencePodSelectionView: View {
             .padding(self.horizontalSizeClass == .regular ? .bottom : [])
             .background(Color(UIColor.secondarySystemGroupedBackground).shadow(radius: 5))
         }
-        .onChange(of: preference) { _ in
+        .onChange(of: preference) { _, _ in
             /// Clear endTimeValue on any change of preference for hopefully a more consistent UX experience
             endTimeValue = nil
         }
@@ -199,10 +222,14 @@ struct SilencePodSelectionView: View {
 struct SilencePodSelectionView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            SilencePodSelectionView(initialValue: .disabled, initialSilenceTimeEndTime: nil) { selectedValue, selectedSilenceEnd, completion in
-                print("Selected: \(selectedValue), end: \(String(describing: selectedSilenceEnd))")
-                completion(nil)
-            }
+            SilencePodSelectionView(initialValue: .disabled,
+                initialSilenceTimeEndTime: nil,
+                onSave: { selectedValue, selectedSilenceEnd, completion in
+                    print("Selected: \(selectedValue), end: \(String(describing: selectedSilenceEnd))")
+                    completion(nil)
+                },
+                noSilentBeep: true
+            )
         }
     }
 }
@@ -273,8 +300,8 @@ struct OptionalDatePicker: View {
                 )
                 .labelsHidden()
                 .monospacedDigit()
-                .onChange(of: pickerDate) { newValue in
-                    applyRollingChange(newValue)
+                .onChange(of: selection) { _, newValue in
+                    syncFromBinding(newValue)
                 }
             }
 
@@ -288,8 +315,8 @@ struct OptionalDatePicker: View {
                 .buttonStyle(.plain)
             }
         }
-        .onChange(of: selection) {
-            newValue in syncFromBinding(newValue)
+        .onChange(of: selection) { _, newValue in
+            syncFromBinding(newValue)
         }
 
         Text(footnote)

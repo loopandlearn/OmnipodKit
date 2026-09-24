@@ -574,6 +574,9 @@ class OmniSettingsViewModel: ObservableObject {
         return pumpManager.podType
     }
 
+    var noSilentBeep: Bool {
+        return pumpManager.noSilentBeep
+    }
 }
 
 

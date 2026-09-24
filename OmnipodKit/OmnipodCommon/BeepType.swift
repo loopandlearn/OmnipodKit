@@ -17,9 +17,9 @@ import Foundation
 // (when used in 0x19 Configure Alerts with an 'a' bit of 0 or 0x1F Cancel) and will return 0x6 Error
 // response, code 7 (when used in 0x19 Configure Alerts with an 'a' bit of 1 or in 0x1E Beep Configure).
 //
-// Beep type 0xF will will have no beeps or errors (when used in 0x19 Configure Alerts
-// or 0x1E Beep Configure), but will generate a 0x37 pod fault when used in 0x1F Cancel!
-//
+// For non "black dot" O5 pods, beep type 0xF will have no beeps or errors (when used in 0x19
+// Configure Alerts or 0x1E Beep Configure), but will cause a 0x37 pod fault when used in 0x1F Cancel!
+// For "black dot" O5 pods, beep type 0xF will emit a bipBip, thus crippling Silence Pod mode. :(
 enum BeepType: UInt8 {
     case noBeepCancel = 0x0 // silent for 0x1F Cancel & inactive 0x19 alerts; error for 0x1E Beep Options & active 0x19 alerts
     case beepBeepBeepBeep = 0x1
@@ -38,5 +38,9 @@ enum BeepType: UInt8 {
     // If pod is currently suspended, 5 second beep for the 0x19, 0x1E & 0x1F commands
     // If pod is not suspended, silent for 0x1F Cancel & inactive 0x19 alerts; error for 0x1E Beep Options & active 0x19 alerts
     case fiveSecondBeep = 0xE
-    case noBeepNonCancel = 0xF // silent for 0x1E Beep Options & 0x19 Configure Alerts, 0x37 pod fault for 0x1F Cancel!
+
+    /// For all Eros, DASH and pre "black dot" O5 pods, will be silent for 0x1E Beep Options & 0x19
+    /// Configure Alerts, but will cause an 0x37 pod fault when used with an 0x1F Cancel command!
+    /// For the newer "black dot" O5 pods, emits a bipBip for all commands, thus crippling Silence Pod mode. :(
+    case noBeepNonCancel = 0xF
 }

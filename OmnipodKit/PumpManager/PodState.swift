@@ -227,6 +227,13 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         return fault != nil || setupProgress == .activationTimeout || setupProgress == .podIncompatible
     }
 
+    /// Does this pod have no silent beep type available (is noBeepNonCancel non-silent)?
+    /// So far this has only been found in the newer the Omnipod 5 "black dot" pods
+    /// which have had firmware verision starting with "12.0". Assume later firmware
+    var noSilentBeep: Bool {
+        return podType.isO5 && firmwareVersion.hasPrefix("12.")
+    }
+
     // MARK: - 32-bit message nonce var's and func's
 
     var currentNonce: UInt32 {
