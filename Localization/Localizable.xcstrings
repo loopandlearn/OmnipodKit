@@ -9958,6 +9958,9 @@
         }
       }
     },
+    "blue" : {
+      "comment" : "Tab color for DASH Pods"
+    },
     "Bluetooth is powered off" : {
       "comment" : "Error description for BluetoothManagerError.bluetoothNotAvailable(.poweredOff)",
       "extractionState" : "manual",
@@ -13806,6 +13809,9 @@
           }
         }
       }
+    },
+    "clear" : {
+      "comment" : "Tab color for Classic and Omnipod 5 Pods"
     },
     "Command error %1$@: %2$@" : {
       "comment" : "Format string for invalid message error code (1: error code number) (2: error description)",
