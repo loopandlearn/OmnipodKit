@@ -300,8 +300,8 @@ struct OptionalDatePicker: View {
                 )
                 .labelsHidden()
                 .monospacedDigit()
-                .onChange(of: selection) { _, newValue in
-                    syncFromBinding(newValue)
+                .onChange(of: pickerDate) { _, newValue in
+                    applyRollingChange(newValue)
                 }
             }
 

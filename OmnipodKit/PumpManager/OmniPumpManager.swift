@@ -1123,7 +1123,7 @@ extension OmniPumpManager {
         }
     }
 
-    // Currently running with an Omnipod 5 "black dot" pod
+    /// Running with a pod that does not have silent beep support (e.g., a "black dot" O5)
     var noSilentBeep: Bool {
         return state.podState?.noSilentBeep == true
     }
