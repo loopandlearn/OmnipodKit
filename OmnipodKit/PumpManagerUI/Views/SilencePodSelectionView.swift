@@ -267,8 +267,9 @@ struct OptionalDatePicker: View {
 
         now = Date()
         earliestAllowedEndTime = now.addingTimeInterval(minimumSilenceModeTime)
-        minimumDate = now.addingTimeInterval(minimumInterval)
-        maximumDate = now.addingTimeInterval(maximumInterval)
+        // Whole minutes: the picker rewrites seconds, and a bound with seconds would never settle
+        minimumDate = now.addingTimeInterval(minimumInterval).rounded(toMinutes: .up)
+        maximumDate = now.addingTimeInterval(maximumInterval).rounded(toMinutes: .down)
 
         let initial = selection.wrappedValue ?? now.addingTimeInterval(defaultOffset)
         _pickerDate = State(initialValue: initial)
@@ -402,5 +403,11 @@ struct OptionalDatePicker: View {
 
     private func clamp(_ date: Date) -> Date {
         min(max(date, minimumDate), maximumDate)
+    }
+}
+
+private extension Date {
+    func rounded(toMinutes rule: FloatingPointRoundingRule) -> Date {
+        Date(timeIntervalSinceReferenceDate: (timeIntervalSinceReferenceDate / 60).rounded(rule) * 60)
     }
 }
