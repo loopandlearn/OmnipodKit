@@ -129,6 +129,8 @@ extension PeripheralManager {
 
     func configureAndRun(_ block: @escaping (_ manager: PeripheralManager) -> Void) -> (() -> Void) {
         return {
+            var attempt = 1
+            while true {
             if BluetoothManager.connectOnDemandEnabled {
                 // "Normally disconnected" model: the pod isn't held connected, so connect on demand
                 // for this session (no forceful reconnect — that heuristic is what caused the ~28s
@@ -172,6 +174,16 @@ extension PeripheralManager {
                     self.log.error("Error applying peripheral configuration: %{public}@", String(describing: error))
                     // Will retry
                 }
+            }
+            // A pod that drops the link right after connecting usually accepts the next attempt
+            if BluetoothManager.connectOnDemandEnabled, self.peripheral.state != .connected, attempt == 1 {
+                attempt += 1
+                self.log.default("[connectOnDemand] link dropped after connecting — retrying")
+                self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] link dropped after connecting — retrying")
+                Thread.sleep(forTimeInterval: 2)
+                continue
+            }
+            break
             }
 
             block(self)

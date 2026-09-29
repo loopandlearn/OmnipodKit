@@ -908,28 +908,13 @@ class BluetoothManager: NSObject {
         }
     }
 
-    /// Issue an on-demand connect with a stale-state flush. The first connect on a peripheral is
-    /// clean, but a cached CBPeripheral that was previously connected then cancelPeripheralConnection'd
-    /// wedges in .connecting on a bare reconnect (measured: every reconnect after an idle-disconnect
-    /// timed out at 20s while iOS reported it .disconnected + advertising connectable). Cancel any
-    /// lingering iOS-side connection intent and re-fetch the peripheral before connecting.
     private func freshConnect(_ peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
-        // freshConnect exists ONLY to unstick a wedged .connecting state before a cold connect. If the pod
-        // is already healthily .connected, cancelling here would murder the live link (the self-inflicted
-        // disconnect that didDisconnect then mislabels a "drop"). Leave the connection alone.
         if peripheral.state == .connected {
-            log.default("[connectOnDemand] freshConnect skipped — already connected to %{public}@", peripheral.identifier.uuidString)
             pendingFreshConnectID = nil
             return
         }
-        manager.cancelPeripheralConnection(peripheral)
-        let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
-        // Keep the session's peripheral reference in sync with the object we actually connect.
-        if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
-            device.manager.peripheral = target
-        }
-        manager.connect(target, options: nil)
+        directConnect(peripheral)
     }
 
     // MARK: - Eager connect watchdog (InPlay / iPhone 16-class)
@@ -1112,13 +1097,30 @@ class BluetoothManager: NSObject {
             eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
             return
         }
-        // Fresh-discovery connect: briefly scan for the pod and connect on its just-heard advert
-        // (~1-2s) instead of a bare cold connect() that waits out iOS's duty-cycled reacquisition
-        // (~10-16s — the slow user-initiated Suspend). Falls back to a cold connect after 4s if the
-        // pod isn't heard. (The heartbeat probe still uses StartDelay; the two stay serialized via
-        // commandConnectInFlight.)
-        log.default("[connectOnDemand] fresh-discovery command connect for %{public}@", peripheral.identifier.uuidString)
-        connectViaFreshDiscovery(peripheral)
+        connectForCommand(peripheral)
+    }
+
+    /// O5 connects fastest on a just-heard advert; DASH on a plain connect().
+    private func connectForCommand(_ peripheral: CBPeripheral) {
+        if podType.isO5 {
+            connectViaFreshDiscovery(peripheral)
+        } else {
+            log.default("[connectOnDemand] connect %{public}@", peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connect")
+            directConnect(peripheral)
+        }
+    }
+
+    private func directConnect(_ peripheral: CBPeripheral) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        if connectRequestedAt[peripheral.identifier.uuidString] == nil {
+            connectRequestedAt[peripheral.identifier.uuidString] = Date()
+        }
+        let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+        if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
+            device.manager.peripheral = target
+        }
+        manager.connect(target, options: nil)
     }
 
     /// The known/autoconnect pod peripheral, for foreground keep-alive and heartbeat. Returns nil when
@@ -1808,7 +1810,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
             // so it won't reconnect).
             log.default("[connectOnDemand] keep-alive — reconnecting after drop")
             connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] keep-alive — reconnecting after drop")
-            connectViaFreshDiscovery(peripheral)
+            connectForCommand(peripheral)
         } else {
             // Idle: run the fault-listener alarm scan, AND (if a heartbeat is needed) arm the StartDelay
             // probe alongside it. The two coexist — the scan is light and issueDelayedConnectProbe no
