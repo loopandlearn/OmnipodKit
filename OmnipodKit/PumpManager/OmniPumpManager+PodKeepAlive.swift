@@ -55,6 +55,7 @@ extension OmniPumpManager {
     func podKeepAliveAppDidEnterBackground() {
         podKeepAliveAppInBackground = true
         if !podKeepAliveTimerAllowed {
+            print("@@@ podKeepAliveAppDidEnterBackground disabling pod keep alive timer at \(timeStr(Date()))")
             podKeepAliveTimer?.invalidate()
         }
     }
