@@ -78,7 +78,6 @@ struct InsertCannulaView: View {
             .padding()
         }
         .alert(isPresented: $cancelModalIsPresented) { cancelPairingModal }
-        .navigationTitle(LocalizedString("Insert Cannula", comment: "navigation bar title for insert cannula"))
         .navigationBarTitleDisplayMode(.automatic)
         .navigationBarBackButtonHidden(true)
         .navigationBarItems(trailing: cancelButton)

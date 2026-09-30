@@ -44,7 +44,7 @@ struct DeliveryUncertaintyRecoveryView: View {
                 }
             }
         }
-        .navigationBarTitle(Text(LocalizedString("Unable to Reach Pod", comment: "Title of delivery uncertainty recovery page")), displayMode: .large)
+        .navigationBarTitleDisplayMode(.large)
         .navigationBarItems(leading: backButton)
     }
 
