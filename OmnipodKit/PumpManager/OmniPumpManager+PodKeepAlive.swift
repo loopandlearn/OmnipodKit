@@ -48,8 +48,8 @@ extension OmniPumpManager {
 
     /// Timer keep alives run in the background only for modes that keep the pod connected there.
     private var podKeepAliveTimerAllowed: Bool {
-        state.podKeepAlive.usesTimerBasedKeepAlives &&
-            (!podKeepAliveAppInBackground || state.podKeepAlive.keepsPodConnectedInBackground)
+        guard state.podKeepAlive.usesTimerBasedKeepAlives else { return false }
+        return !(podKeepAliveAppInBackground && !state.podKeepAlive.keepsPodConnectedInBackground)
     }
 
     func podKeepAliveAppDidEnterBackground() {
