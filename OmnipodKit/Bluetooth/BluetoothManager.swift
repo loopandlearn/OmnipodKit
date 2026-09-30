@@ -882,45 +882,10 @@ class BluetoothManager: NSObject {
         return o5FaultAdvertisementUUID(pdmId)
     }
 
-    /// Peripheral awaiting a fresh-discovery connect: while set, the next matching didDiscover stops
-    /// the scan and connects on that just-heard advertisement (fast) instead of a cold reacquisition.
-    private var pendingFreshConnectID: String?
-
-    /// Connect fast by first hearing the pod: scan for its service, and on the next discovery stop the
-    /// scan and connect on that fresh advertisement (~1-2s) rather than a bare cold connect (~16s).
-    /// Falls back to a direct connect if we don't hear it quickly.
-    func connectViaFreshDiscovery(_ peripheral: CBPeripheral) {
-        managerQueue.async {
-            let id = peripheral.identifier.uuidString
-            self.pendingFreshConnectID = id
-            self.manager.stopScan()
-            self.manager.scanForPeripherals(withServices: [self.podScanServiceUUID], options: nil)
-            self.log.default("[connectOnDemand] fresh-discovery scan for %{public}@", id)
-            self.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] fresh-discovery scan started")
-            self.managerQueue.asyncAfter(deadline: .now() + 4.0) { [weak self] in
-                guard let self = self, self.pendingFreshConnectID == id else { return }
-                self.pendingFreshConnectID = nil
-                self.log.default("[connectOnDemand] no fresh discovery in 4s — direct (cold) connect")
-                self.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] no fresh discovery in 4s — cold connect fallback")
-                self.manager.stopScan()
-                self.freshConnect(peripheral)
-            }
-        }
-    }
-
-    private func freshConnect(_ peripheral: CBPeripheral) {
-        dispatchPrecondition(condition: .onQueue(managerQueue))
-        if peripheral.state == .connected {
-            pendingFreshConnectID = nil
-            return
-        }
-        directConnect(peripheral)
-    }
-
     // MARK: - Eager connect watchdog (InPlay / iPhone 16-class)
 
     /// Governing generation token per peripheral id — bumped on every arm/disarm so a stale scheduled
-    /// watchdog tick no-ops (same token pattern as `pendingFreshConnectID`).
+    /// watchdog tick no-ops.
     private var connectWatchdogGeneration: [String: Int] = [:]
 
     /// When we began waiting for a connection with the app foregrounded (per peripheral id), for the
@@ -1100,22 +1065,12 @@ class BluetoothManager: NSObject {
         connectForCommand(peripheral)
     }
 
-    /// O5 connects fastest on a just-heard advert; DASH on a plain connect().
+    /// A known pod is connected with a plain connect(); iOS completes it on the pod's next advertisement.
     private func connectForCommand(_ peripheral: CBPeripheral) {
-        if podType.isO5 {
-            connectViaFreshDiscovery(peripheral)
-        } else {
-            log.default("[connectOnDemand] connect %{public}@", peripheral.identifier.uuidString)
-            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connect")
-            directConnect(peripheral)
-        }
-    }
-
-    private func directConnect(_ peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
-        if connectRequestedAt[peripheral.identifier.uuidString] == nil {
-            connectRequestedAt[peripheral.identifier.uuidString] = Date()
-        }
+        log.default("[connectOnDemand] connect %{public}@", peripheral.identifier.uuidString)
+        connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connect")
+        connectRequestedAt[peripheral.identifier.uuidString] = Date()
         let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
         if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
             device.manager.peripheral = target
@@ -1546,32 +1501,6 @@ extension BluetoothManager: CBCentralManagerDelegate {
             detectPodAlertStatus(peripheral: peripheral, advertisementData: advertisementData)
         }
 
-        // Fresh-discovery connect: we just heard the pod — stop scanning and connect NOW on this fresh
-        // advertisement (fast) instead of waiting out iOS's cold reacquisition (~16s).
-        //
-        // NOT pod-type specific: all this needs is a just-heard, connectable advert from our own pod.
-        // It used to sit inside the DASH-only branch above, so an O5 pod could never take it —
-        // connectViaFreshDiscovery armed pendingFreshConnectID and scanned for any pod type, the advert
-        // arrived, and nothing consumed it. Every O5 foreground connect therefore waited out the full 4s
-        // fresh-discovery window and fell back to a cold connect: measured 5.9s, against 0.4s for a DASH
-        // pod on the same code path. Still gated on isOwnPod so a stranger's pod can't pull us into a
-        // connect (the C00A fault filter is generic).
-        if isOwnPod, pendingFreshConnectID == peripheral.identifier.uuidString {
-            pendingFreshConnectID = nil
-            log.default("[connectOnDemand] fresh discovery -> connect %{public}@", peripheral.identifier.uuidString)
-            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] pod heard -> connecting on fresh advert")
-            manager.stopScan()
-            // Defer the connect one managerQueue tick so the scan actually tears down first.
-            // Connecting synchronously here (still inside the scan's didDiscover) starved the
-            // connect -> it wedged in .connecting and timed out at 20s. Let iOS settle the
-            // stopScan, then connect on the just-heard advert. Direct connect (not freshConnect):
-            // the peripheral was just heard and is connectable, so skip the cancel+re-retrieve
-            // stale-flush (an In-Play stall workaround) that added a round-trip on the good pod.
-            managerQueue.async { [weak self] in
-                self?.manager.connect(peripheral, options: nil)
-            }
-        }
-
         // Kick off / re-arm the delayed-connect probe once we know the pod is present + disconnected.
         // Left DASH-only deliberately: this drives background wake scheduling, a separate concern from
         // foreground connect latency, and is not what this change is about.
@@ -1629,15 +1558,6 @@ extension BluetoothManager: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
-        // We are connected — any outstanding fresh-discovery cold-connect fallback is now moot. Clearing
-        // the token no-ops a still-pending 4s fallback timer (connectViaFreshDiscovery) so it cannot fire
-        // freshConnect() → cancelPeripheralConnection() against THIS live link. That stale-timer teardown,
-        // re-read by didDisconnect as an unintended "drop", was the root of the self-inflicted
-        // connect → cancel → "reconnecting after drop" → reconnect loop.
-        if pendingFreshConnectID == peripheral.identifier.uuidString {
-            pendingFreshConnectID = nil
-        }
-
         // A completed connect satisfies the eager watchdog — invalidate any pending cancel/retry tick.
         disarmConnectWatchdog(peripheral)
 
@@ -1692,6 +1612,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
             log.default("[#%{public}@] CONNECTED: %{public}@ — connect latency %{public}@s (known device: %{public}@)",
                         instanceID, peripheral, latency,
                         String(describing: devices.contains { $0.manager.peripheral.identifier == peripheral.identifier }))
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connected in \(latency)s")
         } else {
             log.default("[#%{public}@] CONNECTED: %{public}@ — connect latency unknown (no request stamp) (known device: %{public}@)",
                         instanceID, peripheral, String(describing: devices.contains { $0.manager.peripheral.identifier == peripheral.identifier }))
