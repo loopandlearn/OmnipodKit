@@ -129,49 +129,61 @@ extension PeripheralManager {
 
     func configureAndRun(_ block: @escaping (_ manager: PeripheralManager) -> Void) -> (() -> Void) {
         return {
-            if BluetoothManager.connectOnDemandEnabled {
-                // "Normally disconnected" model: the pod isn't held connected, so connect on demand
-                // for this session (no forceful reconnect — that heuristic is what caused the ~28s
-                // disconnect-then-wait stalls). If already connected (burst of sessions), no-op.
-                if self.peripheral.state != .connected {
+            var attempt = 1
+            while true {
+                if BluetoothManager.connectOnDemandEnabled {
+                    // "Normally disconnected" model: the pod isn't held connected, so connect on demand
+                    // for this session (no forceful reconnect — that heuristic is what caused the ~28s
+                    // disconnect-then-wait stalls). If already connected (burst of sessions), no-op.
+                    if self.peripheral.state != .connected {
+                        do {
+                            // 45s: sized above BluetoothManager.eagerConnectBudgetSeconds (40s) so the
+                            // eager watchdog's cancel/retry cycles own the recovery underneath this
+                            // single wait, rather than this timeout firing first.
+                            try self.connectOnDemand(timeout: 45)
+                        } catch let error {
+                            self.log.error("[connectOnDemand] on-demand connect failed: %{public}@", String(describing: error))
+                        }
+                    }
+                } else if self.needsReconnection {
+                    self.log.default("Triggering forceful reconnect")
                     do {
-                        // 45s: sized above BluetoothManager.eagerConnectBudgetSeconds (40s) so the
-                        // eager watchdog's cancel/retry cycles own the recovery underneath this
-                        // single wait, rather than this timeout firing first.
-                        try self.connectOnDemand(timeout: 45)
+                        try self.reconnect(timeout: 5)
                     } catch let error {
-                        self.log.error("[connectOnDemand] on-demand connect failed: %{public}@", String(describing: error))
+                        self.log.error("Error while forcing reconnection: %{public}@", String(describing: error))
                     }
                 }
-            } else if self.needsReconnection {
-                self.log.default("Triggering forceful reconnect")
-                do {
-                    try self.reconnect(timeout: 5)
-                } catch let error {
-                    self.log.error("Error while forcing reconnection: %{public}@", String(describing: error))
+
+                if !self.needsConfiguration && self.peripheral.services == nil {
+                    self.log.error("Configured peripheral has no services. Reconfiguring %{public}@", self.peripheral)
                 }
-            }
 
-            if !self.needsConfiguration && self.peripheral.services == nil {
-                self.log.error("Configured peripheral has no services. Reconfiguring %{public}@", self.peripheral)
-            }
+                if self.needsConfiguration || self.peripheral.services == nil {
+                    do {
+                        self.log.bleDebug("Applying configuration")
+                        try self.applyConfiguration()
+                        self.needsConfiguration = false
 
-            if self.needsConfiguration || self.peripheral.services == nil {
-                do {
-                    self.log.bleDebug("Applying configuration")
-                    try self.applyConfiguration()
-                    self.needsConfiguration = false
+                        if let delegate = self.delegate {
+                            try delegate.completeConfiguration(for: self)
+                            self.log.bleDebug("Delegate configuration notified")
+                        }
 
-                    if let delegate = self.delegate {
-                        try delegate.completeConfiguration(for: self)
-                        self.log.bleDebug("Delegate configuration notified")
+                        self.log.bleDebug("Peripheral configuration completed")
+                    } catch let error {
+                        self.log.error("Error applying peripheral configuration: %{public}@", String(describing: error))
+                        // Will retry
                     }
-
-                    self.log.bleDebug("Peripheral configuration completed")
-                } catch let error {
-                    self.log.error("Error applying peripheral configuration: %{public}@", String(describing: error))
-                    // Will retry
                 }
+                // A pod that drops the link right after connecting usually accepts the next attempt
+                if BluetoothManager.connectOnDemandEnabled, self.peripheral.state != .connected, attempt == 1 {
+                    attempt += 1
+                    self.log.default("[connectOnDemand] link dropped after connecting — retrying")
+                    self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] link dropped after connecting — retrying")
+                    Thread.sleep(forTimeInterval: 2)
+                    continue
+                }
+                break
             }
 
             block(self)
