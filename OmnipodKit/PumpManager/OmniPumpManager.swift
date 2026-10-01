@@ -437,6 +437,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     private let silentTune = SilentTune()
 
     @objc func appMovedToBackground() {
+        podKeepAliveAppDidEnterBackground()
         /// If using Silent Tune pod keep alives and a pod, starting playing the silent tune.
         if state.podKeepAlive == .silentTune && state.podState != nil {
             silentTune.startPlayer()
@@ -444,6 +445,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     }
 
     @objc func appMovedToForeground() {
+        podKeepAliveAppWillEnterForeground()
         silentTune.stopPlayer()
     }
 
