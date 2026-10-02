@@ -93,6 +93,10 @@ public class OmniPumpManager: RileyLinkPumpManager {
         basalDeliveryState(for: state) == .pumpInoperable
     }
 
+    public var localizedInoperableDescription: String? {
+        state.podState?.localizedFaultDescription
+    }
+
     // This string should match the PumpManagerIdentifier string.
     public let pluginIdentifier: String = "Omni"
 
@@ -126,6 +130,12 @@ public class OmniPumpManager: RileyLinkPumpManager {
         super.init(rileyLinkDeviceProvider: rileyLinkDeviceProvider)
 
         finishInit(podType: state.podType)
+
+        // Honor a persisted release (ExclusiveDeviceControl): BlePodComms connects at construction,
+        // and a relaunch must not take the pod back from the controller holding it.
+        if state.podConnectionReleased {
+            (podComms as? BlePodComms)?.releaseConnection()
+        }
     }
 
     // Common initialization used after all mandatory fields are initialized
@@ -141,6 +151,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
             .store(in: &cancellables)
 
+#if os(iOS) // watchOS: no UIApplication lifecycle notifications or audio keepalive; the watch host owns process lifetime
         /// Register for app foreground / background notifications needed for at least Pod Keep Alive timer based options
         if !podType.isEros {
             let nc = NotificationCenter.default
@@ -157,6 +168,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 object: nil
             )
         }
+#endif
 
         /// Initialize or disable the podKeepAlive state as needed
         self.podKeepAlive = state.podKeepAlive
@@ -179,7 +191,16 @@ public class OmniPumpManager: RileyLinkPumpManager {
         deviceProvider.delegate = self
     }
 
-    private var podComms: PodComms {
+    /// DeviceConfigurationSharing: build from another controller's export (+DeviceHandoff).
+    public required convenience init?(adopting configuration: SharedDeviceConfiguration, localState: [String: Any]?) {
+        guard let rawState = OmniPumpManager.adoptedRawState(from: configuration, localState: localState) else {
+            return nil
+        }
+        self.init(rawState: rawState)
+    }
+
+    // Internal (was private) for +DeviceHandoff, which drives the BLE layer's release and take.
+    internal var podComms: PodComms {
         get {
             return lockedPodComms.value
         }
@@ -206,7 +227,8 @@ public class OmniPumpManager: RileyLinkPumpManager {
         return lockedState.value
     }
 
-    private func setState(_ changes: (_ state: inout OmniPumpManagerState) -> Void) -> Void {
+    // Internal (was private) for +DeviceHandoff, which keeps the hand-off flags.
+    internal func setState(_ changes: (_ state: inout OmniPumpManagerState) -> Void) -> Void {
         return setStateWithResult(changes)
     }
 
@@ -442,6 +464,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         }
     }
 
+#if os(iOS) // watchOS: SilentTune (audio keepalive; depends on PumpManagerUI) is excluded from the watchOS target
     private let silentTune = SilentTune()
 
     @objc func appMovedToBackground() {
@@ -454,6 +477,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     @objc func appMovedToForeground() {
         silentTune.stopPlayer()
     }
+#endif
 
 
     // MARK: - RileyLink specific vars and funcs
@@ -1019,6 +1043,7 @@ extension OmniPumpManager {
         return false
     }
 
+#if os(iOS) // watchOS: ReservoirLevelHighlightState is declared in PumpManagerUI (excluded); only UI consumes this property
     var reservoirLevelHighlightState: ReservoirLevelHighlightState? {
         guard let reservoirLevel = reservoirLevel else {
             return nil
@@ -1037,6 +1062,7 @@ extension OmniPumpManager {
             }
         }
     }
+#endif
 
     func buildPumpLifecycleProgress(for state: OmniPumpManagerState) -> PumpLifecycleProgress? {
         switch podCommState {
@@ -1649,6 +1675,12 @@ extension OmniPumpManager {
 
     // Used to serialize a set of Pod Commands for a given session - vectors to correct version
     private func runSession(withName name: String, _ block: @escaping (_ result: PodComms.SessionRunResult) -> Void) {
+        // A controller that has released the pod takes no commands until it takes control again.
+        if state.podConnectionReleased {
+            log.default("'%{public}@' refused — control of the pod is released", name)
+            block(.failure(.podNotConnected))
+            return
+        }
         if let blePodComms = self.podComms as? BlePodComms {
             blePodComms.bleRunSession(withName: name, block)
         } else if let erosPodComms = self.podComms as? ErosPodComms {
@@ -2601,6 +2633,21 @@ extension OmniPumpManager: PumpManager {
     }
 
     public func ensureCurrentPumpData(completion: ((Date?) -> Void)?) {
+        #if targetEnvironment(simulator)
+        // No radio in the simulator, so a status fetch would always fail: stamp a fresh measurement
+        // and report now, as refreshDeliveredUnits does.
+        if state.podState != nil {
+            setState { state in
+                var pod = state.podState
+                let delivered = pod?.lastInsulinMeasurements?.delivered ?? pod?.setupUnitsDelivered ?? Pod.primeUnits
+                pod?.lastInsulinMeasurements = PodInsulinMeasurements(
+                    insulinDelivered: delivered, reservoirLevel: nil, validTime: Date())
+                state.updatePodStateFromPodComms(pod)
+            }
+            completion?(Date())
+            return
+        }
+        #endif
         let shouldFetchStatus = setStateWithResult { (state) -> Bool? in
             guard state.hasActivePod else {
                 return nil // No active pod
@@ -2819,6 +2866,14 @@ extension OmniPumpManager: PumpManager {
             completion(.configuration(OmniPumpManagerError.invalidSetting))
             return
         }
+
+        #if targetEnvironment(simulator)
+        // No radio in the simulator; cancelling with no temp running changes nothing on the pod.
+        if duration < .ulpOfOne, podState.unfinalizedTempBasal == nil {
+            completion(nil)
+            return
+        }
+        #endif
 
         // Round to nearest supported rate
         let rate = roundToSupportedBasalRate(unitsPerHour: unitsPerHour)
@@ -3337,6 +3392,11 @@ extension OmniPumpManager: PodCommsDelegate {
 
     // Not used for Eros pods
     func podCommsDidEstablishSession(_ podComms: PodComms) {
+
+        // ExclusiveDeviceControl readiness, before the setup guard: a taken pod is already set up.
+        pumpDelegate.notify { (delegate) in
+            delegate?.deviceManagerControlDidBecomeReady(self)
+        }
 
         guard podComms.podState?.isSetupComplete == true else {
             self.log.debug("### Skipping post-connect processing with incomplete setup")
