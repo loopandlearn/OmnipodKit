@@ -6280,7 +6280,26 @@
       }
     },
     "⚠️Warning - Unable to silence Pod alerts with the firmware in this particular Pod!" : {
-
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️Warnung – Bei diesem einen Pod lassen sich die Pod-Benachrichtigungen mit der aktuellen Firmware nicht stummschalten!"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Waarschuwing - Met de firmware van deze Pod kunnen Pod-meldingen niet worden gedempt!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️警告：当前这个 Pod 的固件版本不支持关闭 Pod 告警音！"
+          }
+        }
+      }
     },
     "1 hour" : {
       "comment" : "Button text for 1 hour suspend duration",
@@ -8430,7 +8449,27 @@
       }
     },
     "All confirmation reminder beeps are suppressed, but other audible Pod alert beeping cannot be silenced for this Pod." : {
-      "comment" : "Alternate black dot description for SilencePodPreference.disabled"
+      "comment" : "Alternate black dot description for SilencePodPreference.disabled",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Bestätigungssignale werden unterdrückt, andere akustische Pod-Signale lassen sich für diesen Pod jedoch nicht stummschalten."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle piepjes van bevestigingsmeldingen worden uitgezet, maar andere Pod-meldingen met geluid kunnen bij deze Pod niet worden gedempt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有确认提示蜂鸣音已被抑制，但此 Pod 的其他告警蜂鸣无法静音。"
+          }
+        }
+      }
     },
     "All Pod alerts use no beeps and confirmation reminder beeps are suppressed. The Pod will only beep for fatal Pod faults and when playing test beeps.\n\n⚠️Warning - If your phone is out of range of the pod while this feature is enabled, you will not receive any in-app notifications; and the pod will not beep to alert you." : {
       "comment" : "Description for SilencePodPreference.enabled",
@@ -13387,7 +13426,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apparaatondersteuning controleren…"
+            "value" : "Apparaatondersteuning controleren …"
           }
         },
         "ro" : {
@@ -13631,7 +13670,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Serverstatus controleren…"
+            "value" : "Serverstatus controleren …"
           }
         },
         "ro" : {
@@ -20106,7 +20145,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Certificaat downloaden…"
+            "value" : "Certificaat downloaden …"
           }
         },
         "ro" : {
@@ -31790,7 +31829,27 @@
       }
     },
     "Issues status requests to minimize Bluetooth disconnects. The default When Open selection should be sufficient for all iPhone and Pod combinations." : {
-      "comment" : "Summary of the Pod Keep Alive concept"
+      "comment" : "Summary of the Pod Keep Alive concept",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sendet Statusabfragen, um Bluetooth-Verbindungsabbrüche zu minimieren. Die Standardauswahl „Wenn geöffnet“ sollte für alle iPhone- und Pod-Kombinationen ausreichen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vraagt de status op zodat de Bluetooth-verbinding minder vaak wegvalt. De standaardkeuze 'Wanneer geopend' is genoeg voor alle combinaties van iPhone en Pod."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送状态查询指令，用来减少蓝牙断连。默认选项「When Open（打开时）」，对所有 iPhone + Pod 组合都够用。"
+          }
+        }
+      }
     },
     "Keep the RileyLink about 6 inches from the pod during pairing." : {
       "comment" : "Label text for step 2 of Eros pair pod instructions",
@@ -62881,7 +62940,27 @@
       }
     },
     "Silence Pod mode can only suppress confirmation reminder beeping with this Pod." : {
-      "comment" : "Help text for Silence Pod view for black dot pods"
+      "comment" : "Help text for Silence Pod view for black dot pods",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit diesem Pod können lediglich die Bestätigungssignaltöne unterdrückt werden."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bij deze Pod kan de modus 'Pod dempen' alleen de piepjes van bevestigingsherinneringen uitzetten."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Pod 的静默模式，仅能抑制【确认提示音（Confidence Reminder）】的蜂鸣。"
+          }
+        }
+      }
     },
     "Silence Pod mode suppresses all Pod alert and confirmation reminder beeping." : {
       "comment" : "Help text for Silence Pod view",
@@ -69221,7 +69300,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bij deze combinatie kan de Pod de app niet op de gewone manier op vaste tijden 'wakker' maken. In plaats daarvan wordt de app wakker als de verbinding met de Pod wegvalt. Daarna maakt de app meteen opnieuw verbinding."
+            "value" : "Bij deze combinatie kan de Pod de app niet op de gewone manier op vaste tijden 'wakker' maken. In plaats daarvan wordt de app 'wakker' als de verbinding met de Pod wegvalt. Daarna maakt de app meteen opnieuw verbinding."
           }
         },
         "zh-Hans" : {
