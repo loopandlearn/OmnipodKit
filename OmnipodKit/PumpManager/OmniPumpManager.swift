@@ -1217,11 +1217,17 @@ extension OmniPumpManager {
 
     /// Reports the end of a pod's life as a pump event and an analytics event.
     private func reportPodEnded(_ podState: PodState) {
-        guard let activatedAt = podState.activatedAt else {
-            return
+        let lifetime: TimeInterval
+        if let faultTime = podState.fault?.faultEventTimeSinceActivation {
+            /// Since the pod has a valid faultEventTimeSinceActivation, use this rather than the pod's time.
+            /// Reset type pod faults return atypical fault time values that will not be considered valid on decode.
+            lifetime = faultTime
+        } else {
+            /// Otherwise use the always increasing podTime to compute the pod’s
+            /// lifetime for reset pod faults, deactivated pods, or discarded pods.
+            let elapsed = -(podState.podTimeUpdated?.timeIntervalSinceNow ?? 0)
+            lifetime = podState.podTime + elapsed
         }
-
-        let lifetime = (podState.deliveryStoppedAt ?? Date()).timeIntervalSince(activatedAt)
         var properties: [AnyHashable: Any] = [
             "podType": podState.podType.briefName,
             "lifetimeHours": (lifetime.hours * 10).rounded() / 10,
