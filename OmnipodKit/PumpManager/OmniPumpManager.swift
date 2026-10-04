@@ -448,6 +448,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     private let silentTune = SilentTune()
 
     @objc func appMovedToBackground() {
+        podKeepAliveAppDidEnterBackground()
         /// If using Silent Tune pod keep alives and a pod, starting playing the silent tune.
         if state.podKeepAlive == .silentTune && state.podState != nil {
             silentTune.startPlayer()
@@ -455,6 +456,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
     }
 
     @objc func appMovedToForeground() {
+        podKeepAliveAppWillEnterForeground()
         silentTune.stopPlayer()
     }
 
@@ -1126,7 +1128,7 @@ extension OmniPumpManager {
         }
     }
 
-    // Currently running with an Omnipod 5 "black dot" pod
+    /// Running with a pod that does not have silent beep support (e.g., a "black dot" O5)
     var noSilentBeep: Bool {
         return state.podState?.noSilentBeep == true
     }
