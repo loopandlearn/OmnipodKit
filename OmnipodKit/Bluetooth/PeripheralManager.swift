@@ -228,6 +228,15 @@ extension PeripheralManager {
 
 // MARK: - Synchronous Commands
 extension PeripheralManager {
+    /// The state `runCommand`'s entry guard tests, for the device log: `notReady` alone cannot say
+    /// whether the central was nil or not powered on.
+    var readinessDescription: String {
+        "central=" + (central.map { String(describing: $0.state) } ?? "nil")
+            + " peripheral=\(String(describing: peripheral.state))"
+            + " queueDepth=\(sessionQueue.operationCount)"
+            + " conds=\(commandConditions.count)"
+    }
+
     /// - Throws: PeripheralManagerError
     func runCommand(timeout: TimeInterval, allowDisconnected: Bool = false, command: () -> Void) throws {
         // Prelude
@@ -357,7 +366,9 @@ extension PeripheralManager {
         } catch {
             // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
             // instead of leaving it wedged in .connecting. Queue-correct cancel via BluetoothManager.
-            bluetoothManager?.disconnectOnDemand(peripheral)
+            // During an armed takeover disconnectOnDemand refuses this cancel; the error is logged.
+            bluetoothManager?.disconnectOnDemand(peripheral, by: "connectError",
+                                                detail: "\(error) · \(readinessDescription)")
             throw error
         }
         log.default("[connectOnDemand] connected in %{public}@s", String(format: "%.3f", Date().timeIntervalSince(start)))
@@ -694,7 +705,7 @@ extension PeripheralManager {
             self.log.default("[connectOnDemand] idle ~%{public}ds, no queued session -> disconnecting", Int(idleDelay))
             // Queue-correct cancel: route through BluetoothManager so it runs on managerQueue. Cancelling
             // from this (PeripheralManager) queue raced CoreBluetooth's teardown and wedged the next connect.
-            self.bluetoothManager?.disconnectOnDemand(self.peripheral)
+            self.bluetoothManager?.disconnectOnDemand(self.peripheral, by: "idle")
         }
     }
 }

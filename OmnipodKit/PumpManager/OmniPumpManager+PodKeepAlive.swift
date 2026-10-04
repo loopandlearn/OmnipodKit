@@ -28,7 +28,9 @@ extension OmniPumpManager {
 
         /// Create a timer to trigger a getPodStatus call after the specified time from now.
         podKeepAliveTimer?.invalidate()
-        podKeepAliveTimer = Timer(timeInterval: when, repeats: false) { _ in
+        // Weak: the timer is a process-wide global, and must not keep this manager alive.
+        podKeepAliveTimer = Timer(timeInterval: when, repeats: false) { [weak self] _ in
+            guard let self else { return }
             if self.hasPairedNonFaultedPod {
                 print("@@@ timer expired, reading pod status to stay connected at \(self.timeStr(Date()))")
                 self.getPodStatus(canOptimize: false) { _ in }
@@ -64,7 +66,8 @@ extension OmniPumpManager {
             print("@@@ enabling pod keep alive timer for mode \(podKeepAlive) at \(timeStr(now))")
 
             /// Set up the callback from PodCommSession.send() for each response received
-            gotPodResponseSetup(gotPodResponse)
+            // Weak: the callback is a process-wide global, and must not keep this manager alive.
+            gotPodResponseSetup { [weak self] in self?.gotPodResponse() }
  
             let lastResponseTime = state.podState?.podTimeUpdated ?? .distantPast
             let timeSinceLastResponse = now.timeIntervalSince(lastResponseTime)

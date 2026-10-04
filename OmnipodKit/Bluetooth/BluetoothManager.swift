@@ -11,7 +11,9 @@ import CoreBluetooth
 import Foundation
 import LoopKit
 import os.log
+#if canImport(UIKit)
 import UIKit  // only for UIDevice (see shouldUseEagerConnect); lifecycle goes through HostAppState
+#endif
 
 enum BluetoothManagerError: Error {
     case bluetoothNotAvailable(CBManagerState)
@@ -100,12 +102,17 @@ protocol OmniConnectionDelegate: AnyObject {
     /// connects on demand and reads the real pod status, which surfaces the alert to Loop via the
     /// normal getPodStatus -> alertsChanged -> issueAlert path. `slots` is the decoded firing AlertSet.
     func omnipodDidDetectAlert(slots: AlertSet)
+
+    /// A takeover scan adopted the pod as `uuidString`, this device's own peripheral UUID. The
+    /// delegate records it as the pod's bleIdentifier.
+    func omnipodDidAdoptLoanPod(uuidString: String)
 }
 
 extension OmniConnectionDelegate {
     func omnipodLogDeviceEvent(_ message: String) {}
     func omnipodHeartbeatDidFire() {}
     func omnipodDidDetectAlert(slots: AlertSet) {}
+    func omnipodDidAdoptLoanPod(uuidString: String) {}
 }
 
 
@@ -151,8 +158,78 @@ class BluetoothManager: NSObject {
         }
     }
 
+    /// The address of a pod to find by scanning and adopt (CoreBluetooth handles are per device);
+    /// nil when no takeover scan is armed. Every change is logged with its reason.
+    private var loanTakeoverPodId: UInt32? = nil {
+        didSet {
+            guard oldValue != loanTakeoverPodId else { return }
+            let from = oldValue.map { String(format: "0x%x", $0) } ?? "nil"
+            let to = loanTakeoverPodId.map { String(format: "0x%x", $0) } ?? "nil"
+            connectionDelegate?.omnipodLogDeviceEvent("[loan-scan] marker \(from) -> \(to) (\(loanScanMarkerReason))")
+        }
+    }
+
+    /// Why the marker last moved. Set immediately before each write; the didSet reports it.
+    private var loanScanMarkerReason = "init"
+
+    /// A pod whose advertisement matched the loan marker and which we are now connecting to.
+    /// The marker stays armed until this peripheral actually connects — see the adopt block.
+    private var pendingAdoptedLoanPod: String?
+
+    /// The last connect failure, kept so a settle that never verifies can say WHY.
+    private var lastConnectFailure: (id: String, code: String, at: Date)?
+
+    /// One line of BLE state for hand-off diagnostics. A `CBErrorDomain#11` failure means the system
+    /// connection table is full, a host state (cleared by a Bluetooth toggle), not a pod fault.
+    var loanBleDiagnostics: String {
+        let radio: String
+        switch manager.state {
+        case .poweredOn:   radio = "on"
+        case .poweredOff:  radio = "OFF"
+        case .resetting:   radio = "resetting"
+        case .unauthorized: radio = "unauthorized"
+        case .unsupported: radio = "unsupported"
+        case .unknown:     radio = "unknown"
+        @unknown default:  radio = "unknown(\(manager.state.rawValue))"
+        }
+        let failure = lastConnectFailure.map {
+            String(format: "lastFail=%@ @%.0fs ago", $0.code, Date().timeIntervalSince($0.at))
+        } ?? "lastFail=none"
+        return "radio=\(radio) scanning=\(manager.isScanning) devices=\(devices.count) "
+            + "autoConnect=\(autoConnectIDs.count) marker=\(loanTakeoverPodId.map { String(format: "0x%x", $0) } ?? "nil") "
+            + "pendingAdopt=\(pendingAdoptedLoanPod ?? "none") \(failure)"
+    }
+
     /// The uuidPdmId is set after pairing...
     private var uuidPdmId: UInt32? = nil
+
+    /// Drop the pod link so another controller can take it. Clears the command-connect marker first,
+    /// as the idle disconnect does, so the foreground keep-alive does not reconnect.
+    func releaseConnectionForLoan(uuidString: String) {
+        managerQueue.async { self.commandConnectInFlight = false }
+        disconnectFromDevice(uuidString: uuidString)
+    }
+
+    /// Scan for the pod with this address and adopt the peripheral this device discovers.
+    func beginLoanTakeover(podId: UInt32) {
+        managerQueue.async {
+            self.loanScanMarkerReason = "beginLoanTakeover"
+            self.loanTakeoverPodId = podId
+            if self.manager.state == .poweredOn {
+                self.log.default("begin takeover scan for pod 0x%x", podId)
+                // The running idle scan filters on the fault UUID, which a healthy pod never
+                // advertises; scanForPeripherals does not merge filters, so stop it and re-arm.
+                if self.manager.isScanning {
+                    self.log.default("stopping the idle scan to re-arm with the takeover filter")
+                    self.manager.stopScan()
+                }
+                self.startScanning()
+            } else {
+                // centralManagerDidUpdateState starts the scan at poweredOn.
+                self.log.default("takeover armed for pod 0x%x; scan starts at poweredOn", podId)
+            }
+        }
+    }
 
     /// The O5 changes its service advertisement uuid from using FFFFFFFE the pdmId after pairing.
     /// This func is called to set this value to be used in uuid after pairing and with a nil (or 0) to reset.
@@ -648,6 +725,7 @@ class BluetoothManager: NSObject {
 
         log.default("BluetoothManager #%{public}@ INIT (podType=%{public}@)", instanceID, String(describing: podType))
 
+        log.default("central: creating (podType %{public}@)", String(describing: podType))
         managerQueue.sync {
             self.manager = CBCentralManager(delegate: self, queue: managerQueue, options: [CBCentralManagerOptionRestoreIdentifierKey: "com.OmnipodKit"])
         }
@@ -666,6 +744,7 @@ class BluetoothManager: NSObject {
                 self.enterForeground()
             }
         }
+        log.default("central: created")
         center.addObserver(forName: HostAppState.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             let pid = ProcessInfo.processInfo.processIdentifier
             self?.managerQueue.async {
@@ -697,6 +776,33 @@ class BluetoothManager: NSObject {
 
     deinit {
         log.default("BluetoothManager #%{public}@ DEINIT", instanceID)
+    }
+
+    /// Arm a scan-adopt for a pod a pending connect has not reached; either controller may call it.
+    /// The central is kept, not rebuilt: it owns the restore identifier a background relaunch needs.
+    func escalateLoanReclaim(podId: UInt32) {
+        managerQueue.async {
+            self.log.default("take escalation — arming scan-adopt for pod 0x%x (central preserved)", podId)
+            self.loanScanMarkerReason = "escalate"
+            self.loanTakeoverPodId = podId
+            if self.manager.state == .poweredOn, !self.manager.isScanning {
+                self.startScanning()
+            }
+        }
+    }
+
+    /// Disarm a takeover scan that never found the pod, so it does not outlive a release.
+    /// No-op when nothing is armed (an adopt already cleared it).
+    func cancelLoanScan() {
+        managerQueue.async {
+            guard self.loanTakeoverPodId != nil else { return }
+            self.log.default("cancelling unfinished takeover scan")
+            self.loanScanMarkerReason = "cancelLoanScan"
+            self.loanTakeoverPodId = nil
+            if self.manager.state == .poweredOn, self.manager.isScanning, !self.discoveryModeEnabled {
+                self.manager.stopScan()
+            }
+        }
     }
 
     @discardableResult
@@ -821,9 +927,20 @@ class BluetoothManager: NSObject {
                     autoReconnect(peripheral)
                 }
             } else {
-                if peripheral.state == .connected || peripheral.state == .connecting {
+                switch peripheral.state {
+                case .connected:
                     log.info("updateConnections: Disconnecting from peripheral: %{public}@", peripheral)
                     manager.cancelPeripheralConnection(peripheral)
+                case .connecting, .disconnecting:
+                    // Cancel a pending connect; leave a disconnecting one.
+                    if peripheral.state == .connecting {
+                        log.info("updateConnections: Disconnecting from peripheral: %{public}@", peripheral)
+                        manager.cancelPeripheralConnection(peripheral)
+                    }
+                case .disconnected:
+                    break
+                @unknown default:
+                    break
                 }
             }
         }
@@ -892,6 +1009,18 @@ class BluetoothManager: NSObject {
     func connectViaFreshDiscovery(_ peripheral: CBPeripheral) {
         managerQueue.async {
             let id = peripheral.identifier.uuidString
+            // During a takeover, keep its continuous scan rather than tearing it down for a 4 s one
+            // on every connect (repeated teardown gets scanning throttled); didDiscover connects.
+            if self.loanTakeoverPodId != nil {
+                self.pendingFreshConnectID = id
+                if !self.manager.isScanning {
+                    // Re-arm with the takeover filter if a fallback stopped it.
+                    self.startScanning()
+                }
+                self.log.default("[connectOnDemand] takeover in progress — continuous scan, no 4s teardown (%{public}@)", id)
+                self.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] takeover: continuous scan (no 4s teardown)")
+                return
+            }
             self.pendingFreshConnectID = id
             self.manager.stopScan()
             self.manager.scanForPeripherals(withServices: [self.podScanServiceUUID], options: nil)
@@ -1075,14 +1204,15 @@ class BluetoothManager: NSObject {
     /// preempts the heartbeat probe: cancel any in-flight StartDelay probe first so its pending connect
     /// can't complete and get mis-attributed as this command connect, then mark the command in flight
     /// (so the probe won't re-arm or claim the didConnect) and connect.
-    func connectOnDemand(_ peripheral: CBPeripheral) {
+    func connectOnDemand(_ peripheral: CBPeripheral, skipDiscovery: Bool = false) {
         managerQueue.async { [weak self] in
-            self?.beginCommandConnect(peripheral)
+            self?.beginCommandConnect(peripheral, skipDiscovery: skipDiscovery)
         }
     }
 
     /// Start a command (or keep-alive) connect. Must run on managerQueue.
-    private func beginCommandConnect(_ peripheral: CBPeripheral) {
+    /// `skipDiscovery` goes straight to the cold connect, for a pod known to be advertising now.
+    private func beginCommandConnect(_ peripheral: CBPeripheral, skipDiscovery: Bool = false) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
         if delayedProbeInFlight {
             log.default("[connectOnDemand] command preempts heartbeat probe — cancelling probe")
@@ -1117,6 +1247,12 @@ class BluetoothManager: NSObject {
         // (~10-16s — the slow user-initiated Suspend). Falls back to a cold connect after 4s if the
         // pod isn't heard. (The heartbeat probe still uses StartDelay; the two stay serialized via
         // commandConnectInFlight.)
+        if skipDiscovery {
+            log.default("[connectOnDemand] skip-discovery command connect for %{public}@", peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] just-released pod — immediate cold connect (no 4s scan)")
+            freshConnect(peripheral)
+            return
+        }
         log.default("[connectOnDemand] fresh-discovery command connect for %{public}@", peripheral.identifier.uuidString)
         connectViaFreshDiscovery(peripheral)
     }
@@ -1213,11 +1349,21 @@ class BluetoothManager: NSObject {
     /// Cancel/disconnect the peripheral on the central's queue. This is the idle-disconnect / teardown
     /// path, so we're going idle: clear commandConnectInFlight so the resulting didDisconnect re-arms
     /// the heartbeat probe.
-    func disconnectOnDemand(_ peripheral: CBPeripheral) {
+    /// `site` names why we are hanging up: "idle" (the idle-disconnect) or "connectError"
+    /// (connectOnDemand's catch, unsticking a connect after its command threw).
+    func disconnectOnDemand(_ peripheral: CBPeripheral, by site: String, detail: String? = nil) {
         managerQueue.async { [weak self] in
             guard let self = self else { return }
+            // While a takeover scan is armed, a command error must not cancel the pending connect:
+            // the error belongs to the command, and the connect is the recovery about to land.
+            if site == "connectError", self.loanTakeoverPodId != nil {
+                self.connectionDelegate?.omnipodLogDeviceEvent(
+                    "[connectOnDemand] connect-command error (\(detail ?? "unknown")) during an armed takeover — any pending connect is left in place")
+                return
+            }
             self.commandConnectInFlight = false
-            self.log.default("[connectOnDemand] central.cancel on managerQueue for %{public}@", peripheral.identifier.uuidString)
+            self.log.default("[connectOnDemand] central.cancel on managerQueue for %{public}@ (site=%{public}@)", peripheral.identifier.uuidString, site)
+            if let detail { self.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] teardown by \(site): \(detail)") }
             self.manager.cancelPeripheralConnection(peripheral)
         }
     }
@@ -1226,14 +1372,21 @@ class BluetoothManager: NSObject {
         let serviceUUID: CBUUID = podScanServiceUUID
         let services: [CBUUID]?
         let options: [String: Any]
-        if discoveryModeEnabled {
-            // Pairing: scan for the pod's main advertisement service so a new/unpaired pod is found.
+        if discoveryModeEnabled || loanTakeoverPodId != nil {
+            // Pairing or takeover: scan for the pod's main advertisement service, so a pod this
+            // device holds no peripheral for is found.
             // MUST take precedence over the low-power alarm scan (which filters on C005/C00A and would
             // never see a pairing pod) and over scanningEnabled (pairing has to scan regardless).
+            let reason = discoveryModeEnabled ? "discovery/pairing" : "loan-takeover"
             services = [serviceUUID]
             options = [CBCentralManagerScanOptionAllowDuplicatesKey: true]
-            log.default("Start scanning (discovery/pairing filter=%{public}@)", serviceUUID.uuidString)
-            connectionDelegate?.omnipodLogDeviceEvent("[pairing] scan started (filter=\(serviceUUID.uuidString))")
+            log.default("Start scanning (%{public}@ filter=%{public}@)", reason, serviceUUID.uuidString)
+            // Log which branch of `podScanServiceUUID` built the filter: a wrong one matches nothing, silently.
+            let filterSource = podType.isO5
+                ? (uuidPdmId != nil ? "O5/pdm-derived" : "O5/profile-fallback")
+                : "profile(\(String(describing: podType)))"
+            connectionDelegate?.omnipodLogDeviceEvent(
+                "[\(reason)] scan started (filter=\(serviceUUID.uuidString) via \(filterSource))")
             manager.scanForPeripherals(withServices: services, options: options)
             return
         }
@@ -1376,9 +1529,11 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 // Monitor mode: keep scanning continuously so we observe pod advertisements,
                 // regardless of whether all autoConnect devices are known/connected.
                 if !manager.isScanning { startScanning() }
-            } else if (discoveryModeEnabled || !hasDiscoveredAllAutoConnectDevices) && !manager.isScanning {
+            // An armed takeover scans: its autoConnectIDs are empty, so hasDiscoveredAllAutoConnectDevices
+            // is vacuously true and would not.
+            } else if (discoveryModeEnabled || loanTakeoverPodId != nil || !hasDiscoveredAllAutoConnectDevices) && !manager.isScanning {
                 startScanning()
-            } else if !discoveryModeEnabled && manager.isScanning {
+            } else if !discoveryModeEnabled && loanTakeoverPodId == nil && manager.isScanning {
                 stopScanning()
             }
         }
@@ -1596,35 +1751,54 @@ extension BluetoothManager: CBCentralManagerDelegate {
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {
             addPeripheral(peripheral, podAdvertisement: podAdvertisement)
 
-            if discoveryModeEnabled {
-                connectionDelegate?.omnipodLogDeviceEvent("[pairing] heard pod \(peripheral.identifier.uuidString) pairable=\(podAdvertisement.pairable) state=\(peripheral.state.rawValue)")
-            }
-            if discoveryModeEnabled && podAdvertisement.pairable {
-                // Stop the scan so it doesn't starve the connect, then connect if disconnected.
-                // Anything already .connecting is ours: discoverPods cancels stale connects first.
-                if manager.isScanning { manager.stopScan() }
-                if peripheral.state == .disconnected {
-                    log.default("Connecting to pairable device %{public}@ in discovery mode", peripheral)
-                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString)")
-                    timedConnect(peripheral)
-                }
-            } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
-                log.debug("Reconnecting to autoconnect device")
-                autoReconnect(peripheral)
+            // Adopt a pod paired elsewhere by its advertised address, the one identifier both devices
+            // share. O5 adverts carry the controller id instead, so match on that.
+            let advertMatchesLoanPod = podAdvertisement.podId == loanTakeoverPodId
+                || (podType.isO5 && podAdvertisement.pdmId != nil && podAdvertisement.pdmId == uuidPdmId)
+            if let takeoverId = loanTakeoverPodId, advertMatchesLoanPod, peripheral.state == .disconnected {
+                let adopted = peripheral.identifier.uuidString
+                log.default("adopting pod 0x%x as %{public}@", takeoverId, adopted)
+                // The marker stays armed until didConnect: a refused connect (e.g. Code=11) must
+                // leave the scan running for the next advertisement.
+                pendingAdoptedLoanPod = adopted
+                autoConnectIDs.insert(adopted)
+                connectionDelegate?.omnipodDidAdoptLoanPod(uuidString: adopted)
+                timedConnect(peripheral)  // takeover — an explicit connect, not auto-reconnect
             } else {
-                log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
+                if discoveryModeEnabled {
+                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] heard pod \(peripheral.identifier.uuidString) pairable=\(podAdvertisement.pairable) state=\(peripheral.state.rawValue)")
+                }
+                if discoveryModeEnabled && podAdvertisement.pairable {
+                    // Stop the scan so it doesn't starve the connect, then connect if disconnected.
+                    // Anything already .connecting is ours: discoverPods cancels stale connects first.
+                    if manager.isScanning { manager.stopScan() }
+                    if peripheral.state == .disconnected {
+                        log.default("Connecting to pairable device %{public}@ in discovery mode", peripheral)
+                        connectionDelegate?.omnipodLogDeviceEvent("[pairing] connecting to pairable pod \(peripheral.identifier.uuidString)")
+                        timedConnect(peripheral)
+                    }
+                } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
+                    log.debug("Reconnecting to autoconnect device")
+                    autoReconnect(peripheral)
+                } else {
+                    log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
+                }
             }
         } else {
             log.info("Ignoring peripheral with unexpected advertisement data: %{public}@", advertisementData)
         }
         
-        if !BluetoothManager.advertisementMonitorEnabled && !discoveryModeEnabled && central.isScanning && hasDiscoveredAllAutoConnectDevices {
+        // Never stop an armed takeover scan: with empty autoConnectIDs the first discovery of any
+        // peripheral would otherwise end it.
+        if !BluetoothManager.advertisementMonitorEnabled && !discoveryModeEnabled && loanTakeoverPodId == nil && central.isScanning && hasDiscoveredAllAutoConnectDevices {
             log.debug("All peripherals discovered")
             stopScanning()
         }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        // Feeds ConnectClock, with noteDisconnect and noteFailToConnect.
+        ConnectClock.noteConnect(appState: isAppForeground ? "fg" : "bg")
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
         // We are connected — any outstanding fresh-discovery cold-connect fallback is now moot. Clearing
@@ -1632,6 +1806,16 @@ extension BluetoothManager: CBCentralManagerDelegate {
         // freshConnect() → cancelPeripheralConnection() against THIS live link. That stale-timer teardown,
         // re-read by didDisconnect as an unintended "drop", was the root of the self-inflicted
         // connect → cancel → "reconnecting after drop" → reconnect loop.
+        // The adoption is only real once the link is up. Until this point the marker stayed
+        // armed so the scan could keep hunting through a refused connect.
+        if pendingAdoptedLoanPod == peripheral.identifier.uuidString {
+            pendingAdoptedLoanPod = nil
+            if loanTakeoverPodId != nil {
+                loanScanMarkerReason = "adopted+connected"
+                loanTakeoverPodId = nil
+            }
+            connectionDelegate?.omnipodDidAdoptLoanPod(uuidString: peripheral.identifier.uuidString)
+        }
         if pendingFreshConnectID == peripheral.identifier.uuidString {
             pendingFreshConnectID = nil
         }
@@ -1731,6 +1915,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
     }
 
     private func handleDisconnect(_ central: CBCentralManager, peripheral: CBPeripheral, error: Error?, isReconnecting: Bool) {
+        ConnectClock.noteDisconnect(error: error, appState: isAppForeground ? "fg" : "bg")
         dispatchPrecondition(condition: .onQueue(managerQueue))
 
         log.default("[#%{public}@] DISCONNECTED: %{public}@ error=%{public}@ willReconnect=%{public}@ systemReconnecting=%{public}@", instanceID, peripheral,
@@ -1833,8 +2018,20 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         log.error("[#%{public}@] FAILED TO CONNECT: %{public}@ error=%{public}@", instanceID, peripheral, String(describing: error))
 
+        ConnectClock.noteFailToConnect(error: error, appState: isAppForeground ? "fg" : "bg")
+        lastConnectFailure = (id: peripheral.identifier.uuidString,
+                              code: (error as NSError?).map { "\($0.domain)#\($0.code)" } ?? "no-error",
+                              at: Date())
+
         connectionDelegate?.omnipodPeripheralDidFailToConnect(peripheral: peripheral, error: error)
 
+        // A refused adoption keeps the marker, so the scan stays armed for the next advertisement.
+        if pendingAdoptedLoanPod == peripheral.identifier.uuidString {
+            pendingAdoptedLoanPod = nil
+            let code = (error as NSError?).map { "\($0.domain)#\($0.code)" } ?? "no-error"
+            connectionDelegate?.omnipodLogDeviceEvent(
+                "[loan-scan] adoption connect FAILED (\(code)) — marker HELD, scan stays armed for the next advert")
+        }
         // Under active watchdog: defer reconnection to it (don't start the idle scan / probe here, which
         // would starve the watchdog's next connect attempt).
         if isConnectWatchdogActive(peripheral) {

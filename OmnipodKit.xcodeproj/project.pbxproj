@@ -18,6 +18,11 @@
 		D8B88D502D33A52F001893B6 /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8B88D4F2D33A52F001893B6 /* LoopKit.framework */; };
 		D8B88D522D33A53E001893B6 /* LoopKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8B88D512D33A53E001893B6 /* LoopKitUI.framework */; };
 		D8F83FB52D1563B70005D165 /* SlideButton in Frameworks */ = {isa = PBXBuildFile; productRef = D8F83FB42D1563B70005D165 /* SlideButton */; };
+		FADE00000000000000000110 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B66A70BC2E6CFDB800F1641B /* Localizable.xcstrings */; };
+		FADE0000000000000000010C /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = FADE00000000000000000107 /* CryptoSwift */; };
+		FADE0000000000000000010D /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8B88D4F2D33A52F001893B6 /* LoopKit.framework */; };
+		FADE0000000000000000010E /* RileyLinkKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D850B71C2D81733D0095CDF2 /* RileyLinkKit.framework */; };
+		FADE0000000000000000010F /* RileyLinkBLEKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D850B71B2D81733D0095CDF2 /* RileyLinkBLEKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +77,7 @@
 		D8D0ED182D74EF41000B0AF4 /* OmniTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OmniTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8DF84DD2D5D243B00798277 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8F83F882D155ADA0005D165 /* OmnipodKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = OmnipodKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		FADE00000000000000000101 /* OmnipodKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = OmnipodKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -157,6 +163,78 @@
 			);
 			target = D8F83F872D155ADA0005D165 /* OmnipodKit */;
 		};
+		FADE00000000000000000108 /* Exceptions for "OmnipodKit" folder in "OmnipodKit-watchOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Common/FrameworkLocalText.swift,
+				Common/Image.swift,
+				Common/NibLoadable.swift,
+				Common/SilentTune.swift,
+				Common/UIColor.swift,
+				Common/UIDevice.swift,
+				Info.plist,
+				PumpManagerUI/OmniHUDProvider.swift,
+				PumpManagerUI/Views/InPlayConnectionInfoView.swift,
+				"PumpManagerUI/OmniPumpManager+UI.swift",
+				PumpManagerUI/OmniUI.xcassets,
+				PumpManagerUI/ViewControllers/OmniUICoordinator.swift,
+				PumpManagerUI/ViewModels/DeactivatePodViewModel.swift,
+				PumpManagerUI/ViewModels/DeliveryUncertaintyRecoveryViewModel.swift,
+				PumpManagerUI/ViewModels/InsertCannulaViewModel.swift,
+				PumpManagerUI/ViewModels/OmniSettingsViewModel.swift,
+				PumpManagerUI/ViewModels/PairPodViewModel.swift,
+				PumpManagerUI/ViewModels/PodLifeState.swift,
+				PumpManagerUI/ViewModels/RileyLinkListDataSource.swift,
+				PumpManagerUI/Views/ActivityView.swift,
+				PumpManagerUI/Views/AttachPodView.swift,
+				PumpManagerUI/Views/BasalStateView.swift,
+				PumpManagerUI/Views/BeepPreferenceSelectionView.swift,
+				PumpManagerUI/Views/CheckInsertedCannulaView.swift,
+				PumpManagerUI/Views/DeactivatePodView.swift,
+				PumpManagerUI/Views/DeliveryUncertaintyRecoveryView.swift,
+				PumpManagerUI/Views/DesignElements/ErrorView.swift,
+				PumpManagerUI/Views/DesignElements/LeadingImage.swift,
+				PumpManagerUI/Views/DesignElements/RoundedCard.swift,
+				PumpManagerUI/Views/ExpirationReminderPickerView.swift,
+				PumpManagerUI/Views/ExpirationReminderSetupView.swift,
+				PumpManagerUI/Views/HUDAssets.xcassets,
+				PumpManagerUI/Views/InsertCannulaView.swift,
+				PumpManagerUI/Views/InsulinTypeConfirmation.swift,
+				PumpManagerUI/Views/LowReservoirView.swift,
+				PumpManagerUI/Views/ManualTempBasalEntryView.swift,
+				PumpManagerUI/Views/NotificationSettingsView.swift,
+				PumpManagerUI/Views/O5KeyFetchView.swift,
+				PumpManagerUI/Views/O5KeySetupView.swift,
+				PumpManagerUI/Views/OmniReservoirView.swift,
+				PumpManagerUI/Views/OmniReservoirView.xib,
+				PumpManagerUI/Views/OmniSettingsView.swift,
+				PumpManagerUI/Views/Omnipod5SupportView.swift,
+				PumpManagerUI/Views/PairPodView.swift,
+				PumpManagerUI/Views/PlayTestBeepsView.swift,
+				PumpManagerUI/Views/PodDetailsView.swift,
+				PumpManagerUI/Views/PodDiagnosticsView.swift,
+				PumpManagerUI/Views/PodKeepAliveView.swift,
+				PumpManagerUI/Views/PodSetupView.swift,
+				PumpManagerUI/Views/PodTypeSelection.swift,
+				PumpManagerUI/Views/PumpManagerDetailsView.swift,
+				PumpManagerUI/Views/ReadPodInfoView.swift,
+				PumpManagerUI/Views/ReadPodStatusView.swift,
+				PumpManagerUI/Views/RileyLinkSetupView.swift,
+				PumpManagerUI/Views/ScheduledExpirationReminderEditView.swift,
+				PumpManagerUI/Views/SetupCompleteView.swift,
+				PumpManagerUI/Views/SilencePodSelectionView.swift,
+				PumpManagerUI/Views/TimeView.swift,
+				PumpManagerUI/Views/UncertaintyRecoveredView.swift,
+				Resources/blank.wav,
+				Resources/heartbeat.wav,
+				Resources/silent.wav,
+				Services/O5AppAttestService.swift,
+			);
+			publicHeaders = (
+				OmnipodKit.h,
+			);
+			target = FADE00000000000000000102 /* OmnipodKit-watchOS */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -187,6 +265,7 @@
 			exceptions = (
 				D8F83F8D2D155ADA0005D165 /* Exceptions for "OmnipodKit" folder in "OmnipodKit" target */,
 				D8D0EB722D744FE4000B0AF4 /* Exceptions for "OmnipodKit" folder in "OmniParser" target */,
+				FADE00000000000000000108 /* Exceptions for "OmnipodKit" folder in "OmnipodKit-watchOS" target */,
 			);
 			path = OmnipodKit;
 			sourceTree = "<group>";
@@ -230,6 +309,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FADE00000000000000000105 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FADE0000000000000000010F /* RileyLinkBLEKit.framework in Frameworks */,
+				FADE0000000000000000010C /* CryptoSwift in Frameworks */,
+				FADE0000000000000000010E /* RileyLinkKit.framework in Frameworks */,
+				FADE0000000000000000010D /* LoopKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -262,6 +352,7 @@
 				D889B2392D2B4BFE00C8E64C /* OmnipodKitPlugin.loopplugin */,
 				D8D0EB6A2D744A24000B0AF4 /* OmniParser */,
 				D8D0ED182D74EF41000B0AF4 /* OmniTests.xctest */,
+				FADE00000000000000000101 /* OmnipodKit.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -289,6 +380,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D8F83F832D155ADA0005D165 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FADE00000000000000000103 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -394,6 +492,30 @@
 			productReference = D8F83F882D155ADA0005D165 /* OmnipodKit.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		FADE00000000000000000102 /* OmnipodKit-watchOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FADE00000000000000000109 /* Build configuration list for PBXNativeTarget "OmnipodKit-watchOS" */;
+			buildPhases = (
+				FADE00000000000000000103 /* Headers */,
+				FADE00000000000000000104 /* Sources */,
+				FADE00000000000000000105 /* Frameworks */,
+				FADE00000000000000000106 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D8F83F8A2D155ADA0005D165 /* OmnipodKit */,
+			);
+			name = "OmnipodKit-watchOS";
+			packageProductDependencies = (
+				FADE00000000000000000107 /* CryptoSwift */,
+			);
+			productName = OmnipodKit;
+			productReference = FADE00000000000000000101 /* OmnipodKit.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -462,6 +584,7 @@
 				D889B2382D2B4BFE00C8E64C /* OmnipodKitPlugin */,
 				D8D0EB692D744A24000B0AF4 /* OmniParser */,
 				D8D0ED172D74EF41000B0AF4 /* OmniTests */,
+				FADE00000000000000000102 /* OmnipodKit-watchOS */,
 			);
 		};
 /* End PBXProject section */
@@ -490,6 +613,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FADE00000000000000000106 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FADE00000000000000000110 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -515,6 +646,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D8F83F842D155ADA0005D165 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FADE00000000000000000104 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -934,6 +1072,98 @@
 			};
 			name = Release;
 		};
+		FADE0000000000000000010A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OmnipodKit/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				LOCALIZED_STRING_MACRO_NAMES = (
+					NSLocalizedString,
+					CFCopyLocalizedString,
+					LocalizedString,
+					FrameworkLocalText,
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = org.loopkit.OmnipodKit;
+				PRODUCT_NAME = OmnipodKit;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Debug;
+		};
+		FADE0000000000000000010B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OmnipodKit/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				LOCALIZED_STRING_MACRO_NAMES = (
+					NSLocalizedString,
+					CFCopyLocalizedString,
+					LocalizedString,
+					FrameworkLocalText,
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = org.loopkit.OmnipodKit;
+				PRODUCT_NAME = OmnipodKit;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -982,6 +1212,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		FADE00000000000000000109 /* Build configuration list for PBXNativeTarget "OmnipodKit-watchOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FADE0000000000000000010A /* Debug */,
+				FADE0000000000000000010B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1013,6 +1252,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D8F83FB32D1563B70005D165 /* XCRemoteSwiftPackageReference "SlideButton" */;
 			productName = SlideButton;
+		};
+		FADE00000000000000000107 /* CryptoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D82CA8F82D4B7305009C5276 /* XCRemoteSwiftPackageReference "CryptoSwift" */;
+			productName = CryptoSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
