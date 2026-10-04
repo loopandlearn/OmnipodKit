@@ -45957,6 +45957,9 @@
         }
       }
     },
+    "Pod Change (%@)" : {
+      "comment" : "Pump event title for a newly paired pod (1: pod type)"
+    },
     "Pod Connections" : {
       "comment" : "Navigation bar title for InPlay connection info view"
     },
@@ -50540,6 +50543,9 @@
           }
         }
       }
+    },
+    "Pod Removed after %@" : {
+      "comment" : "Pump event title when a pod ends (1: pod lifetime)"
     },
     "Pod sent ack instead of response" : {
       "comment" : "Error message shown when pod sends ack instead of response",
