@@ -3260,6 +3260,28 @@ extension OmniPumpManager: PumpManager {
         }
     }
 
+    /// Once the pod has expired, its earlier expiration reminder no longer means anything, but the pod keeps
+    /// beeping for it until that slot is acknowledged too. True when acknowledging `alert` should clear it.
+    private func expiryAlertSupersedesReminder(_ alert: PumpManagerAlert) -> Bool {
+        switch alert {
+        case .podExpiring, .podExpireImminent:
+            return state.podState?.activeAlertSlots.contains(.slot3ExpirationReminder) == true
+        default:
+            return false
+        }
+    }
+
+    private func retractExpirationReminder() {
+        for alert in state.activeAlerts.union(state.alertsWithPendingAcknowledgment) {
+            if case .userPodExpiration = alert {
+                retractAlert(alert: alert)
+                setState { state in
+                    state.alertsWithPendingAcknowledgment.remove(alert)
+                }
+            }
+        }
+    }
+
     private func silenceAcknowledgedAlerts() {
         // Only attempt to clear one per cycle (more than one should be rare)
         if let alert = state.alertsWithPendingAcknowledgment.first {
@@ -3479,6 +3501,9 @@ extension OmniPumpManager {
                         return
                     }
 
+                    let clearsExpirationReminder = self.expiryAlertSupersedesReminder(alert)
+                    let slots = AlertSet(slots: clearsExpirationReminder ? [slot, .slot3ExpirationReminder] : [slot])
+
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) -> Void in
                         self.runSession(withName: "Acknowledge Alert") { (result) in
                             switch result {
@@ -3487,7 +3512,7 @@ extension OmniPumpManager {
 
                                 do {
                                     let beepBlock = self.beepMessageBlock(beepType: .beep)
-                                    let _ = try session.acknowledgeAlerts(alerts: AlertSet(slots: [slot]), beepBlock: beepBlock)
+                                    let _ = try session.acknowledgeAlerts(alerts: slots, beepBlock: beepBlock)
                                 } catch {
                                     self.setState { state in
                                         state.alertsWithPendingAcknowledgment.insert(alert)
@@ -3497,6 +3522,9 @@ extension OmniPumpManager {
                                 }
                                 self.setState { state in
                                     state.activeAlerts.remove(alert)
+                                }
+                                if clearsExpirationReminder {
+                                    self.retractExpirationReminder()
                                 }
                                 continuation.resume()
                             case .failure(let error):
