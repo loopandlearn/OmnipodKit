@@ -269,6 +269,12 @@ class BluetoothManager: NSObject {
         (UserDefaults.standard.object(forKey: "OmnipodKit.eagerConnectBudgetSeconds") as? Double) ?? 40.0
     }
 
+    /// How long an on-demand command connect waits when the eager watchdog is not in play. A nearby
+    /// pod connects in about a second; a pod that is off or out of range never does.
+    static var connectOnDemandTimeoutSeconds: TimeInterval {
+        (UserDefaults.standard.object(forKey: "OmnipodKit.connectOnDemandTimeoutSeconds") as? Double) ?? 20.0
+    }
+
     /// Overall budget for the eager cancel/retry cycle during pairing discovery — longer than one
     /// wedge-cycle so a wedged first attempt doesn't consume the whole pairing window.
     static var eagerPairingBudgetSeconds: TimeInterval {

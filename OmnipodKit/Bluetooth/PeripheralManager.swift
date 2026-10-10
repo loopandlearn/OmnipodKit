@@ -146,10 +146,11 @@ extension PeripheralManager {
                             self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] queued behind a failed connect — failing fast")
                         } else {
                             do {
-                                // 45s: sized above BluetoothManager.eagerConnectBudgetSeconds (40s) so the
-                                // eager watchdog's cancel/retry cycles own the recovery underneath this
-                                // single wait, rather than this timeout firing first.
-                                try self.connectOnDemand(timeout: 45)
+                                // With the eager watchdog in play, wait above its 40s budget so its
+                                // cancel/retry cycles own the recovery underneath this single wait.
+                                let eager = self.bluetoothManager?.shouldUseEagerConnect(for: self.peripheral) ?? false
+                                let timeout = eager ? 45 : BluetoothManager.connectOnDemandTimeoutSeconds
+                                try self.connectOnDemand(timeout: timeout)
                                 self.lastConnectFailure = nil
                                 linkWasUp = true
                             } catch let error {
