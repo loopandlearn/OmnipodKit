@@ -103,6 +103,10 @@ class DeactivatePodViewModel: ObservableObject, Identifiable {
     
     @Published var state: DeactivatePodViewModelState = .active
 
+    /// What the deactivation is waiting on, shown under the progress indicator.
+    @Published var deactivatingStatus: String?
+    private var deactivationAttempt = 0
+
     var stateNeedsDeliberateUserAcceptance : Bool {
         switch state {
         case .active:
@@ -170,8 +174,17 @@ class DeactivatePodViewModel: ObservableObject, Identifiable {
             didFinish?()
         } else {
             self.state = .deactivating
+            deactivationAttempt += 1
+            let attempt = deactivationAttempt
+            deactivatingStatus = LocalizedString("Connecting to pod…", comment: "Status shown while deactivation waits for a pod connection")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                if self.deactivationAttempt == attempt, case .deactivating = self.state {
+                    self.deactivatingStatus = LocalizedString("The pod is not responding. Still trying…", comment: "Status shown when a deactivation connection attempt is taking a while")
+                }
+            }
             podDeactivator.deactivatePod { (error) in
                 DispatchQueue.main.async {
+                    self.deactivatingStatus = nil
                     if let error = error {
                         self.state = .resultError(DeactivationError.OmniPumpManagerError(error))
                     } else {

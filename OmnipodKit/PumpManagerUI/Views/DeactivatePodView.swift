@@ -40,6 +40,12 @@ struct DeactivatePodView: View {
                         if viewModel.error == nil {
                             VStack {
                                 ProgressIndicatorView(state: viewModel.state.progressState)
+                                if let status = viewModel.deactivatingStatus {
+                                    Text(status)
+                                        .font(.footnote)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 4)
+                                }
                                 if self.viewModel.state.isFinished {
                                     FrameworkLocalText("Deactivated", comment: "Label text showing pod is deactivated")
                                         .bold()
