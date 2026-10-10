@@ -16323,6 +16323,9 @@
         }
       }
     },
+    "Connecting to pod…" : {
+      "comment" : "Status shown while deactivation waits for a pod connection"
+    },
     "Connecting to the pod may sometimes take noticeably longer than usual — occasionally up to 30 seconds — while stalled attempts are detected and retried automatically. Commands still complete once the connection is made." : {
       "comment" : "InPlay connection info: what to expect body 1",
       "localizations" : {
@@ -68598,6 +68601,9 @@
           }
         }
       }
+    },
+    "The pod is not responding. Still trying…" : {
+      "comment" : "Status shown when a deactivation connection attempt is taking a while"
     },
     "The reminders above will not sound on your device when it is in Silent or Do Not Disturb mode. There are other critical Pod alerts that will sound on your device even when set to Silent or Do Not Disturb mode.\n\nThe Pod will also use audible beeps for all Pod reminders and alerts except when the Pod is Silenced." : {
       "comment" : "Description text for critical alerts",
