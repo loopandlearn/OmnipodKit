@@ -10,6 +10,7 @@
 import Foundation
 
 import XCTest
+import LoopKit
 @testable import OmnipodKit
 
 class MockMessageTransport: MessageTransport {
@@ -94,5 +95,4 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
          XCTAssertTrue(finalizedBolus.isFinished(at: statusRequestTime))
          XCTAssertFalse(finalizedBolus.isMutable(at: statusRequestTime))
      }
-
 }

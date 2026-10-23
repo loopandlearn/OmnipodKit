@@ -135,6 +135,14 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
 
     var lastDeliveryStatusReceived: DeliveryStatus? // this variable is not persistent across app restarts
 
+    /// When the bolus the pod reported giving at its last status will end, whoever started it.
+    /// Not persistent, like the delivery status it comes from.
+    var reportedBolusEndsAt: Date?
+
+    /// Untracked delivery may be another controller's, so none is booked. Set on adopt, take-back or
+    /// a foreign session; cleared once the pod shows no bolus running.
+    var untrackedDeliveryIsForeign: Bool = false
+
 
     init(
         address: UInt32,
@@ -225,6 +233,13 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
 
     var isFaulted: Bool {
         return fault != nil || setupProgress == .activationTimeout || setupProgress == .podIncompatible
+    }
+
+    /// What a faulted pod's alarm is titled; "Pod Error" when the pod gave no fault code.
+    var localizedFaultDescription: String? {
+        guard isFaulted else { return nil }
+        return fault?.faultEventCode.notificationTitle
+            ?? LocalizedString("Pod Error", comment: "Status highlight message for other alarm.")
     }
 
     /// Does this pod have no silent beep type available (is noBeepNonCancel non-silent)?
@@ -389,10 +404,14 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
 
         // save the current pod delivery state for verification before any insulin delivery command
         self.lastDeliveryStatusReceived = deliveryStatus
+        reportedBolusEndsAt = deliveryStatus.bolusing ? date.addingTimeInterval(bolusNotDelivered / Pod.bolusDeliveryRate) : nil
 
         // See if the pod's deliveryStatus indicates some insulin delivery that podState isn't tracking
+        if !deliveryStatus.bolusing {
+            untrackedDeliveryIsForeign = false
+        }
         if deliveryStatus.bolusing && unfinalizedBolus == nil { // active bolus that we aren't tracking
-            if podProgressStatus.readyForDelivery {
+            if podProgressStatus.readyForDelivery && !untrackedDeliveryIsForeign {
                 // Create an unfinalizedBolus with the remaining bolus amount to capture what we can.
                 unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
             }
@@ -638,6 +657,8 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             self.insulinType = .novolog
         }
 
+        self.untrackedDeliveryIsForeign = rawValue["untrackedDeliveryIsForeign"] as? Bool ?? false
+
         if let podTypeRaw = rawValue["podType"] as? UInt8 {
             self.podType = PodType(rawValue: podTypeRaw)
         } else if rawValue["ltk"] != nil {
@@ -673,11 +694,16 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             }
 
             // BLE pod type specific values
-            if let ltkString = rawValue["ltk"] as? String,
-                let bleIdentifier = rawValue["bleIdentifier"] as? String
-            {
+            // Decoded independently: an export drops the per-device handle, and must keep the key.
+            if let ltkString = rawValue["ltk"] as? String {
                 self.ltk = Data(hexadecimalString: ltkString)
+            }
+            if let bleIdentifier = rawValue["bleIdentifier"] as? String {
                 self.bleIdentifier = bleIdentifier
+            }
+            // A pod with no key connects and then fails every command, with nothing else saying why.
+            if self.ltk == nil, rawValue["ltk"] != nil {
+                os_log("PodState decode: ltk present in rawValue but did not decode — every pod command will fail", log: log, type: .error)
             }
 
             if podType.isO5 {
@@ -736,6 +762,9 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         rawValue["podTime"] = podTime
         rawValue["podTimeUpdated"] = podTimeUpdated
         rawValue["setupUnitsDelivered"] = setupUnitsDelivered
+        if untrackedDeliveryIsForeign {
+            rawValue["untrackedDeliveryIsForeign"] = true
+        }
 
         if configuredAlerts.count > 0 {
             let rawConfiguredAlerts = Dictionary(uniqueKeysWithValues:
