@@ -572,14 +572,6 @@ class OmniSettingsViewModel: ObservableObject {
         return pumpManager.podType
     }
 
-    /// What the paired pod's certificate said about it. Only an Omnipod 5
-    /// presents one, and only "simulated" is ever shown: an unverified pod is
-    /// treated like a genuine one, so an older pod or a chain we cannot place
-    /// is never flagged.
-    var podAuthenticity: O5PodAuthenticity {
-        return pumpManager.state.podState?.podAuthenticity ?? .unverified
-    }
-
     var noSilentBeep: Bool {
         return pumpManager.noSilentBeep
     }
@@ -692,6 +684,7 @@ extension OmniPumpManager {
             activatedAt: podState.activatedAt,
             deliveryStoppedAt: podState.deliveryStoppedAt,
             podTime: podState.podTime,
+            isSimulated: podState.podAuthenticity == .simulated,
         )
     }
 
