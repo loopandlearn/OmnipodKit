@@ -260,6 +260,7 @@ class BlePodComms: PodComms {
             ltk: ltk,
             bleIdentifier: manager.peripheral.identifier.uuidString,
             signingKey: signingKey,
+            podAuthenticity: response.podAuthenticity,
         )
 
         // podState setupProgress state should be addressAssigned

@@ -684,6 +684,7 @@ extension OmniPumpManager {
             activatedAt: podState.activatedAt,
             deliveryStoppedAt: podState.deliveryStoppedAt,
             podTime: podState.podTime,
+            isSimulated: podState.podAuthenticity == .simulated,
         )
     }
 

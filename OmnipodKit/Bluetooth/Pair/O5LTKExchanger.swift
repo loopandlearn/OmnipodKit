@@ -35,6 +35,9 @@ class O5LTKExchanger {
     private let certStore: O5CertificateStore
     private var seq: UInt8 = 1
 
+    /// What the pod's SPS2 certificate said about it, once it has shown one.
+    private var podAuthenticity: O5PodAuthenticity = .unverified
+
     private let log = OSLog(category: "O5LTKExchanger")
 
     init(manager: PeripheralManager, ids: Ids) throws {
@@ -196,7 +199,8 @@ class O5LTKExchanger {
         return PairResult(
             ltk: keyExchange.ltk,
             address: ids.podId.toUInt32(),
-            msgSeq: seq
+            msgSeq: seq,
+            podAuthenticity: podAuthenticity
         )
     }
 
@@ -508,6 +512,11 @@ class O5LTKExchanger {
         let podSignature = decryptedPayload.subdata(in: certLen..<decryptedPayload.count)
 
         log.default("Pod SPS2 decrypted: %{public}d bytes (cert_DER=%{public}d + sig=%{public}d)", decryptedPayload.count, certLen, podSignature.count)
+
+        // Who signed the pod's certificate. This never blocks a pairing; it
+        // only records what we could tell, for the UI to show.
+        podAuthenticity = O5PodIdentity.authenticity(leafCertificate: podCertDER)
+        log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
         log.info("Pod cert DER (%{public}d bytes): %{public}@", podCertDER.count, podCertDER.hexadecimalString)
         log.info("Pod signature (64 bytes): %{public}@", podSignature.hexadecimalString)
 
