@@ -38,7 +38,8 @@ struct PodAdvertisement {
 
         if podType.isO5 {
             // For O5, serviceUUID[0] will have an imbedded pdmId of "FFFFFFFE" only before pairing
-            return serviceUUIDs[0].uuidString == o5OmnipodServiceUUID.advertisement.rawValue
+            // The status suffix after the pdmId can be 00 or 02 (attention) while unpaired
+            return serviceUUIDs[0].uuidString.dropLast(2) == o5OmnipodServiceUUID.advertisement.rawValue.dropLast(2)
         }
 
         return false

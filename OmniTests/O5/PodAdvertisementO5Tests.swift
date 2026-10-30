@@ -21,6 +21,14 @@ class PodAdvertisementO5Tests: XCTestCase {
         XCTAssertEqual(ad!.serviceUUIDs.count, 1)
     }
 
+    func testO5PairableAttentionAdvertisement() {
+        let uuid = o5FaultAdvertisementUUID(0xFFFFFFFE)
+        let ad = PodAdvertisement(advertisementData(serviceUUID: uuid), podType: omnipod5Type)
+        XCTAssertNotNil(ad)
+        XCTAssertTrue(ad!.pairable)
+        XCTAssertFalse(PodAdvertisement(advertisementData(serviceUUID: o5FaultAdvertisementUUID(0x002A1C6C)), podType: omnipod5Type)!.pairable)
+    }
+
     func testO5PdmIdDecoding() {
         let uuid = CBUUID(string: o5OmnipodServiceUUID.advertisement.rawValue)
         let ad = PodAdvertisement(advertisementData(serviceUUID: uuid), podType: omnipod5Type)
