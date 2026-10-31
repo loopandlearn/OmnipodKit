@@ -89,7 +89,8 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
     // Approximate insulin left in the current pod while it reads 50+ U, from its fill amount
     var approximateReservoirLevel: Double? {
-        guard let podState, podState.isSetupComplete else {
+        // a faulted pod no longer delivers, so its remaining insulin no longer matters
+        guard let podState, podState.isActive else {
             return nil
         }
         return ReservoirEstimate.approximateUnitsRemaining(

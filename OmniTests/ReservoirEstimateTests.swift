@@ -105,6 +105,17 @@ class ReservoirEstimateTests: XCTestCase {
         XCTAssertNil(state.approximateReservoirLevel)
     }
 
+    func testStateDoesNotApproximateForFaultedPod() throws {
+        var podState = makePodState()
+        podState.setupProgress = .completed
+        podState.updateFromStatusResponse(statusResponse(insulinDelivered: 54.95))
+        podState.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020f0000000900345c000103ff0001000005ae056029")!)
+
+        var state = makeState(podState: podState)
+        state.reservoirFillAmount = 180
+        XCTAssertNil(state.approximateReservoirLevel)
+    }
+
     func testFillAmountsArePersisted() {
         var state = makeState(podState: nil)
         state.reservoirFillAmount = 150
