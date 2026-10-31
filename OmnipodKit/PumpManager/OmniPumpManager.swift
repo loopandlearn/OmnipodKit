@@ -1180,6 +1180,7 @@ extension OmniPumpManager {
             // Reset other miscellaneous state variables that are actually per pod
             state.podAttachmentConfirmed = false
             state.acknowledgedTimeOffsetAlert = false
+            state.reservoirFillAmount = nil
         }
     }
 
@@ -1605,7 +1606,10 @@ extension OmniPumpManager {
 
             state.scheduledExpirationReminderOffset = state.defaultExpirationReminderOffset
             state.lowReservoirReminderValue = state.defaultLowReservoirReminderValue
-            state.reservoirFillAmount = state.defaultReservoirFillAmount
+            // Only for a new pod, so a retried insertion doesn't overwrite a fill amount already set
+            if podState.setupProgress.needsCannulaInsertion {
+                state.reservoirFillAmount = state.defaultReservoirFillAmount
+            }
 
             if let silencePodEnd = state.silencePodEnd, silencePodEnd <= Date() {
                 /// The silencePodEnd time has been reached before we are about to the

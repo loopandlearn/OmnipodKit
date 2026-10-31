@@ -569,7 +569,7 @@ struct OmniSettingsView: View  {
                                 ReservoirFillAmountSettingsView(
                                     reservoirFillAmount: viewModel.reservoirFillAmount,
                                     defaultReservoirFillAmount: viewModel.defaultReservoirFillAmount,
-                                    hasActivePod: !viewModel.noPod,
+                                    hasActivePod: viewModel.podOk,
                                     onSaveReservoirFillAmount: viewModel.saveReservoirFillAmount,
                                     onSaveDefaultReservoirFillAmount: viewModel.saveDefaultReservoirFillAmount)
                                )
