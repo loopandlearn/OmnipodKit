@@ -254,8 +254,10 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
         }
 
-        /// Notify podState observers of any podState or silencePod state changes
-        if oldValue.podState != newValue.podState || oldValue.silencePod != newValue.silencePod {
+        /// Notify podState observers of any podState, silencePod or reservoirFillAmount state changes
+        if oldValue.podState != newValue.podState || oldValue.silencePod != newValue.silencePod ||
+            oldValue.reservoirFillAmount != newValue.reservoirFillAmount
+        {
             podStateObservers.forEach { (observer) in
                 observer.podStateDidUpdate(newValue.podState)
             }
@@ -867,6 +869,40 @@ extension OmniPumpManager {
         get {
             state.defaultLowReservoirReminderValue
         }
+    }
+
+    // Units the current pod was filled with, nil when not set
+    var reservoirFillAmount: Double? {
+        set {
+            setState { (state) in
+                state.reservoirFillAmount = newValue
+            }
+            log.default("Set Reservoir Fill Amount for current pod to %{public}@", String(describing: newValue))
+        }
+        get {
+            state.reservoirFillAmount
+        }
+    }
+
+    // Fill amount to use when pairing a new pod, nil to not approximate the reservoir level
+    var defaultReservoirFillAmount: Double? {
+        set {
+            setState { (state) in
+                state.defaultReservoirFillAmount = newValue
+            }
+            log.default("Set Default Reservoir Fill Amount to %{public}@", String(describing: newValue))
+        }
+        get {
+            state.defaultReservoirFillAmount
+        }
+    }
+
+    /// Approximate insulin left in the pod while it reads 50+ U, from the fill amount set for the
+    /// current pod. Nil when no fill amount is set or the pod's own reading applies.
+    /// For display only: it is never reported as a reservoir reading.
+    // XXX needs be declared public with the current Trio implementation
+    public var approximateReservoirLevel: Double? {
+        return state.approximateReservoirLevel
     }
 
     var podAttachmentConfirmed: Bool {
@@ -1569,6 +1605,7 @@ extension OmniPumpManager {
 
             state.scheduledExpirationReminderOffset = state.defaultExpirationReminderOffset
             state.lowReservoirReminderValue = state.defaultLowReservoirReminderValue
+            state.reservoirFillAmount = state.defaultReservoirFillAmount
 
             if let silencePodEnd = state.silencePodEnd, silencePodEnd <= Date() {
                 /// The silencePodEnd time has been reached before we are about to the

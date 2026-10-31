@@ -111,6 +111,15 @@ class OmniSettingsViewModel: ObservableObject {
     // Default low reservoir alert value for new pods
     @Published var defaultLowReservoirAlertValue: Int
 
+    // Units the current pod was filled with, 0 when not set
+    @Published var reservoirFillAmount: Int
+
+    // Fill amount to use when pairing a new pod, 0 when not set
+    @Published var defaultReservoirFillAmount: Int
+
+    // Approximate insulin left while the pod reads 50+ U, nil when not available
+    @Published var approximateReservoirLevel: Double?
+
     @Published var basalDeliveryState: PumpManagerStatus.BasalDeliveryState?
 
     @Published var basalDeliveryRate: Double?
@@ -280,6 +289,9 @@ class OmniSettingsViewModel: ObservableObject {
         expirationReminderDefault = Int(pumpManager.defaultExpirationReminderOffset.hours)
         lowReservoirAlertValue = Int(pumpManager.state.lowReservoirReminderValue)
         defaultLowReservoirAlertValue = Int(pumpManager.state.defaultLowReservoirReminderValue)
+        reservoirFillAmount = Int(pumpManager.reservoirFillAmount ?? 0)
+        defaultReservoirFillAmount = Int(pumpManager.defaultReservoirFillAmount ?? 0)
+        approximateReservoirLevel = pumpManager.approximateReservoirLevel
         podCommState = pumpManager.podCommState
         beepPreference = pumpManager.beepPreference
         silencePodPreference = pumpManager.silencePod ? .enabled : .disabled
@@ -400,6 +412,17 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
+    func saveReservoirFillAmount(_ selectedValue: Int) {
+        pumpManager.reservoirFillAmount = selectedValue > 0 ? Double(selectedValue) : nil
+        reservoirFillAmount = selectedValue
+        approximateReservoirLevel = pumpManager.approximateReservoirLevel
+    }
+
+    func saveDefaultReservoirFillAmount(_ selectedValue: Int) {
+        pumpManager.defaultReservoirFillAmount = selectedValue > 0 ? Double(selectedValue) : nil
+        defaultReservoirFillAmount = selectedValue
+    }
+
     func playTestBeeps() async throws {
         try await pumpManager.playTestBeeps()
     }
@@ -487,9 +510,15 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
-    func reservoirText(for level: ReservoirLevel) -> String {
+    func reservoirText(for level: ReservoirLevel, approximateLevel: Double? = nil) -> String {
         switch level {
         case .aboveThreshold:
+            if let approximateLevel {
+                // "~" marks the amount as approximated from the fill amount
+                let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: approximateLevel)
+                return String(format: LocalizedString("~%1$@", comment: "Format string for approximate reservoir level while the pod reads above its max measurable threshold. (1: approximate reservoir level with units)"),
+                              reservoirVolumeFormatter.string(from: quantity) ?? "")
+            }
             let quantity = HKQuantity(unit: .internationalUnit(), doubleValue: Pod.maximumReservoirReading)
             let thresholdString = reservoirVolumeFormatter.string(from: quantity, includeUnit: false) ?? ""
             let unitString = reservoirVolumeFormatter.localizedUnitStringWithPlurality(forValue: Pod.maximumReservoirReading, avoidLineBreaking: true)
@@ -583,6 +612,8 @@ extension OmniSettingsViewModel: PodStateObserver {
         lifeState = self.pumpManager.lifeState
         basalDeliveryRate = self.pumpManager.basalDeliveryRate
         reservoirLevel = self.pumpManager.reservoirLevel
+        approximateReservoirLevel = self.pumpManager.approximateReservoirLevel
+        reservoirFillAmount = Int(self.pumpManager.reservoirFillAmount ?? 0)
         activatedAt = state?.activatedAt
         expiresAt = state?.expiresAt
         reservoirLevelHighlightState = self.pumpManager.reservoirLevelHighlightState

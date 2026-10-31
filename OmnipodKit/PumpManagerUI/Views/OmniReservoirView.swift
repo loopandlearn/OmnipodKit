@@ -39,6 +39,7 @@ final class OmniReservoirView: LevelHUDView, NibLoadable {
     }
 
     private var reservoirLevel: ReservoirLevel?
+    private var approximateReservoirLevel: Double?
     private var lastUpdateDate: Date?
     private var reservoirLevelHighlightState = ReservoirLevelHighlightState.normal
 
@@ -86,10 +87,17 @@ final class OmniReservoirView: LevelHUDView, NibLoadable {
             switch reservoirLevel {
             case .aboveThreshold:
                 level = nil
-                volumeLabel.isHidden = true
-                if let units = numberFormatter.string(from: Pod.maximumReservoirReading) {
-                    volumeLabel.text = String(format: LocalizedString("%@+ U", comment: "Format string for reservoir volume when above maximum reading. (1: The maximum reading)"), units)
-                    accessibilityValue = String(format: LocalizedString("Greater than %1$@ units remaining at %2$@", comment: "Accessibility format string for (1: localized volume)(2: time)"), units, time)
+                if let approximateReservoirLevel = approximateReservoirLevel, let units = numberFormatter.string(from: approximateReservoirLevel) {
+                    // "~" marks the volume as approximated from the fill amount
+                    volumeLabel.isHidden = false
+                    volumeLabel.text = String(format: LocalizedString("~%@U", comment: "Format string for approximate reservoir volume while the pod reads above its maximum reading. (1: The localized volume)"), units)
+                    accessibilityValue = String(format: LocalizedString("About %1$@ units remaining at %2$@", comment: "Accessibility format string for approximate reservoir volume (1: localized volume)(2: time)"), units, time)
+                } else {
+                    volumeLabel.isHidden = true
+                    if let units = numberFormatter.string(from: Pod.maximumReservoirReading) {
+                        volumeLabel.text = String(format: LocalizedString("%@+ U", comment: "Format string for reservoir volume when above maximum reading. (1: The maximum reading)"), units)
+                        accessibilityValue = String(format: LocalizedString("Greater than %1$@ units remaining at %2$@", comment: "Accessibility format string for (1: localized volume)(2: time)"), units, time)
+                    }
                 }
             case .valid(let value):
                 level = reservoirLevel.percentage
@@ -119,8 +127,9 @@ final class OmniReservoirView: LevelHUDView, NibLoadable {
         })
     }
     
-    func update(level: ReservoirLevel?, at date: Date, reservoirLevelHighlightState: ReservoirLevelHighlightState) {
+    func update(level: ReservoirLevel?, approximateLevel: Double? = nil, at date: Date, reservoirLevelHighlightState: ReservoirLevelHighlightState) {
         self.reservoirLevel = level
+        self.approximateReservoirLevel = approximateLevel
         self.lastUpdateDate = date
         self.reservoirLevelHighlightState = reservoirLevelHighlightState
         updateViews()
