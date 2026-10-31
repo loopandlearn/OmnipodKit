@@ -5631,6 +5631,10 @@
         }
       }
     },
+    "%1$@ U" : {
+      "comment" : "Format string for a reservoir fill amount (1: number of units)",
+      "extractionState" : "manual"
+    },
     "%1$@ units remaining at %2$@" : {
       "comment" : "Accessibility format string for (1: localized volume)(2: time)",
       "extractionState" : "manual",
@@ -7002,6 +7006,10 @@
         }
       }
     },
+    "A Pod only measures its reservoir once 50 U or less remain, and shows 50+ U until then.\n\nWith a fill amount set, the insulin the Pod has used since activation, including priming and cannula insertion, is subtracted from it to show an approximate amount, for example ~145 U. Once the Pod measures 50 U or less, its own reading is always shown.\n\nThe approximation is only as accurate as the fill amount. It is for display only and is not used for dosing or alerts." : {
+      "comment" : "Description text for the approximate reservoir level",
+      "extractionState" : "manual"
+    },
     "Abort" : {
       "comment" : "The text for an \"Abort\" button.",
       "extractionState" : "manual",
@@ -7163,6 +7171,10 @@
           }
         }
       }
+    },
+    "About %1$@ units remaining at %2$@" : {
+      "comment" : "Accessibility format string for approximate reservoir volume (1: localized volume)(2: time)",
+      "extractionState" : "manual"
     },
     "Access Omnipod Screen" : {
       "comment" : "Button title to access Omnipod screen if waiting for recovery from uncertain comms",
@@ -8650,6 +8662,10 @@
           }
         }
       }
+    },
+    "Approximate Reservoir" : {
+      "comment" : "Title for the approximate reservoir description",
+      "extractionState" : "manual"
     },
     "Are you sure you want to cancel Pod setup?" : {
       "comment" : "Alert title for cancel pairing modal",
@@ -17245,6 +17261,10 @@
         }
       }
     },
+    "Current Pod" : {
+      "comment" : "Label for the current Pod reservoir fill amount row",
+      "extractionState" : "manual"
+    },
     "Current Pod Alerts" : {
       "comment" : "Title for Current Pod Alerts section",
       "extractionState" : "manual",
@@ -17406,6 +17426,10 @@
           }
         }
       }
+    },
+    "Current Pod Fill Amount" : {
+      "comment" : "Title for the current Pod reservoir fill amount picker",
+      "extractionState" : "manual"
     },
     "Current Reminders configured for the active Pod." : {
       "comment" : "Footer text for Current Pod Alerts section",
@@ -18864,6 +18888,10 @@
           }
         }
       }
+    },
+    "Default Fill Amount" : {
+      "comment" : "Label for the default reservoir fill amount row\nTitle for the default reservoir fill amount picker",
+      "extractionState" : "manual"
     },
     "Delete saved certificate" : {
       "comment" : "Confirm destructive delete action",
@@ -25914,6 +25942,10 @@
           }
         }
       }
+    },
+    "Fill amount for the current Pod." : {
+      "comment" : "Footer text for the current Pod reservoir fill amount row",
+      "extractionState" : "manual"
     },
     "Finish deactivation" : {
       "comment" : "Settings page link description when next lifecycle action is to finish deactivation",
@@ -40600,6 +40632,10 @@
           }
         }
       }
+    },
+    "Off" : {
+      "comment" : "Value text when no reservoir fill amount is set",
+      "extractionState" : "manual"
     },
     "Ok" : {
       "comment" : "Action button default text for PodAlerts",
@@ -58151,6 +58187,10 @@
         }
       }
     },
+    "Reservoir Fill Amount" : {
+      "comment" : "Text for Reservoir Fill Amount navigation link\nnavigation title for reservoir fill amount settings",
+      "extractionState" : "manual"
+    },
     "Resolving app identity…" : {
       "comment" : "O5 fetch progress: team id / bundle id",
       "localizations" : {
@@ -60016,7 +60056,7 @@
       }
     },
     "Save" : {
-      "comment" : "button title for saving confidence reminder\nbutton title for saving low reservoir alert value\nbutton title for saving scheduled reminder\nbutton title for saving silence pod preference",
+      "comment" : "button title for saving confidence reminder\nbutton title for saving low reservoir alert value\nbutton title for saving scheduled reminder\nbutton title for saving silence pod preference\nbutton title for saving the reservoir fill amount",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -61796,6 +61836,14 @@
           }
         }
       }
+    },
+    "Set the amount of insulin the current Pod was filled with, to show an approximate reservoir level while the Pod reads 50+ U.\n\nChoose Off to show 50+ U." : {
+      "comment" : "Description text for the current Pod reservoir fill amount picker",
+      "extractionState" : "manual"
+    },
+    "Set the amount of insulin you usually fill a new Pod with. It is configured for each Pod you pair, to show an approximate reservoir level while the Pod reads 50+ U.\n\nChoose Off to show 50+ U." : {
+      "comment" : "Description text for the default reservoir fill amount picker",
+      "extractionState" : "manual"
     },
     "Setup cancelled." : {
       "comment" : "O5 fetch: user dismissed the setup token prompt",
@@ -68116,6 +68164,10 @@
           }
         }
       }
+    },
+    "The default fill amount to configure when pairing a new Pod." : {
+      "comment" : "Footer text for the default reservoir fill amount row",
+      "extractionState" : "manual"
     },
     "The default number of hours advance notice to configure when pairing a new Pod." : {
       "comment" : "Footer text for the Expiration Reminder Default row",
@@ -78886,6 +78938,14 @@
           }
         }
       }
+    },
+    "~%1$@" : {
+      "comment" : "Format string for approximate reservoir level while the pod reads above its max measurable threshold. (1: approximate reservoir level with units)",
+      "extractionState" : "manual"
+    },
+    "~%@U" : {
+      "comment" : "Format string for approximate reservoir volume while the pod reads above its maximum reading. (1: The localized volume)",
+      "extractionState" : "manual"
     }
   },
   "version" : "1.1"
