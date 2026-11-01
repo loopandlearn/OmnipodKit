@@ -311,6 +311,8 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
     private let lockedIsDeactivating = Locked(false)
 
+    private let lastAlertTask = Locked<Task<Void, Never>?>(nil)
+
     private let statusObservers = WeakSynchronizedSet<PumpManagerStatusObserver>()
 
     private func notifyStatusObservers(oldStatus: PumpManagerStatus) {
@@ -541,11 +543,11 @@ public class OmniPumpManager: RileyLinkPumpManager {
             self.setState { state in
                 state.lastRileyLinkBatteryAlertDate = Date()
             }
-            Task {
+            deliverAlertInOrder { (delegate) in
                 let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: "lowRLBattery")
                 let alertBody = String(format: LocalizedString("\"%1$@\" has a low battery", comment: "Format string for low battery alert body for RileyLink. (1: device name)"), device.name ?? "unnamed")
                 let content = Alert.Content(title: LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert"), body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
-                await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
+                await delegate.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
             }
         }
     }
@@ -2664,9 +2666,9 @@ extension OmniPumpManager: PumpManager {
     }
 
     fileprivate func clearSuspendReminder() {
-        Task {
-            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
-            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
+        deliverAlertInOrder { (delegate) in
+            await delegate.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
+            await delegate.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
         }
     }
 
@@ -3204,16 +3206,16 @@ extension OmniPumpManager: PumpManager {
     func issueAlert(alert: PumpManagerAlert) {
         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
         let loopAlert = Alert(identifier: identifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .immediate)
-        Task {
-            await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+        deliverAlertInOrder { (delegate) in
+            await delegate.issueAlert(loopAlert)
         }
 
         if let repeatInterval = alert.repeatInterval {
             // Schedule an additional repeating 15 minute reminder for suspend period ended.
             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
             let loopAlert = Alert(identifier: repeatingIdentifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .repeating(repeatInterval: repeatInterval))
-            Task {
-                await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+            deliverAlertInOrder { (delegate) in
+                await delegate.issueAlert(loopAlert)
             }
         }
 
@@ -3222,15 +3224,28 @@ extension OmniPumpManager: PumpManager {
         }
     }
 
+    // Delivers alerts to the delegate in call order
+    private func deliverAlertInOrder(_ deliver: @escaping (PumpManagerDelegate) async -> Void) {
+        lastAlertTask.mutate { (lastTask) in
+            let previous = lastTask
+            lastTask = Task {
+                await previous?.value
+                if let delegate = self.pumpDelegate.delegate {
+                    await deliver(delegate)
+                }
+            }
+        }
+    }
+
     func retractAlert(alert: PumpManagerAlert) {
         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
-        Task {
-            await self.pumpDelegate.delegate?.retractAlert(identifier: identifier)
+        deliverAlertInOrder { (delegate) in
+            await delegate.retractAlert(identifier: identifier)
         }
         if alert.isRepeating {
             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
-            Task {
-                await self.pumpDelegate.delegate?.retractAlert(identifier: repeatingIdentifier)
+            deliverAlertInOrder { (delegate) in
+                await delegate.retractAlert(identifier: repeatingIdentifier)
             }
         }
         self.setState { (state) in
@@ -3383,11 +3398,11 @@ extension OmniPumpManager: PumpManager {
             delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false) { _ in }
         }
 
-        Task {
+        deliverAlertInOrder { (delegate) in
             let content = Alert.Content(title: fault.faultEventCode.notificationTitle,
                                         body: fault.faultEventCode.notificationBody,
                                         acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Alert acknowledgment OK button"))
-            await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
+            await delegate.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
                                                                     alertIdentifier: fault.faultEventCode.description),
                                        foregroundContent: content, backgroundContent: content,
                                        trigger: .immediate))
