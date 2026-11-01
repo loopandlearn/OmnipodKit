@@ -10,7 +10,6 @@
 import SwiftUI
 import LoopKitUI
 import LoopKit
-import LoopAlgorithm
 
 
 struct ManualTempBasalEntryView: View {
