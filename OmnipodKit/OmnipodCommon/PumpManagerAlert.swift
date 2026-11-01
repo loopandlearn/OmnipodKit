@@ -8,7 +8,6 @@
 //
 
 import Foundation
-import LoopAlgorithm
 import LoopKit
 
 // XXX still needs be declared public with the current Trio implementation
