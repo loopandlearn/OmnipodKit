@@ -30,6 +30,16 @@ class BlePodComms: PodComms {
 
     private var needsSessionEstablishment: Bool = false
 
+    /// Set when the user chooses to pair with a pod whose certificate is not
+    /// Insulet's; the next pairing attempt uses it up.
+    var acceptsNonInsuletCertificate = false {
+        didSet {
+            if acceptsNonInsuletCertificate {
+                log.default("User chose to pair with a pod whose certificate is not Insulet's")
+            }
+        }
+    }
+
     private var bluetoothManager: BluetoothManager!
 
     /// Whether a host has asked the pump to provide the BLE heartbeat (see
@@ -209,7 +219,8 @@ class BlePodComms: PodComms {
             ltk = response.ltk
             signingKey = nil
         case omnipod5Type:
-            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids)
+            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids, acceptsNonInsuletCertificate: acceptsNonInsuletCertificate)
+            acceptsNonInsuletCertificate = false
             response = try o5LTKExchanger.o5negotiateLTK()
             ltk = response.ltk
             signingKey = try? O5CertificateStore(controllerId: myId).signingKey.rawRepresentation
@@ -652,6 +663,10 @@ class BlePodComms: PodComms {
 
                 block(.success(session: podSession))
             } catch let error as PodCommsError {
+                if case .podCertificateNotGenuine = error {
+                    // Hang up so that pairing again starts over on a new connection.
+                    self?.bluetoothManager.disconnectFromDevice(uuidString: manager.peripheral.identifier.uuidString)
+                }
                 block(.failure(error))
             } catch {
                 block(.failure(PodCommsError.commsError(error: error)))

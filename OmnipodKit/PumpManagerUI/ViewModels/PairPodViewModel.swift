@@ -148,7 +148,9 @@ class PairPodViewModel: ObservableObject, Identifiable {
     }
 
     @Published var state: PairPodViewModelState = .ready
-    
+
+    @Published var showsCertificateWarning = false
+
     var podIsActivated: Bool {
         return podPairer.podCommState != .noPod
     }
@@ -203,7 +205,11 @@ class PairPodViewModel: ObservableObject, Identifiable {
             DispatchQueue.main.async {
                 switch status {
                 case .failure(let error):
-                    if self.podPairer.podCommState == .noPod {
+                    if case .communication(let commsError) = error,
+                       case .podCertificateNotGenuine? = commsError as? PodCommsError {
+                        self.state = .error(OmniPairingError.pumpManagerError(error))
+                        self.showsCertificateWarning = true
+                    } else if self.podPairer.podCommState == .noPod {
                         let pairAndPrimeError = OmniPairingError.pumpManagerError(error)
                         self.state = .error(pairAndPrimeError)
                     } else if case .fault = self.podPairer.podCommState {
@@ -238,6 +244,11 @@ class PairPodViewModel: ObservableObject, Identifiable {
                 }
             }
         }
+    }
+
+    func continuePairingWithNonInsuletCertificate() {
+        podPairer.acceptNonInsuletCertificate()
+        pairAndPrime()
     }
 
     func continueButtonTapped() {
@@ -315,12 +326,17 @@ enum OmniPairingError : LocalizedError {
 protocol PodPairer {
     func pairAndPrimePod(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void)
     func discardPod(completion: @escaping (Bool) -> ())
+    func acceptNonInsuletCertificate()
     var podCommState: PodCommState { get }
     var podType: PodType { get }
 }
 
 extension OmniPumpManager: PodPairer {
     func discardPod(completion: @escaping (Bool) -> ()) { }
+
+    func acceptNonInsuletCertificate() {
+        acceptNonInsuletPodCertificate()
+    }
 
     func pairAndPrimePod(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
         pairAndPrime(completion: completion)

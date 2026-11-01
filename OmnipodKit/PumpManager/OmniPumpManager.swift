@@ -1351,6 +1351,11 @@ extension OmniPumpManager {
 
     // MARK: - Pairing
 
+    /// Lets the next pairing attempt go ahead with a pod whose certificate is not Insulet's.
+    func acceptNonInsuletPodCertificate() {
+        (podComms as? BlePodComms)?.acceptsNonInsuletCertificate = true
+    }
+
     // Called on the main thread
     func pairAndPrime(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
 

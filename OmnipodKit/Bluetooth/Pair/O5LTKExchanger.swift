@@ -38,11 +38,15 @@ class O5LTKExchanger {
     /// What the pod's SPS2 certificate said about it, once it has shown one.
     private var podAuthenticity: O5PodAuthenticity = .unverified
 
+    /// Whether the user chose to pair with this pod even if its certificate is not Insulet's.
+    private let acceptsNonInsuletCertificate: Bool
+
     private let log = OSLog(category: "O5LTKExchanger")
 
-    init(manager: PeripheralManager, ids: Ids) throws {
+    init(manager: PeripheralManager, ids: Ids, acceptsNonInsuletCertificate: Bool = false) throws {
         self.manager = manager
         self.ids = ids
+        self.acceptsNonInsuletCertificate = acceptsNonInsuletCertificate
         self.certStore = try O5CertificateStore(controllerId: ids.myIdAddr)
         self.keyExchange = try O5KeyExchange(P256KeyGenerator(), OmniRandomByteGenerator(), controllerIdData: certStore.controllerIdData)
     }
@@ -513,12 +517,10 @@ class O5LTKExchanger {
 
         log.default("Pod SPS2 decrypted: %{public}d bytes (cert_DER=%{public}d + sig=%{public}d)", decryptedPayload.count, certLen, podSignature.count)
 
-        // Who signed the pod's certificate. This never blocks a pairing; it
-        // only records what we could tell, for the UI to show.
-        podAuthenticity = O5PodIdentity.authenticity(leafCertificate: podCertDER)
-        log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
         log.info("Pod cert DER (%{public}d bytes): %{public}@", podCertDER.count, podCertDER.hexadecimalString)
         log.info("Pod signature (64 bytes): %{public}@", podSignature.hexadecimalString)
+
+        var signatureValid = false
 
         // Extract pod's public key from its DER certificate
         if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
@@ -527,7 +529,7 @@ class O5LTKExchanger {
             // Verify the pod's signature over the pod's channel-binding transcript variant
             // Pod signs with w1=1: [0x02][controller_id][FIRMWARE_ID][podPub][pdmPub][podNonce][pdmNonce]
             let transcript = keyExchange.buildPodChannelBindingTranscript()
-            let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
+            signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
             if signatureValid {
                 log.default("Pod SPS2 signature verification PASSED")
             } else {
@@ -540,6 +542,17 @@ class O5LTKExchanger {
 
         if let serial = O5CertificateStore.extractSerialNumber(fromDERCert: podCertDER) {
             log.info("Pod cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        }
+
+        // A certificate is only the pod's if the pod signed this exchange with
+        // its key; anyone can replay a real pod's certificate.
+        podAuthenticity = signatureValid ? O5PodIdentity.authenticity(leafCertificate: podCertDER) : .unverified
+        log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
+
+        // Stop before the LTK is agreed so the user can decide, and so that
+        // a retry pairs from scratch.
+        if podAuthenticity != .genuine && !acceptsNonInsuletCertificate {
+            throw PodCommsError.podCertificateNotGenuine
         }
     }
 

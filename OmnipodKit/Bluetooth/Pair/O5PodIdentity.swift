@@ -15,11 +15,11 @@ import Foundation
 /// intermediate (CN=INS01PG1) in SPS2.1, its own certificate issued by that
 /// intermediate in SPS2, and signs the channel-binding transcript with the key
 /// in it. The simulator mirrors this with its own published CA, so the two are
-/// distinguishable. This is a safety marker - it never blocks a pairing, and
-/// an unverified pod is treated like a real one, so a pod whose chain we
-/// cannot place is never falsely flagged. The simulator's key is public, so
-/// "simulated" only ever errs toward "this is a simulated pod", never the
-/// reverse for a real one.
+/// distinguishable. Pairing with anything but a genuine pod asks the user
+/// first, since it may mean the pairing is being intercepted; after that it
+/// is treated like a real pod. The simulator's key is public, so "simulated"
+/// only ever errs toward "this is a simulated pod", never the reverse for a
+/// real one.
 public enum O5PodAuthenticity: String, Equatable {
     case genuine
     case simulated
