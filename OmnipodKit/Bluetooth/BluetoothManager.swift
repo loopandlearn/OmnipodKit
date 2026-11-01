@@ -1173,15 +1173,16 @@ class BluetoothManager: NSObject {
             // Pairing: scan for the pod's main advertisement service so a new/unpaired pod is found.
             // MUST take precedence over the low-power alarm scan (which filters on C005/C00A and would
             // never see a pairing pod) and over scanningEnabled (pairing has to scan regardless).
-            // A filled, unpaired O5 can advertise the attention suffix (…FE02) instead of …FE00.
+            // Also hear unpaired O5s advertising …FE02, only to log them: what 02 means before pairing is unknown.
             if podType.isO5 && uuidPdmId == nil {
-                services = [serviceUUID, o5FaultAdvertisementUUID(0xFFFFFFFE)]
+                services = [serviceUUID, o5UnpairedAttentionAdvertisementUUID]
             } else {
                 services = [serviceUUID]
             }
             options = [CBCentralManagerScanOptionAllowDuplicatesKey: true]
-            log.default("Start scanning (discovery/pairing filter=%{public}@)", serviceUUID.uuidString)
-            connectionDelegate?.omnipodLogDeviceEvent("[pairing] scan started (filter=\(serviceUUID.uuidString))")
+            let filter = services?.map { $0.uuidString }.joined(separator: ",") ?? "-"
+            log.default("Start scanning (discovery/pairing filter=%{public}@)", filter)
+            connectionDelegate?.omnipodLogDeviceEvent("[pairing] scan started (filter=\(filter))")
             manager.scanForPeripherals(withServices: services, options: options)
             return
         }
@@ -1513,6 +1514,15 @@ extension BluetoothManager: CBCentralManagerDelegate {
             log.default("[POD-FAULT] %{public}@ → O5 attention advert (…02) (from advertisement, no connect)", peripheral.identifier.uuidString)
             connectionDelegate?.omnipodLogDeviceEvent("[POD-FAULT] → O5 attention advert (…02) — connecting to read status")
             surfacePodConditionAndQuiet(alertSet: AlertSet(rawValue: 0))
+        }
+
+        if discoveryModeEnabled, podType.isO5, advSvcUUIDs.contains(o5UnpairedAttentionAdvertisementUUID) {
+            let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
+            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
+            log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE02, not pairing: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
+                        peripheral.identifier.uuidString, RSSI, name, mfg)
+            connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE02, not pairing: rssi=\(RSSI) name=\(name) mfg=\(mfg)")
+            return
         }
 
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {
