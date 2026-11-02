@@ -1278,10 +1278,10 @@ extension OmniPumpManager {
     }
 
     // Stop using OmnipodKit altogether: release Bluetooth and any RileyLinks, then ask the delegate to remove us.
-    func stopUsing(completion: @escaping () -> Void) {
+    public func delete() async {
         lockedIsDeactivating.value = true
         forgetBluetoothConnections()
-        notifyDelegateOfDeactivation(completion: completion)
+        await pumpManagerDelegate?.pumpManagerWantsDeletion(self)
     }
 
     /// Forget all Bluetooth connections. For BLE pods call
