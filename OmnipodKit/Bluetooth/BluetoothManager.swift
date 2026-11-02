@@ -1000,11 +1000,9 @@ class BluetoothManager: NSObject {
 
     // MARK: - Central calls (MUST run on managerQueue)
     //
-    // CBCentralManager was created with `managerQueue`, so every call into it has to be serialized on
-    // that same queue — otherwise connect/cancel race the delegate callbacks and CoreBluetooth's
-    // internal state machine. Connect-on-demand was calling central.connect()/cancelPeripheralConnection()
-    // from PeripheralManager.queue, which wedged reconnects in .connecting (intermittently). These
-    // helpers give PeripheralManager a queue-correct way to drive the central.
+    // CBCentralManager delivers its callbacks on `managerQueue`, and the connect-on-demand state
+    // (commandConnectInFlight, the probe) lives there too. These helpers let PeripheralManager drive the
+    // central and update that state together, in order with the callbacks.
 
     /// Connect the (known/recovered) peripheral on the central's queue for a real command. A command
     /// preempts the heartbeat probe: cancel any in-flight StartDelay probe first so its pending connect
@@ -1161,6 +1159,20 @@ class BluetoothManager: NSObject {
             guard let self = self else { return }
             self.commandConnectInFlight = false
             self.log.default("[connectOnDemand] central.cancel on managerQueue for %{public}@", peripheral.identifier.uuidString)
+            self.manager.cancelPeripheralConnection(peripheral)
+        }
+    }
+
+    /// Drop a link whose pod stopped answering. While the connection is held (keep-alive), the drop
+    /// reconnects like any other unintended drop; otherwise the link goes idle so the probe can re-arm.
+    func disconnectUnresponsive(_ peripheral: CBPeripheral) {
+        managerQueue.async { [weak self] in
+            guard let self = self else { return }
+            if !self.shouldHoldConnection {
+                self.commandConnectInFlight = false
+            }
+            self.log.default("[connectOnDemand] unresponsive pod — cancelling %{public}@ (held=%{public}@)",
+                             peripheral.identifier.uuidString, String(describing: self.shouldHoldConnection))
             self.manager.cancelPeripheralConnection(peripheral)
         }
     }
@@ -1713,8 +1725,8 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         if shouldHoldConnection && commandConnectInFlight {
             // Keep-alive (foreground, or a background Pod Keep Alive mode): an unintended drop while we want
-            // to stay connected (a deliberate background/idle disconnect clears commandConnectInFlight first,
-            // so it won't reconnect).
+            // to stay connected, including our own teardown of an unresponsive pod. A deliberate
+            // background/idle disconnect clears commandConnectInFlight first, so it won't reconnect.
             log.default("[connectOnDemand] keep-alive — reconnecting after drop")
             connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] keep-alive — reconnecting after drop")
             connectForCommand(peripheral)

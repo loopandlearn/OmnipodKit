@@ -719,8 +719,6 @@ extension PeripheralManager {
             guard self.idleStart == idleAt, self.sessionQueue.operationCount == 0,
                   self.peripheral.state == .connected else { return }
             self.log.default("[connectOnDemand] idle ~%{public}ds, no queued session -> disconnecting", Int(idleDelay))
-            // Queue-correct cancel: route through BluetoothManager so it runs on managerQueue. Cancelling
-            // from this (PeripheralManager) queue raced CoreBluetooth's teardown and wedged the next connect.
             self.bluetoothManager?.disconnectOnDemand(self.peripheral)
         }
     }
