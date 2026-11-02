@@ -1241,8 +1241,16 @@ extension OmniPumpManager {
     }
 
     func forgetPod(completion: @escaping () -> Void) {
+        forgetPod(bookingDiscardedDosing: true, completion: completion)
+    }
 
-        self.podComms.handleDiscardedPodDosing(podTime: podTime, reservoirLevel: reservoirLevel?.rawValue)
+    /// Without `bookingDiscardedDosing`, another controller ended the pod and booked its last delivery
+    /// (OmniPumpManager+DeviceHandoff).
+    func forgetPod(bookingDiscardedDosing: Bool, completion: @escaping () -> Void) {
+
+        if bookingDiscardedDosing {
+            self.podComms.handleDiscardedPodDosing(podTime: podTime, reservoirLevel: reservoirLevel?.rawValue)
+        }
 
         if let podState = state.podState {
             reportPodEnded(podState)

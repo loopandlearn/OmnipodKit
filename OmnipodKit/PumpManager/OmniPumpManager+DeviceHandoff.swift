@@ -8,7 +8,8 @@
 //  handle for the pod travels only in its `localState`, which the host saves and hands back at
 //  the next adopt; an adopter owns the in-flight doses under the exporter's identities; a
 //  controller that released drops its copies when it takes control back; and none books
-//  delivery it did not command (PodState).
+//  delivery it did not command (PodState). A faulted pod can be ended by the controller holding
+//  it, and the other forgets it without booking.
 //
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
@@ -269,6 +270,43 @@ extension OmniPumpManager: ExclusiveDeviceControl {
         case .connected:     return "connected"
         case .disconnecting: return "DISCONNECTING(wedged?)"
         @unknown default:    return "unknown(\(peripheral.state.rawValue))"
+        }
+    }
+}
+
+// MARK: - Ending a faulted pod
+
+extension OmniPumpManager {
+
+    /// A faulted pod alarms until it is deactivated, and only the controller holding it can do that.
+    public var failedDeviceDeactivationTitle: String? {
+        guard state.podState?.fault != nil else { return nil }
+        return LocalizedString("Deactivate Pod", comment: "Action that deactivates a faulted pod from the controller holding it")
+    }
+
+    /// The pod settings' Deactivate Pod: deactivate, then forget the pod, booking its end here.
+    public func deactivateFailedDevice() async throws {
+        let error: OmniPumpManagerError? = await withCheckedContinuation { done in
+            DispatchQueue.main.async { self.deactivatePod { done.resume(returning: $0) } }
+        }
+        if let error { throw error }
+        await withCheckedContinuation { done in
+            DispatchQueue.main.async { self.forgetPod { done.resume() } }
+        }
+    }
+
+    /// The controller that ended the pod booked its last delivery: this copy's in-flight doses are
+    /// dropped as at a take-back, and the pod is forgotten without booking a discard.
+    public func forgetDeviceDeactivatedElsewhere() async {
+        guard state.podState != nil, state.podConnectionReleased else { return }
+        (podComms as? BlePodComms)?.resolveAfterForeignControl(dropInFlight: state.inFlightDosesInheritedAway)
+        setState { state in
+            state.podConnectionReleased = false
+            state.inFlightDosesInheritedAway = false
+        }
+        omnipodLogDeviceEvent("[release] the pod was deactivated by another controller; forgotten here")
+        await withCheckedContinuation { done in
+            DispatchQueue.main.async { self.forgetPod(bookingDiscardedDosing: false) { done.resume() } }
         }
     }
 }
