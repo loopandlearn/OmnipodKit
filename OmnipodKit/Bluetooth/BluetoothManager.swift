@@ -141,6 +141,8 @@ class BluetoothManager: NSObject {
     /// once (captures the fault transition without flooding the device log).
     private var lastLoggedAdvKey: [String: String] = [:]
 
+    private var lastLoggedUnpairedAttentionAdvKey: [String: String] = [:]
+
     /// Isolated to `managerQueue`
     private var discoveryModeEnabled: Bool = false
 
@@ -1519,9 +1521,13 @@ extension BluetoothManager: CBCentralManagerDelegate {
         if discoveryModeEnabled, podType.isO5, advSvcUUIDs.contains(o5UnpairedAttentionAdvertisementUUID) {
             let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
             let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
-            log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE02, not pairing: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
-                        peripheral.identifier.uuidString, RSSI, name, mfg)
-            connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE02, not pairing: rssi=\(RSSI) name=\(name) mfg=\(mfg)")
+            let advKey = "\(name)|\(mfg)"
+            if lastLoggedUnpairedAttentionAdvKey[peripheral.identifier.uuidString] != advKey {
+                lastLoggedUnpairedAttentionAdvKey[peripheral.identifier.uuidString] = advKey
+                log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE02, not pairing: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
+                            peripheral.identifier.uuidString, RSSI, name, mfg)
+                connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE02, not pairing: rssi=\(RSSI) name=\(name) mfg=\(mfg)")
+            }
             return
         }
 
