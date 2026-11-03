@@ -1557,8 +1557,10 @@ extension BluetoothManager: CBCentralManagerDelegate {
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
                 log.debug("Reconnecting to autoconnect device")
                 autoReconnect(peripheral)
+            } else if discoveryModeEnabled {
+                log.info("Ignoring paired peripheral: %{public}@", peripheral)
             } else {
-                log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
+                log.info("Ignoring peripheral, not pairing and not ours: %{public}@", peripheral)
             }
         } else {
             log.info("Ignoring peripheral with unexpected advertisement data: %{public}@", advertisementData)
