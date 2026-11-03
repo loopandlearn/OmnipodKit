@@ -5,6 +5,7 @@
 //  Copyright © 2026 LoopKit Authors. All rights reserved.
 //
 
+import CryptoKit
 import XCTest
 @testable import OmnipodKit
 
@@ -40,11 +41,13 @@ class O5PodIdentityTests: XCTestCase {
     func testSimulatedPodIsNotGenuine() {
         let signed = SignedCertificate(der: simulatedPodCertificate)
         XCTAssertNotNil(signed)
-        XCTAssertFalse(signed!.isSigned(byPublicKey: O5PodIdentity.insuletPodAnchorKey))
+        for key in O5PodIdentity.insuletPodAnchorKeys {
+            XCTAssertFalse(signed!.isSigned(byPublicKey: key))
+        }
     }
 
-    /// Anything we cannot place is unverified, which the UI treats like a
-    /// genuine pod. Rubbish must not crash or read as either anchor.
+    /// Anything we cannot place is unverified, which asks the user before
+    /// pairing. Rubbish must not crash or read as either anchor.
     func testUnplaceableCertificatesAreUnverified() {
         XCTAssertEqual(O5PodIdentity.authenticity(leafCertificate: Data()), .unverified)
         XCTAssertEqual(O5PodIdentity.authenticity(leafCertificate: Data([0x30, 0x82, 0xff, 0xff])), .unverified)
@@ -74,10 +77,15 @@ class O5PodIdentityTests: XCTestCase {
         XCTAssertGreaterThan(signed.signature.count, 60)
     }
 
-    /// The pinned anchors must be the shapes they claim to be: a raw P-256
-    /// public key, and a parseable certificate.
+    /// The pinned anchors must be what they claim to be: valid P-256 public
+    /// keys (a mistyped hex digit would leave every real pod unrecognised),
+    /// and a parseable certificate.
     func testAnchorsAreWellFormed() {
-        XCTAssertEqual(O5PodIdentity.insuletPodAnchorKey.count, 64, "a raw P-256 key is x then y")
+        XCTAssertFalse(O5PodIdentity.insuletPodAnchorKeys.isEmpty)
+        for key in O5PodIdentity.insuletPodAnchorKeys {
+            XCTAssertEqual(key.count, 64, "a raw P-256 key is x then y")
+            XCTAssertNoThrow(try P256.Signing.PublicKey(rawRepresentation: key), "not a point on P-256")
+        }
         XCTAssertNotNil(O5CertificateStore.extractP256PublicKey(fromDERCert: O5PodIdentity.simulatorAnchorCertificate))
     }
 }

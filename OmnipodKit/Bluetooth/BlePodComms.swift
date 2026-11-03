@@ -30,16 +30,6 @@ class BlePodComms: PodComms {
 
     private var needsSessionEstablishment: Bool = false
 
-    /// Set when the user chooses to pair with a pod whose certificate is not
-    /// Insulet's; the next pairing attempt uses it up.
-    var acceptsNonInsuletCertificate = false {
-        didSet {
-            if acceptsNonInsuletCertificate {
-                log.default("User chose to pair with a pod whose certificate is not Insulet's")
-            }
-        }
-    }
-
     private var bluetoothManager: BluetoothManager!
 
     /// Whether a host has asked the pump to provide the BLE heartbeat (see
@@ -198,7 +188,7 @@ class BlePodComms: PodComms {
 
     // Handles negotiating the LTK (if needed), establishing the session and transport,
     // running the AssignVesion command, and then creating the PodState for the pod.
-    private func pairPod(insulinType: InsulinType) throws {
+    private func pairPod(insulinType: InsulinType, acceptingNonInsuletCertificate: Bool) throws {
         // We should already be holding podStateLock during calls to this function, so try() should fail
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
@@ -219,8 +209,10 @@ class BlePodComms: PodComms {
             ltk = response.ltk
             signingKey = nil
         case omnipod5Type:
-            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids, acceptsNonInsuletCertificate: acceptsNonInsuletCertificate)
-            acceptsNonInsuletCertificate = false
+            if acceptingNonInsuletCertificate {
+                log.default("User chose to pair with a pod whose certificate is not Insulet's")
+            }
+            let o5LTKExchanger = try O5LTKExchanger(manager: manager, ids: ids, acceptsNonInsuletCertificate: acceptingNonInsuletCertificate)
             response = try o5LTKExchanger.o5negotiateLTK()
             ltk = response.ltk
             signingKey = try? O5CertificateStore(controllerId: myId).signingKey.rawRepresentation
@@ -271,7 +263,7 @@ class BlePodComms: PodComms {
             ltk: ltk,
             bleIdentifier: manager.peripheral.identifier.uuidString,
             signingKey: signingKey,
-            podAuthenticity: response.podAuthenticity,
+            podAuthenticity: versionResponse.podType.isO5 ? response.podAuthenticity : nil,
         )
 
         // podState setupProgress state should be addressAssigned
@@ -594,6 +586,7 @@ class BlePodComms: PodComms {
     func blePairAndSetupPod(
         timeZone: TimeZone,
         insulinType: InsulinType,
+        acceptingNonInsuletCertificate: Bool = false,
         messageLogger: MessageLogger?,
         _ block: @escaping (_ result: SessionRunResult) -> Void
     ) {
@@ -619,7 +612,7 @@ class BlePodComms: PodComms {
                     // Fresh pod: full pairing sequence (HELLO + LTK + EAP-AKA)
                     try manager.sendHello(myId: myId)
                     try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
-                    try pairPod(insulinType: insulinType)
+                    try pairPod(insulinType: insulinType, acceptingNonInsuletCertificate: acceptingNonInsuletCertificate)
                 } else if !needsSessionEstablishment,
                           let ck = podState?.bleMessageTransportState.ck,
                           !ck.isEmpty {

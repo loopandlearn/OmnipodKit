@@ -28,16 +28,19 @@ public enum O5PodAuthenticity: String, Equatable {
 
 enum O5PodIdentity {
 
-    /// The public key of Insulet's pod intermediate (CN=INS01PG1, issued by
-    /// CN=INS00PG1), captured from a real Omnipod 5 on 2026-10-27. A genuine
-    /// pod's certificate is signed by this.
+    /// Public keys of Insulet's pod intermediates. A genuine pod's certificate is
+    /// signed by one of these. Add a key here when pods turn up signed by a new
+    /// intermediate; the pairing log prints the key a non-genuine pod showed.
     ///
-    /// The key is pinned rather than the certificate: a certificate can be
-    /// reissued around the same key, and os_log truncates the DER anyway.
-    static let insuletPodAnchorKey = Data(hexadecimalString: [
-        "ad2f3b7cc5b5971bea582dff282e08421416d92e2380dbb45802944138cde023",
-        "c5480d43ce04fda10b4980139a400903f581a3ef8a67186d719a79dc5492f441"
-    ].joined())!
+    /// Keys are pinned rather than certificates: a certificate can be reissued
+    /// around the same key, and os_log truncates the DER anyway.
+    static let insuletPodAnchorKeys: [Data] = [
+        // CN=INS01PG1, issued by CN=INS00PG1, captured from a real Omnipod 5 on 2026-10-27.
+        Data(hexadecimalString: [
+            "ad2f3b7cc5b5971bea582dff282e08421416d92e2380dbb45802944138cde023",
+            "c5480d43ce04fda10b4980139a400903f581a3ef8a67186d719a79dc5492f441"
+        ].joined())!
+    ]
 
     /// The LoopKit/pod simulator's CA. Its signing key is published in that
     /// repository as a development marker, so this proves "simulated", not
@@ -70,7 +73,7 @@ enum O5PodIdentity {
         guard let signed = SignedCertificate(der: leafCertificate) else {
             return .unverified
         }
-        if signed.isSigned(byPublicKey: insuletPodAnchorKey) {
+        if insuletPodAnchorKeys.contains(where: signed.isSigned(byPublicKey:)) {
             return .genuine
         }
         if let simulatorKey = O5CertificateStore.extractP256PublicKey(fromDERCert: simulatorAnchorCertificate),

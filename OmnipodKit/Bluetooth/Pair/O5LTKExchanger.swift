@@ -37,6 +37,8 @@ class O5LTKExchanger {
 
     /// What the pod's SPS2 certificate said about it, once it has shown one.
     private var podAuthenticity: O5PodAuthenticity = .unverified
+    /// The public key of the intermediate certificate the pod showed in SPS2.1.
+    private var podIntermediateKey: Data?
 
     /// Whether the user chose to pair with this pod even if its certificate is not Insulet's.
     private let acceptsNonInsuletCertificate: Bool
@@ -417,6 +419,7 @@ class O5LTKExchanger {
         // Extract and log the pod certificate details
         if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
             log.info("Pod SPS2.1 cert public key: %{public}@", podPubKeyRaw.hexadecimalString)
+            podIntermediateKey = podPubKeyRaw
         } else {
             log.error("Failed to extract P-256 public key from pod SPS2.1 certificate DER")
         }
@@ -533,8 +536,7 @@ class O5LTKExchanger {
             if signatureValid {
                 log.default("Pod SPS2 signature verification PASSED")
             } else {
-                log.error("Pod SPS2 signature verification FAILED — transcript format may differ")
-                // Don't throw — continue pairing and log for debugging
+                log.error("Pod SPS2 signature verification FAILED — the pod is treated as unverified")
             }
         } else {
             log.error("Failed to extract P-256 public key from pod SPS2 certificate DER")
@@ -548,6 +550,18 @@ class O5LTKExchanger {
         // its key; anyone can replay a real pod's certificate.
         podAuthenticity = signatureValid ? O5PodIdentity.authenticity(leafCertificate: podCertDER) : .unverified
         log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
+        if podAuthenticity != .genuine {
+            // Enough to tell a new Insulet intermediate from anything else: if the
+            // pod's certificate chains to the intermediate it showed, that key is
+            // the one to add to O5PodIdentity.insuletPodAnchorKeys once confirmed.
+            let chainsToShownIntermediate = podIntermediateKey.map {
+                SignedCertificate(der: podCertDER)?.isSigned(byPublicKey: $0) ?? false
+            } ?? false
+            log.default("Pod certificate not Insulet's: signature %{public}@, SPS2.1 intermediate key %{public}@, pod certificate signed by it: %{public}@",
+                        signatureValid ? "valid" : "invalid",
+                        podIntermediateKey?.hexadecimalString ?? "none",
+                        String(describing: chainsToShownIntermediate))
+        }
 
         // Stop before the LTK is agreed so the user can decide, and so that
         // a retry pairs from scratch.

@@ -26,6 +26,7 @@ struct PodDetails {
     var deliveryStoppedAt: Date?
     var podTime: TimeInterval
     var isSimulated: Bool = false
+    var isUnverified: Bool = false
 }
 
 struct PodDetailsView: View {
@@ -110,6 +111,9 @@ struct PodDetailsView: View {
             if podDetails.isSimulated {
                 row(LocalizedString("Certificate", comment: "description label for the pod certificate pod details row"),
                     value: LocalizedString("Simulated pod", comment: "Pod details value when the pod's certificate is from the pod simulator"))
+            } else if podDetails.isUnverified {
+                row(LocalizedString("Certificate", comment: "description label for the pod certificate pod details row"),
+                    value: LocalizedString("Not from Insulet", comment: "Pod details value when the user chose to pair with a pod whose certificate is not Insulet's"))
             }
             if let deviceName = podDetails.deviceName {
                 row(LocalizedString("Device Name", comment: "description label for device name pod details row"), value: deviceName)

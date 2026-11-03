@@ -1351,13 +1351,8 @@ extension OmniPumpManager {
 
     // MARK: - Pairing
 
-    /// Lets the next pairing attempt go ahead with a pod whose certificate is not Insulet's.
-    func acceptNonInsuletPodCertificate() {
-        (podComms as? BlePodComms)?.acceptsNonInsuletCertificate = true
-    }
-
-    // Called on the main thread
-    func pairAndPrime(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
+    // Called on the main thread. `acceptingNonInsuletCertificate` applies only to this attempt.
+    func pairAndPrime(acceptingNonInsuletCertificate: Bool = false, completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
 
         guard state.podType != unknownOmnipodType else {
             completion(.failure(.configuration(OmniPumpManagerError.podTypeNotConfigured)))
@@ -1456,7 +1451,7 @@ extension OmniPumpManager {
 
         // Common code that invokes blePairAndSetupPod and then a primingSession if successful
         func blePairSetupPrimePod(blePodComms: BlePodComms) {
-            blePodComms.blePairAndSetupPod(timeZone: .currentFixed, insulinType: insulinType, messageLogger: self) { (result) in
+            blePodComms.blePairAndSetupPod(timeZone: .currentFixed, insulinType: insulinType, acceptingNonInsuletCertificate: acceptingNonInsuletCertificate, messageLogger: self) { (result) in
                 switch result {
                 case .success:
                     // Calls completion

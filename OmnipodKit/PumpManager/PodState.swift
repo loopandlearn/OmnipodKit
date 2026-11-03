@@ -129,10 +129,10 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
     var bleIdentifier: String? = nil
     var signingKey: Data? = nil // O5 only
 
-    /// What the pod's certificate said about it when it paired. A safety
-    /// marker only: it never blocks a command, and an unverified pod is
-    /// treated like a genuine one.
-    var podAuthenticity: O5PodAuthenticity = .unverified
+    /// What the pod's certificate said about it when it paired. Pairing asks the
+    /// user before going ahead with anything but a genuine pod; after that it
+    /// never blocks a command. Nil for non-O5 pods and pods paired before the check.
+    var podAuthenticity: O5PodAuthenticity? = nil
 
     // Eros specific variables
     var erosMessageTransportState: ErosMessageTransportState
@@ -155,7 +155,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         ltk: Data? = nil,
         bleIdentifier: String? = nil,
         signingKey: Data? = nil, // O5 only
-        podAuthenticity: O5PodAuthenticity = .unverified,
+        podAuthenticity: O5PodAuthenticity? = nil,
 
         // Eros specific variables
         erosMessageTransportState: ErosMessageTransportState? = nil,
@@ -771,7 +771,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             if let signingKey = signingKey {
                 rawValue["signingKey"] = signingKey.hexadecimalString
             }
-            if podAuthenticity != .unverified {
+            if let podAuthenticity {
                 rawValue["podAuthenticity"] = podAuthenticity.rawValue
             }
         }
@@ -798,6 +798,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             "* lotNo: \(lotNo)",
             "* lotSeq: \(lotSeq)",
             "* podTypeValue: \(podType.rawValue)",
+            "* podAuthenticity: \(podAuthenticity?.rawValue ?? "nil")",
             "* suspendState: \(suspendState)",
             "* unacknowledgedCommand: \(optionalString(unacknowledgedCommand))",
             "* unfinalizedBolus: \(optionalString(unfinalizedBolus))",
