@@ -46,8 +46,9 @@ struct BleMessageTransportState: MessageTransportState {
             else {
                 return nil
         }
-        self.ck = Data(hex: ckString)
-        self.noncePrefix = Data(hex: noncePrefixString)
+        // A missing key is saved as "" and reads back missing, not as an empty key.
+        self.ck = ckString.isEmpty ? nil : Data(hex: ckString)
+        self.noncePrefix = noncePrefixString.isEmpty ? nil : Data(hex: noncePrefixString)
         self.eapSeq = rawValue["eapSeq"] as? Int ?? 1
         self.msgSeq = msgSeq
         self.nonceSeq = nonceSeq
@@ -183,7 +184,8 @@ class BlePodMessageTransport: MessageTransport {
         self.podId = podId
         self.state = state
         
-        guard let noncePrefix = self.noncePrefix, let ck = self.ck else { return }
+        // Without both session keys nothing is encrypted, and every send throws podNotConnected.
+        guard let noncePrefix = self.noncePrefix, noncePrefix.count == Nonce.prefixLength, let ck = self.ck, !ck.isEmpty else { return }
         self.nonce = Nonce(prefix: noncePrefix)
         self.enDecrypt = EnDecrypt(nonce: self.nonce!, ck: ck)
         self.signingKey = signingKey

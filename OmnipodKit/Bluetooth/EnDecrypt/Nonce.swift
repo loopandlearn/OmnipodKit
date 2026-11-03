@@ -10,15 +10,17 @@
 import Foundation
 
 class Nonce {
+    static let prefixLength = 8
+
     let prefix: Data
     
     init (prefix: Data) {
-        guard prefix.count == 8 else { fatalError("Nonce prefix should be 8 bytes long") }
+        guard prefix.count == Self.prefixLength else { fatalError("Nonce prefix should be 8 bytes long") }
         self.prefix = prefix
     }
 
     func toData(sqn: Int, podReceiving: Bool) -> Data {
-        var ret = Data(bigEndian: sqn)
+        var ret = Data(bigEndian: Int64(sqn))
             .subdata(in: 3..<8)
         if (podReceiving) {
             ret[0] = UInt8(ret[0] & 127)

@@ -28,6 +28,11 @@ struct PodAdvertisement {
 
     var serviceUUIDs: [CBUUID]
 
+    /// The advertised pod id (DASH: the pod's address) and controller id (O5), so another device
+    /// can find an already-paired pod; CoreBluetooth peripheral UUIDs are per device.
+    var podId: UInt32?
+    var pdmId: UInt32?
+
     var pairable: Bool {
         if podType.isDash {
             // For DASH, serviceUUIDs 3 & 4 are the podId and will be "FFFF" & "FFFE" only before pairing
@@ -80,6 +85,7 @@ struct PodAdvertisement {
                 return nil
             }
 
+            self.podId = decodedPodId
             print("DASH advertisement: pod id: \(decodedPodId), lot: \(decodedLotNo), seq: \(decodedSeqNo)")
 
         case omnipod5Type:
@@ -104,6 +110,7 @@ struct PodAdvertisement {
                 return nil
             }
 
+            self.pdmId = decodedPdmId
             print("O5 advertisement PDM id: \(decodedPdmId)")
 
         default:

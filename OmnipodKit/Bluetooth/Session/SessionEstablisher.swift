@@ -59,7 +59,7 @@ class SessionEstablisher {
 
         self.manager = manager
         self.ltk = ltk
-        self.eapSqn = Data(bigEndian: eapSqn).subdata(in: 2..<8)
+        self.eapSqn = Data(bigEndian: Int64(eapSqn)).subdata(in: 2..<8)
         self.myId = myId
         self.podId = podId
         self.msgSeq = msgSeq
