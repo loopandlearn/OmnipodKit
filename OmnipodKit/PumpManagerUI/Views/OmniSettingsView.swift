@@ -185,7 +185,7 @@ struct OmniSettingsView: View  {
                     Text(podError).fontWeight(.bold)
                 } else if let reservoirLevel = viewModel.reservoirLevel, let reservoirLevelHighlightState = viewModel.reservoirLevelHighlightState {
                     reservoir(filledPercent: CGFloat(reservoirLevel.percentage), fillColor: reservoirColor(for: reservoirLevelHighlightState))
-                    Text(viewModel.reservoirText(for: reservoirLevel))
+                    Text(viewModel.reservoirText(for: reservoirLevel, approximateLevel: viewModel.approximateReservoirLevel))
                         .font(.system(size: 28))
                         .fontWeight(.heavy)
                         .fixedSize()
@@ -563,6 +563,24 @@ struct OmniSettingsView: View  {
                 {
                     FrameworkLocalText("Notification Settings", comment: "Text for Notification Settings disclosure row")
                         .foregroundColor(Color.primary)
+                }
+
+                NavigationLink(destination:
+                                ReservoirFillAmountSettingsView(
+                                    reservoirFillAmount: viewModel.reservoirFillAmount,
+                                    defaultReservoirFillAmount: viewModel.defaultReservoirFillAmount,
+                                    hasActivePod: viewModel.podOk,
+                                    onSaveReservoirFillAmount: viewModel.saveReservoirFillAmount,
+                                    onSaveDefaultReservoirFillAmount: viewModel.saveDefaultReservoirFillAmount)
+                               )
+                {
+                    HStack {
+                        FrameworkLocalText("Reservoir Fill Amount", comment: "Text for Reservoir Fill Amount navigation link")
+                            .foregroundColor(Color.primary)
+                        Spacer()
+                        Text(formatReservoirFillAmount(viewModel.noPod ? viewModel.defaultReservoirFillAmount : viewModel.reservoirFillAmount))
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 NavigationLink(destination: BeepPreferenceSelectionView(initialValue: viewModel.beepPreference, onSave: viewModel.setConfirmationBeeps)) {

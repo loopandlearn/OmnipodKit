@@ -227,6 +227,17 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         return fault != nil || setupProgress == .activationTimeout || setupProgress == .podIncompatible
     }
 
+    /// Total insulin the pod has dispensed from its reservoir since activation: everything
+    /// it has delivered plus the prime and cannula insertion boluses. Nil until the pod
+    /// has reported its insulin delivery.
+    var totalInsulinDispensed: Double? {
+        guard let delivered = lastInsulinMeasurements?.delivered else {
+            return nil
+        }
+        let setupUnits = setupUnitsDelivered ?? Pod.primeUnits + Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+        return setupUnits + delivered
+    }
+
     /// Does this pod have no silent beep type available (is noBeepNonCancel non-silent)?
     /// So far this has only been found in the newer the Omnipod 5 "black dot" pods
     /// which have had firmware verision starting with "12.0". Assume later firmware
