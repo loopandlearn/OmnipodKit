@@ -358,6 +358,7 @@ extension PeripheralManager {
     func reconnect(timeout: TimeInterval) throws {
         try runCommand(timeout: timeout) {
             addCondition(.connect)
+            bluetoothManager?.noteCancel(peripheral)
             central?.cancelPeripheralConnection(peripheral)
         }
     }
@@ -384,8 +385,11 @@ extension PeripheralManager {
                 bluetoothManager?.connectOnDemand(peripheral)
             }
         } catch {
+            if peripheral.state == .connecting {
+                bluetoothManager?.logStuckConnect(peripheral, "on-demand connect timed out")
+            }
             // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
-            // instead of leaving it wedged in .connecting. Queue-correct cancel via BluetoothManager.
+            // instead of leaving it in .connecting.
             bluetoothManager?.disconnectOnDemand(peripheral)
             throw error
         }
