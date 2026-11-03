@@ -434,6 +434,9 @@ class BluetoothManager: NSObject {
     /// idle-disconnect (going idle) so the probe re-arms. managerQueue-isolated.
     private var commandConnectInFlight = false
 
+    /// Set by disconnectUnresponsive until its didDisconnect arrives. managerQueue-isolated.
+    private var unresponsiveTeardownPending = false
+
     /// Set when a delayed-connect probe completes (a heartbeat wake): we disconnect the wake link and
     /// fire the heartbeat from the resulting didDisconnect, so Loop's commands start from a clean
     /// disconnected state via connect-on-demand. managerQueue-isolated.
@@ -1025,19 +1028,27 @@ class BluetoothManager: NSObject {
         manager.cancelPeripheralConnection(peripheral)
     }
 
+    /// Reads `lastCancel` before returning when called on managerQueue, so a cancel the caller issues
+    /// next isn't reported as the earlier one.
     func logStuckConnect(_ peripheral: CBPeripheral, _ context: String) {
-        managerQueue.async { [weak self] in
-            guard let self = self else { return }
-            let detail: String
-            if let cancel = self.lastCancel[peripheral.identifier] {
-                detail = String(format: "last cancel %.1fs earlier, from %@", Date().timeIntervalSince(cancel.at),
-                                cancel.onManagerQueue ? "managerQueue" : "another queue")
-            } else {
-                detail = "no cancel recorded"
-            }
-            self.log.default("[stuckConnect] %{public}@: %{public}@", context, detail)
-            self.connectionDelegate?.omnipodLogDeviceEvent("[stuckConnect] \(context): \(detail)")
+        if DispatchQueue.getSpecific(key: BluetoothManager.managerQueueKey) == true {
+            reportStuckConnect(peripheral, context)
+        } else {
+            managerQueue.async { [weak self] in self?.reportStuckConnect(peripheral, context) }
         }
+    }
+
+    private func reportStuckConnect(_ peripheral: CBPeripheral, _ context: String) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        let detail: String
+        if let cancel = lastCancel[peripheral.identifier] {
+            detail = String(format: "last cancel %.1fs earlier, from %@", Date().timeIntervalSince(cancel.at),
+                            cancel.onManagerQueue ? "managerQueue" : "another queue")
+        } else {
+            detail = "no cancel recorded"
+        }
+        log.default("[stuckConnect] %{public}@: %{public}@", context, detail)
+        connectionDelegate?.omnipodLogDeviceEvent("[stuckConnect] \(context): \(detail)")
     }
 
     // MARK: - Central calls (MUST run on managerQueue)
@@ -1205,16 +1216,14 @@ class BluetoothManager: NSObject {
         }
     }
 
-    /// Drop a link whose pod stopped answering. While the connection is held (keep-alive), the drop
-    /// reconnects like any other unintended drop; otherwise the link goes idle so the probe can re-arm.
+    /// Drop a link whose pod stopped answering. The resulting didDisconnect decides what follows, from
+    /// the hold state at that moment: a held link reconnects like any other unintended drop; otherwise
+    /// the link goes idle so the probe can re-arm.
     func disconnectUnresponsive(_ peripheral: CBPeripheral) {
         managerQueue.async { [weak self] in
             guard let self = self else { return }
-            if !self.shouldHoldConnection {
-                self.commandConnectInFlight = false
-            }
-            self.log.default("[connectOnDemand] unresponsive pod — cancelling %{public}@ (held=%{public}@)",
-                             peripheral.identifier.uuidString, String(describing: self.shouldHoldConnection))
+            self.unresponsiveTeardownPending = true
+            self.log.default("[connectOnDemand] unresponsive pod — cancelling %{public}@", peripheral.identifier.uuidString)
             self.cancelConnection(peripheral)
         }
     }
@@ -1705,6 +1714,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
         }
 
         connectionDelegate?.omnipodPeripheralDidDisconnect(peripheral: peripheral, error: error)
+
+        if unresponsiveTeardownPending {
+            unresponsiveTeardownPending = false
+            if !shouldHoldConnection {
+                commandConnectInFlight = false
+            }
+            log.default("[connectOnDemand] unresponsive-pod teardown complete (held=%{public}@)", String(describing: shouldHoldConnection))
+        }
 
         // The system is auto-reconnecting this link itself (EnableAutoReconnect experiment): defer to
         // it — no app-side reconnect, no probe re-arm; didConnect fires when it re-establishes. The

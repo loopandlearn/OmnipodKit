@@ -185,10 +185,10 @@ extension PeripheralManager {
                         }
 
                         self.log.bleDebug("Peripheral configuration completed")
-                        self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent(String(format: "Configured in %.3fs", Date().timeIntervalSince(configurationStart)))
+                        self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connect] configured in \(String(format: "%.3f", Date().timeIntervalSince(configurationStart)))s")
                     } catch let error {
                         self.log.error("Error applying peripheral configuration: %{public}@", String(describing: error))
-                        self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent(String(format: "Configuration failed after %.3fs: %@", Date().timeIntervalSince(configurationStart), String(describing: error)))
+                        self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connect] configuration failed after \(String(format: "%.3f", Date().timeIntervalSince(configurationStart)))s: \(error)")
                         // Will retry
                     }
                 }
