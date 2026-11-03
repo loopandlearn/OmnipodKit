@@ -39,8 +39,8 @@ class BlePodComms: PodComms {
 
     override init(podState: PodState?, podType: PodType, myId: UInt32 = 0, podId: UInt32 = 0) {
         super.init(podState: podState, podType: podType, myId: myId, podId: podId)
-        // A pod handed over by another controller carries no session keys (PodState.sharedFacts;
-        // stored, they read back empty, not nil): nothing runs on it until a handshake makes them.
+        // A pod handed over by another controller carries no session keys (PodState.sharedFacts):
+        // nothing runs on it until a handshake makes them.
         if hasLTK, podState?.bleMessageTransportState.ck?.isEmpty ?? true {
             needsSessionEstablishment = true
         }

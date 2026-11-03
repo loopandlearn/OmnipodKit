@@ -117,13 +117,23 @@ final class DeviceHandoffTests: XCTestCase {
         XCTAssertEqual(adopter.controllerId, exporter.controllerId)
         XCTAssertEqual(adopter.podId, exporter.podId)
         XCTAssertNil(pod.unacknowledgedCommand)
-        XCTAssertNil(pod.bleMessageTransportState.ck.flatMap { $0.isEmpty ? nil : $0 }, "no session falls through from the exporter")
+        XCTAssertNil(pod.bleMessageTransportState.ck, "no session falls through from the exporter")
+        XCTAssertNil(pod.bleMessageTransportState.noncePrefix)
 
         // The same dose reported under the same identity, from either manager.
         let theirs = NewPumpEvent(try XCTUnwrap(exporter.podState?.unfinalizedBolus))
         let ours = NewPumpEvent(try XCTUnwrap(pod.unfinalizedBolus))
         XCTAssertEqual(ours.raw, theirs.raw)
         XCTAssertEqual(ours.dose?.syncIdentifier, theirs.dose?.syncIdentifier)
+    }
+
+    /// A missing session key, saved and loaded, is still missing: an empty one would reach the pod's encryption.
+    func testMissingSessionKeysSurviveASaveAndLoad() throws {
+        let saved = BleMessageTransportState(ck: nil, noncePrefix: nil, eapSeq: 41, messageNumber: 3)
+        let loaded = try XCTUnwrap(BleMessageTransportState(rawValue: saved.rawValue))
+        XCTAssertNil(loaded.ck)
+        XCTAssertNil(loaded.noncePrefix)
+        XCTAssertEqual(loaded.eapSeq, 41)
     }
 
     func testAnAdopterThatNeverMetThePodSearches() throws {
