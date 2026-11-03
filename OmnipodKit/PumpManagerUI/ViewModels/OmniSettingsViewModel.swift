@@ -10,7 +10,6 @@
 import SwiftUI
 import LoopKit
 import LoopKitUI
-import LoopAlgorithm
 import Combine
 
 
@@ -330,10 +329,9 @@ class OmniSettingsViewModel: ObservableObject {
 
     // Stop using the OmnipodKit pumpManager altogether
     func stopUsingPumpTypeTapped() {
-        pumpManager.stopUsing {
-            DispatchQueue.main.async {
-                self.didFinish?()
-            }
+        Task { @MainActor in
+            await pumpManager.delete()
+            self.didFinish?()
         }
     }
 
