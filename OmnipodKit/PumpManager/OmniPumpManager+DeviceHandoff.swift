@@ -322,6 +322,9 @@ extension OmniPumpManager: PumpDeliveryOdometer {
 
     public var deliveryPulseUnits: Double { Pod.pulseSize }
 
+    /// A faulted pod delivers nothing more, and its fault carried its last total.
+    public var deliveredUnitsAreFinal: Bool { state.podState?.fault != nil }
+
     /// From the pod's own status, so it includes a bolus another controller started.
     public var bolusUnderWayEndsAt: Date? {
         guard let endsAt = state.podState?.reportedBolusEndsAt, endsAt > Date() else { return nil }
