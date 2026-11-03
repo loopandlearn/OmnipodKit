@@ -129,6 +129,11 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
     var bleIdentifier: String? = nil
     var signingKey: Data? = nil // O5 only
 
+    /// What the pod's certificate said about it when it paired. Pairing asks the
+    /// user before going ahead with anything but a genuine pod; after that it
+    /// never blocks a command. Nil for non-O5 pods and pods paired before the check.
+    var podAuthenticity: O5PodAuthenticity? = nil
+
     // Eros specific variables
     var erosMessageTransportState: ErosMessageTransportState
     var nonceState: NonceState? = nil
@@ -150,6 +155,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         ltk: Data? = nil,
         bleIdentifier: String? = nil,
         signingKey: Data? = nil, // O5 only
+        podAuthenticity: O5PodAuthenticity? = nil,
 
         // Eros specific variables
         erosMessageTransportState: ErosMessageTransportState? = nil,
@@ -191,6 +197,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             self.ltk = ltk
             self.bleIdentifier = bleIdentifier
             self.signingKey = signingKey // O5 only
+            self.podAuthenticity = podAuthenticity
             if let bleMessageTransportState = bleMessageTransportState {
                 self.bleMessageTransportState = bleMessageTransportState
             } else {
@@ -684,6 +691,10 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             }
 
             if podType.isO5 {
+                if let raw = rawValue["podAuthenticity"] as? String,
+                   let authenticity = O5PodAuthenticity(rawValue: raw) {
+                    self.podAuthenticity = authenticity
+                }
                 if let signingKeyString = rawValue["signingKey"] as? String {
                     // This is the normal path for new O5 pods which should
                     // have the 32-byte signingKey initialized during pairing.
@@ -760,6 +771,9 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             if let signingKey = signingKey {
                 rawValue["signingKey"] = signingKey.hexadecimalString
             }
+            if let podAuthenticity {
+                rawValue["podAuthenticity"] = podAuthenticity.rawValue
+            }
         }
 
         return rawValue
@@ -784,6 +798,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             "* lotNo: \(lotNo)",
             "* lotSeq: \(lotSeq)",
             "* podTypeValue: \(podType.rawValue)",
+            "* podAuthenticity: \(podAuthenticity?.rawValue ?? "nil")",
             "* suspendState: \(suspendState)",
             "* unacknowledgedCommand: \(optionalString(unacknowledgedCommand))",
             "* unfinalizedBolus: \(optionalString(unfinalizedBolus))",

@@ -35,11 +35,20 @@ class O5LTKExchanger {
     private let certStore: O5CertificateStore
     private var seq: UInt8 = 1
 
+    /// What the pod's SPS2 certificate said about it, once it has shown one.
+    private var podAuthenticity: O5PodAuthenticity = .unverified
+    /// The public key of the intermediate certificate the pod showed in SPS2.1.
+    private var podIntermediateKey: Data?
+
+    /// Whether the user chose to pair with this pod even if its certificate is not Insulet's.
+    private let acceptsNonInsuletCertificate: Bool
+
     private let log = OSLog(category: "O5LTKExchanger")
 
-    init(manager: PeripheralManager, ids: Ids) throws {
+    init(manager: PeripheralManager, ids: Ids, acceptsNonInsuletCertificate: Bool = false) throws {
         self.manager = manager
         self.ids = ids
+        self.acceptsNonInsuletCertificate = acceptsNonInsuletCertificate
         self.certStore = try O5CertificateStore(controllerId: ids.myIdAddr)
         self.keyExchange = try O5KeyExchange(P256KeyGenerator(), OmniRandomByteGenerator(), controllerIdData: certStore.controllerIdData)
     }
@@ -196,7 +205,8 @@ class O5LTKExchanger {
         return PairResult(
             ltk: keyExchange.ltk,
             address: ids.podId.toUInt32(),
-            msgSeq: seq
+            msgSeq: seq,
+            podAuthenticity: podAuthenticity
         )
     }
 
@@ -409,6 +419,7 @@ class O5LTKExchanger {
         // Extract and log the pod certificate details
         if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
             log.info("Pod SPS2.1 cert public key: %{public}@", podPubKeyRaw.hexadecimalString)
+            podIntermediateKey = podPubKeyRaw
         } else {
             log.error("Failed to extract P-256 public key from pod SPS2.1 certificate DER")
         }
@@ -508,8 +519,11 @@ class O5LTKExchanger {
         let podSignature = decryptedPayload.subdata(in: certLen..<decryptedPayload.count)
 
         log.default("Pod SPS2 decrypted: %{public}d bytes (cert_DER=%{public}d + sig=%{public}d)", decryptedPayload.count, certLen, podSignature.count)
+
         log.info("Pod cert DER (%{public}d bytes): %{public}@", podCertDER.count, podCertDER.hexadecimalString)
         log.info("Pod signature (64 bytes): %{public}@", podSignature.hexadecimalString)
+
+        var signatureValid = false
 
         // Extract pod's public key from its DER certificate
         if let podPubKeyRaw = O5CertificateStore.extractP256PublicKey(fromDERCert: podCertDER) {
@@ -518,12 +532,11 @@ class O5LTKExchanger {
             // Verify the pod's signature over the pod's channel-binding transcript variant
             // Pod signs with w1=1: [0x02][controller_id][FIRMWARE_ID][podPub][pdmPub][podNonce][pdmNonce]
             let transcript = keyExchange.buildPodChannelBindingTranscript()
-            let signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
+            signatureValid = O5CertificateStore.verifySignature(podSignature, for: transcript, publicKeyRaw: podPubKeyRaw)
             if signatureValid {
                 log.default("Pod SPS2 signature verification PASSED")
             } else {
-                log.error("Pod SPS2 signature verification FAILED — transcript format may differ")
-                // Don't throw — continue pairing and log for debugging
+                log.error("Pod SPS2 signature verification FAILED — the pod is treated as unverified")
             }
         } else {
             log.error("Failed to extract P-256 public key from pod SPS2 certificate DER")
@@ -531,6 +544,29 @@ class O5LTKExchanger {
 
         if let serial = O5CertificateStore.extractSerialNumber(fromDERCert: podCertDER) {
             log.info("Pod cert serial (%{public}d bytes): %{public}@", serial.count, serial.hexadecimalString)
+        }
+
+        // A certificate is only the pod's if the pod signed this exchange with
+        // its key; anyone can replay a real pod's certificate.
+        podAuthenticity = signatureValid ? O5PodIdentity.authenticity(leafCertificate: podCertDER) : .unverified
+        log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
+        if podAuthenticity != .genuine {
+            // Enough to tell a new Insulet intermediate from anything else: if the
+            // pod's certificate chains to the intermediate it showed, that key is
+            // the one to add to O5PodIdentity.insuletPodAnchorKeys once confirmed.
+            let chainsToShownIntermediate = podIntermediateKey.map {
+                SignedCertificate(der: podCertDER)?.isSigned(byPublicKey: $0) ?? false
+            } ?? false
+            log.default("Pod certificate not Insulet's: signature %{public}@, SPS2.1 intermediate key %{public}@, pod certificate signed by it: %{public}@",
+                        signatureValid ? "valid" : "invalid",
+                        podIntermediateKey?.hexadecimalString ?? "none",
+                        String(describing: chainsToShownIntermediate))
+        }
+
+        // Stop before the LTK is agreed so the user can decide, and so that
+        // a retry pairs from scratch.
+        if podAuthenticity != .genuine && !acceptsNonInsuletCertificate {
+            throw PodCommsError.podCertificateNotGenuine
         }
     }
 
