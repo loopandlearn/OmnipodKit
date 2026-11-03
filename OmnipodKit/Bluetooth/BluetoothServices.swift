@@ -53,7 +53,9 @@ func o5FaultAdvertisementUUID(_ pdmId: UInt32) -> CBUUID {
     return CBUUID(string: uuidString)
 }
 
-let o5UnpairedAttentionAdvertisementUUID = o5FaultAdvertisementUUID(0xFFFFFFFE)
+/// The …FFFFFFFE02 service some unpaired O5 pods advertise while waiting to pair. The 02 suffix is
+/// borrowed from the paired fault advert; what it means before pairing is unknown.
+let o5UnpairedStatus02AdvertisementUUID = o5FaultAdvertisementUUID(0xFFFFFFFE)
 
 enum o5OmnipodServiceUUID: String, CBUUIDRawValue {
     case advertisement = "CE1F923D-C539-48EA-7300-0AFFFFFFFE00" // i.e., o5ServiceAdvertisementUUID(0xFFFFFFFE).uuidString

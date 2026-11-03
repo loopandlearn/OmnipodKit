@@ -141,7 +141,14 @@ class BluetoothManager: NSObject {
     /// once (captures the fault transition without flooding the device log).
     private var lastLoggedAdvKey: [String: String] = [:]
 
-    private var lastLoggedUnpairedAttentionAdvKey: [String: String] = [:]
+    /// Last …FE02 advert (name|mfg) logged per unpaired O5 during the current discovery, so each pod is
+    /// logged once per pairing attempt.
+    private var lastLoggedUnpairedStatus02AdvKey: [String: String] = [:]
+
+    /// Whether this discovery also hears unpaired O5s advertising …FE02, only to log them.
+    private var listensForUnpairedStatus02Adverts: Bool {
+        discoveryModeEnabled && podType.isO5 && uuidPdmId == nil
+    }
 
     /// Isolated to `managerQueue`
     private var discoveryModeEnabled: Bool = false
@@ -828,6 +835,7 @@ class BluetoothManager: NSObject {
 
         // We will attempt to connect to all pairable devices when in discovery mode
         discoveryModeEnabled = true
+        lastLoggedUnpairedStatus02AdvKey.removeAll()
         connectionDelegate?.omnipodLogDeviceEvent("[pairing] discoverPods — scanning for a pairable pod")
         // Quiet any in-flight heartbeat probe / stale connect churn so it doesn't clobber discovery.
         delayedProbeInFlight = false
@@ -1176,8 +1184,8 @@ class BluetoothManager: NSObject {
             // MUST take precedence over the low-power alarm scan (which filters on C005/C00A and would
             // never see a pairing pod) and over scanningEnabled (pairing has to scan regardless).
             // Also hear unpaired O5s advertising …FE02, only to log them: what 02 means before pairing is unknown.
-            if podType.isO5 && uuidPdmId == nil {
-                services = [serviceUUID, o5UnpairedAttentionAdvertisementUUID]
+            if listensForUnpairedStatus02Adverts {
+                services = [serviceUUID, o5UnpairedStatus02AdvertisementUUID]
             } else {
                 services = [serviceUUID]
             }
@@ -1518,12 +1526,12 @@ extension BluetoothManager: CBCentralManagerDelegate {
             surfacePodConditionAndQuiet(alertSet: AlertSet(rawValue: 0))
         }
 
-        if discoveryModeEnabled, podType.isO5, advSvcUUIDs.contains(o5UnpairedAttentionAdvertisementUUID) {
+        if listensForUnpairedStatus02Adverts, advSvcUUIDs.contains(o5UnpairedStatus02AdvertisementUUID) {
             let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
             let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
             let advKey = "\(name)|\(mfg)"
-            if lastLoggedUnpairedAttentionAdvKey[peripheral.identifier.uuidString] != advKey {
-                lastLoggedUnpairedAttentionAdvKey[peripheral.identifier.uuidString] = advKey
+            if lastLoggedUnpairedStatus02AdvKey[peripheral.identifier.uuidString] != advKey {
+                lastLoggedUnpairedStatus02AdvKey[peripheral.identifier.uuidString] = advKey
                 log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE02, not pairing: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
                             peripheral.identifier.uuidString, RSSI, name, mfg)
                 connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE02, not pairing: rssi=\(RSSI) name=\(name) mfg=\(mfg)")
