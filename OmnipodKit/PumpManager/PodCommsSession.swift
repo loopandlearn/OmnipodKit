@@ -261,7 +261,7 @@ class PodCommsSession: MessageTransportDelegate {
                 // N.B., recoverUnacknowledgedCommand() skips using bolusNotDelivered for a stopProgram with a faulted pod.
                 recoverUnacknowledgedCommand(using: derivedStatusResponse)
             }
-            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: currentDate)
+            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: podState.deliveryStoppedAt ?? currentDate)
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
 
             // Now that the cancel dosing *and* the lastInsulinMeasurements have all been updated,
