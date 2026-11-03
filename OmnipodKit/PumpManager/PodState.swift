@@ -464,9 +464,11 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         if let bolus = unfinalizedBolus,
             let finishTime = bolus.finishTime,
             deliveryType.contains(.bolus),
-            finishTime > now
+            finishTime > now || (bolusNotDelivered > 0 && bolus.rate > 0)
         {
-            unfinalizedBolus?.cancel(at: now, withRemaining: bolusNotDelivered)
+            // Read after the scheduled end: the undelivered pulses were the last ones.
+            let stoppedAt = finishTime > now ? now : finishTime - .hours(bolusNotDelivered / bolus.rate)
+            unfinalizedBolus?.cancel(at: stoppedAt, withRemaining: bolusNotDelivered)
             canceledDose = unfinalizedBolus
             print("Interrupted bolus: \(String(describing: canceledDose))")
         }
