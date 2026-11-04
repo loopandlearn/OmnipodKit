@@ -280,12 +280,31 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
+    /// The fault time is in whole minutes, so it can be up to a minute early. A bolus runs at a fixed rate,
+    /// so one still running at the fault places the fault within that minute.
+    private func refineDeliveryStoppedAt(bolusNotDelivered: Double) {
+        guard bolusNotDelivered > 0,
+              let stoppedAt = podState.deliveryStoppedAt,
+              let bolus = podState.unfinalizedBolus,
+              bolus.scheduledUnits == nil,
+              let finishTime = bolus.finishTime,
+              bolus.rate > 0
+        else {
+            return
+        }
+        let bolusStoppedAt = finishTime - .hours(bolusNotDelivered / bolus.rate)
+        if bolusStoppedAt > stoppedAt && bolusStoppedAt < stoppedAt + .minutes(1) {
+            podState.deliveryStoppedAt = bolusStoppedAt
+        }
+    }
+
     // Handles updating PodState on first pod fault seen
     private func handlePodFault(fault: DetailedStatus) {
         if podState.fault == nil {
             // First pod fault seen, handle the transition to a faulted state.
             setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
+            refineDeliveryStoppedAt(bolusNotDelivered: derivedStatusResponse.bolusNotDelivered)
             if podState.unacknowledgedCommand != nil {
                 // Process the pending unacknowledgeCommnd to handle any pending doses matters for an unacknowledged
                 // command before calling handleCancelDosing() to deal with the final dosing adjustments from pod fault.

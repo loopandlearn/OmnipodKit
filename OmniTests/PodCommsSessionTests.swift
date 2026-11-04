@@ -98,7 +98,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
     func testFaultSeenAfterScheduledBolusEndRecordsUndeliveredBolus() {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
-        let bolusStart = activatedAt + .minutes(99.5)
+        let bolusStart = activatedAt + .minutes(98.5)
         podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
@@ -117,7 +117,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
     func testFaultAfterUnacknowledgedCancelSubtractsBolusNotDeliveredOnce() {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
-        let bolusStart = activatedAt + .minutes(99.5)
+        let bolusStart = activatedAt + .minutes(98.5)
         podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
 
         // 0x18 empty reservoir fault at 100 minutes with 1.8 U (36 pulses) of the bolus not delivered
@@ -164,6 +164,31 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let bolus = state.finalizedDoses.first { $0.doseType == .bolus }!
         XCTAssertEqual(2.2, bolus.units, accuracy: 0.01)
         XCTAssertEqual(activatedAt + .minutes(100), bolus.finishTime)
+    }
+
+    func testBolusStartedInTheFaultMinuteEndsWhenItsPulsesStopped() {
+        let activatedAt = Date().addingTimeInterval(.hours(-3))
+        podState.expiresAt = activatedAt + Pod.nominalPodLife
+        // A 2 U bolus started 5 s into the fault's minute, so the fault time (minute 100) is before it started
+        let bolusStart = activatedAt + .minutes(100) + 5
+        podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        session.mockCurrentDate = activatedAt + .minutes(105)
+
+        // 0x18 fault at 100 minutes with 1.0 U (20 pulses) of the bolus not delivered: 1.0 U went in, 40 s after it started
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000140508001800640000006900001900000000")!)
+        mockTransport.addResponse(fault)
+
+        XCTAssertThrowsError(try session.getStatus())
+
+        let state = lastPodStateUpdate!
+        let stoppedAt = bolusStart + 40
+        XCTAssertEqual(stoppedAt.timeIntervalSince1970, state.deliveryStoppedAt!.timeIntervalSince1970, accuracy: 0.01)
+        let bolus = state.finalizedDoses.first { $0.doseType == .bolus }!
+        XCTAssertEqual(1.0, bolus.units, accuracy: 0.01)
+        XCTAssertEqual(stoppedAt.timeIntervalSince1970, bolus.finishTime!.timeIntervalSince1970, accuracy: 0.01)
+        let suspend = state.finalizedDoses.first { $0.doseType == .suspend }!
+        XCTAssertEqual(stoppedAt.timeIntervalSince1970, suspend.startTime.timeIntervalSince1970, accuracy: 0.01)
     }
 
 }
