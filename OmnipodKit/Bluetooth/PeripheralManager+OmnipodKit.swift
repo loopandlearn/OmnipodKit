@@ -74,12 +74,14 @@ extension PeripheralManager {
         dispatchPrecondition(condition: .onQueue(queue))
 
         var didSend = false
+        var stage = "RTS"
 
         do {
             if podType.isDash {
                 log.bleDebug("[sendMessagePacket] Sending RTS...")
                 try requestToSend()
                 log.bleDebug("[sendMessagePacket] Waiting for CTS...")
+                stage = "CTS"
                 try waitForCommand(PodCommand.CTS, timeout: 5)
                 log.bleDebug("[sendMessagePacket] Got CTS")
             } else {
@@ -98,6 +100,7 @@ extension PeripheralManager {
                     didSend = true
                 }
                 let packetData = packet.toData(layout: profile.packetLayout)
+                stage = "packet \(index + 1)/\(packets.count)"
                 log.bleDebug("[sendMessagePacket] Writing data packet %{public}d/%{public}d (%{public}d bytes)... peripheral state=%{public}@",
                             index + 1, packets.count, packetData.count, String(describing: peripheral.state))
                 try sendData(packetData, timeout: 5)
@@ -107,6 +110,7 @@ extension PeripheralManager {
 
             log.bleDebug("[sendMessagePacket] All packets written. Waiting for SUCCESS... peripheral state=%{public}@",
                          String(describing: peripheral.state))
+            stage = "SUCCESS"
             try waitForCommand(PodCommand.SUCCESS, timeout: 5)
             log.bleDebug("[sendMessagePacket] SUCCESS received. peripheral state=%{public}@",
                          String(describing: peripheral.state))
@@ -117,6 +121,7 @@ extension PeripheralManager {
             }
             log.error("[sendMessagePacket] Error (didSend=%{public}@): %{public}@. peripheral state=%{public}@",
                       String(describing: didSend), String(describing: error), String(describing: peripheral.state))
+            logDeviceEvent("[send] \(error) at \(stage), \(didSend ? "may have been received" : "not sent"); \(stateDescription); \(linkContext)")
             if didSend {
                 return .sentWithError(error)
             } else {
@@ -131,12 +136,15 @@ extension PeripheralManager {
         dispatchPrecondition(condition: .onQueue(queue))
 
         var packet: MessagePacket?
+        let start = Date()
+        var stage = "RTS"
 
         do {
             if podType.isDash {
                 log.bleDebug("[readMessagePacket] Waiting for RTS from pod...")
                 try waitForCommand(PodCommand.RTS)
                 log.bleDebug("[readMessagePacket] Got RTS, sending CTS...")
+                stage = "CTS write"
                 try sendCommandType(PodCommand.CTS)
                 log.bleDebug("[readMessagePacket] CTS sent")
             } else {
@@ -145,6 +153,7 @@ extension PeripheralManager {
             }
 
             var expected: UInt8 = 0
+            stage = "data seq 0"
 
             log.bleDebug("[readMessagePacket] Waiting for first data packet (seq 0)... peripheral state=%{public}@",
                          String(describing: peripheral.state))
@@ -159,6 +168,7 @@ extension PeripheralManager {
             if joiner.fullFragments > 0 {
                 for i in 1...joiner.fullFragments {
                     expected += 1
+                    stage = "data seq \(expected)"
                     log.bleDebug("[readMessagePacket] Waiting for fragment %{public}d (seq %{public}d)... peripheral state=%{public}@",
                                 i, expected, String(describing: peripheral.state))
                     let packet = try waitForData(sequence: expected, timeout: 5)
@@ -168,16 +178,20 @@ extension PeripheralManager {
             }
             if joiner.oneExtraPacket {
                 expected += 1
+                stage = "data seq \(expected)"
                 log.bleDebug("[readMessagePacket] Waiting for extra fragment (seq %{public}d)... peripheral state=%{public}@",
                             expected, String(describing: peripheral.state))
                 let packet = try waitForData(sequence: expected, timeout: 5)
                 log.bleDebug("[readMessagePacket] Extra fragment received (%{public}d bytes)", packet.count)
                 try joiner.accumulate(packet: packet)
             }
+            stage = "reassembly"
             let fullPayload = try joiner.finalize()
             log.bleDebug("[readMessagePacket] All fragments received, total payload %{public}d bytes. Sending SUCCESS...", fullPayload.count)
+            stage = "SUCCESS write"
             try  sendCommandType(PodCommand.SUCCESS)
             log.bleDebug("[readMessagePacket] SUCCESS sent. Parsing message...")
+            stage = "parse"
             packet = try MessagePacket.parse(payload: fullPayload)
             log.bleDebug("[readMessagePacket] Message parsed successfully. peripheral state=%{public}@",
                          String(describing: peripheral.state))
@@ -185,19 +199,23 @@ extension PeripheralManager {
             log.error("[readMessagePacket] Error reading message: %{public}@. peripheral state=%{public}@",
                       String(describing: error),
                       String(describing: peripheral.state))
+            let action: String
             if let error = error as? PeripheralManagerError, error.isSymptomaticOfUnresponsivePod {
                 if disconnectOnUnresponsivePod, peripheral.state == .connected {
                     log.error("[readMessagePacket] Disconnecting due to unresponsive pod error while reading")
-                    bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] no response from pod (\(error)) — disconnecting")
+                    action = "disconnecting"
                     bluetoothManager?.disconnectUnresponsive(peripheral)
                 } else {
                     log.error("[readMessagePacket] Pod already not connected (state=%{public}@), skipping disconnect",
                               String(describing: peripheral.state))
+                    action = disconnectOnUnresponsivePod ? "link already down" : "not disconnecting"
                 }
             } else {
                 log.error("[readMessagePacket] Non-unresponsive error, sending NACK")
                 try? sendCommandType(PodCommand.NACK)
+                action = "sent NACK"
             }
+            logDeviceEvent("[read] \(error) at \(stage) after \(Self.seconds(since: start)), \(action); \(stateDescription); \(linkContext)")
             throw PeripheralManagerError.incorrectResponse
         }
 
