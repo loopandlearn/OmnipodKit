@@ -358,7 +358,6 @@ extension PeripheralManager {
     func reconnect(timeout: TimeInterval) throws {
         try runCommand(timeout: timeout) {
             addCondition(.connect)
-            bluetoothManager?.noteCancel(peripheral)
             central?.cancelPeripheralConnection(peripheral)
         }
     }
@@ -380,14 +379,11 @@ extension PeripheralManager {
                 addCondition(.connect)
                 // Scan-free connect: the peripheral is a known/recovered CBPeripheral (via
                 // retrievePeripherals), so a plain connect() registers a pending connect and iOS
-                // reacquires the pod on its own — no scan needed. Route through BluetoothManager so
-                // the central call runs on managerQueue (see connectOnDemand helper).
+                // reacquires the pod on its own — no scan needed. BluetoothManager owns the
+                // connect-on-demand state, so the connect goes through it.
                 bluetoothManager?.connectOnDemand(peripheral)
             }
         } catch {
-            if peripheral.state == .connecting {
-                bluetoothManager?.logStuckConnect(peripheral, "on-demand connect timed out")
-            }
             // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
             // instead of leaving it in .connecting.
             bluetoothManager?.disconnectOnDemand(peripheral)
