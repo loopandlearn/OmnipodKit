@@ -135,6 +135,35 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
 
         let bolus = lastPodStateUpdate!.finalizedDoses.first { $0.doseType == .bolus }!
         XCTAssertEqual(2.2, bolus.units, accuracy: 0.01)
+        XCTAssertEqual(activatedAt + .minutes(100), bolus.finishTime)
+    }
+
+    func testCancelAnsweredWithFaultRecordsUndeliveredBolusOnce() {
+        let activatedAt = Date().addingTimeInterval(.hours(-3))
+        podState.expiresAt = activatedAt + Pod.nominalPodLife
+        podState.setupProgress = .completed
+        let bolusStart = activatedAt + .minutes(98.5)
+        podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+
+        // 0x18 empty reservoir fault at 100 minutes with 1.8 U (36 pulses) of the bolus not delivered
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000240508001800640000006900001900000000")!)
+
+        // The bolus cancel is sent before the bolus's scheduled end, and the pod answers with the fault
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        session.mockCurrentDate = activatedAt + .minutes(100.5)
+        XCTAssertLessThan(session.mockCurrentDate!, podState.unfinalizedBolus!.finishTime!)
+        mockTransport.addResponse(fault)
+
+        guard case .certainFailure = session.cancelDelivery(deliveryType: .all) else {
+            return XCTFail("expected the cancel to fail with the fault")
+        }
+
+        let state = lastPodStateUpdate!
+        XCTAssertNotNil(state.fault)
+        XCTAssertNil(state.unacknowledgedCommand)
+        let bolus = state.finalizedDoses.first { $0.doseType == .bolus }!
+        XCTAssertEqual(2.2, bolus.units, accuracy: 0.01)
+        XCTAssertEqual(activatedAt + .minutes(100), bolus.finishTime)
     }
 
 }
