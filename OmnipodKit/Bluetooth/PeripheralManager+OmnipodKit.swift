@@ -111,6 +111,10 @@ extension PeripheralManager {
             log.bleDebug("[sendMessagePacket] SUCCESS received. peripheral state=%{public}@",
                          String(describing: peripheral.state))
         } catch {
+            // notReady is only thrown before the write is issued, so the last packet never left
+            if case PeripheralManagerError.notReady = error {
+                didSend = false
+            }
             log.error("[sendMessagePacket] Error (didSend=%{public}@): %{public}@. peripheral state=%{public}@",
                       String(describing: didSend), String(describing: error), String(describing: peripheral.state))
             if didSend {
