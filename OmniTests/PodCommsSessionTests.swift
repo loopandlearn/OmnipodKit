@@ -191,26 +191,46 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         XCTAssertEqual(stoppedAt.timeIntervalSince1970, suspend.startTime.timeIntervalSince1970, accuracy: 0.01)
     }
 
-    func testResetFaultWithoutFaultTimeEndsBolusWhenItsPulsesStopped() {
+    func testResetFaultBeforeBolusEndAssumesDeliveryUntilNow() {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
-        let bolusStart = activatedAt + .minutes(100) + 5
+        let bolusStart = activatedAt + .minutes(100)
         podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
-        session.mockCurrentDate = activatedAt + .minutes(105)
+        let now = bolusStart + 45
+        session.mockCurrentDate = now
 
-        // 0x10 reset fault with no fault time ($0000, as DASH reports) and 1.0 U (20 pulses) not delivered
-        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000140508001000000000006900001900000000")!)
+        // O5 0x22 reset fault: no fault time, and the $3FF sigil in bolus not delivered
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0007ff00000022000003ff000000008800000000")!)
         mockTransport.addResponse(fault)
 
         XCTAssertThrowsError(try session.getStatus())
 
         let state = lastPodStateUpdate!
-        let stoppedAt = bolusStart + 40
-        XCTAssertEqual(stoppedAt.timeIntervalSince1970, state.deliveryStoppedAt!.timeIntervalSince1970, accuracy: 0.01)
+        XCTAssertEqual(now, state.deliveryStoppedAt)
         let bolus = state.finalizedDoses.first { $0.doseType == .bolus }!
-        XCTAssertEqual(1.0, bolus.units, accuracy: 0.01)
-        XCTAssertEqual(stoppedAt.timeIntervalSince1970, bolus.finishTime!.timeIntervalSince1970, accuracy: 0.01)
+        // 45 s is 22.5 pulses, rounded up to 23
+        XCTAssertEqual(1.15, bolus.units, accuracy: 0.001)
+        XCTAssertEqual(now, bolus.finishTime)
+    }
+
+    func testResetFaultAfterBolusEndAssumesFullDelivery() {
+        let activatedAt = Date().addingTimeInterval(.hours(-3))
+        podState.expiresAt = activatedAt + Pod.nominalPodLife
+        let bolusStart = activatedAt + .minutes(100)
+        podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        session.mockCurrentDate = activatedAt + .minutes(105)
+
+        // DASH 0x10 reset fault: no fault time and nothing not delivered
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d00000000000010000003ff000000008800000000")!)
+        mockTransport.addResponse(fault)
+
+        XCTAssertThrowsError(try session.getStatus())
+
+        let bolus = lastPodStateUpdate!.finalizedDoses.first { $0.doseType == .bolus }!
+        XCTAssertEqual(2, bolus.units, accuracy: 0.001)
+        XCTAssertEqual(bolusStart + 80, bolus.finishTime)
     }
 
 }

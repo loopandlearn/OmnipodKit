@@ -280,10 +280,9 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    /// deliveryStoppedAt has a one minute resolution from the fault time, and is the current time for a reset
-    /// fault with no fault time. If a bolus was interrupted by the fault, its pulses not delivered place the
-    /// fault more precisely: within the fault's minute, or anywhere before now when there is no fault time.
-    private func refineDeliveryStoppedAt(bolusNotDelivered: Double, faultTimeKnown: Bool) {
+    /// deliveryStoppedAt has a one minute resolution from the fault time. If a bolus was interrupted
+    /// by the fault, its pulses not delivered place the fault more precisely within the fault's minute.
+    private func refineDeliveryStoppedAt(bolusNotDelivered: Double) {
         guard bolusNotDelivered > 0,
               let stoppedAt = podState.deliveryStoppedAt,
               let bolus = podState.unfinalizedBolus,
@@ -294,11 +293,23 @@ class PodCommsSession: MessageTransportDelegate {
             return
         }
         let bolusStoppedAt = finishTime - .hours(bolusNotDelivered / bolus.rate)
-        let earliest = faultTimeKnown ? stoppedAt : bolus.startTime
-        let latest = faultTimeKnown ? stoppedAt + .minutes(1) : stoppedAt
-        if bolusStoppedAt >= earliest && bolusStoppedAt < latest {
+        if bolusStoppedAt >= stoppedAt && bolusStoppedAt < stoppedAt + .minutes(1) {
             podState.deliveryStoppedAt = bolusStoppedAt
         }
+    }
+
+    /// A reset fault has no fault time and its bolus not delivered can't be trusted. A bolus seen still
+    /// running is assumed to have delivered every pulse up to now; one past its scheduled end, all of it.
+    private func assumeBolusDeliveredUntilNow() {
+        guard let bolus = podState.unfinalizedBolus,
+              bolus.scheduledUnits == nil,
+              !bolus.isFinished(at: currentDate)
+        else {
+            return
+        }
+        let elapsed = max(0, currentDate.timeIntervalSince(bolus.startTime))
+        let delivered = min(bolus.units, ceil(elapsed / Pod.secondsPerBolusPulse) / Pod.pulsesPerUnit)
+        podState.unfinalizedBolus?.cancel(at: currentDate, withRemaining: bolus.units - delivered)
     }
 
     // Handles updating PodState on first pod fault seen
@@ -307,13 +318,20 @@ class PodCommsSession: MessageTransportDelegate {
             // First pod fault seen, handle the transition to a faulted state.
             setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
-            refineDeliveryStoppedAt(bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, faultTimeKnown: fault.faultEventTimeSinceActivation != nil)
+            let faultTimeKnown = fault.faultEventTimeSinceActivation != nil
+            let bolusNotDelivered = faultTimeKnown ? derivedStatusResponse.bolusNotDelivered : 0
+            if faultTimeKnown {
+                refineDeliveryStoppedAt(bolusNotDelivered: bolusNotDelivered)
+            }
             if podState.unacknowledgedCommand != nil {
                 // Process the pending unacknowledgeCommnd to handle any pending doses matters for an unacknowledged
                 // command before calling handleCancelDosing() to deal with the final dosing adjustments from pod fault.
                 recoverUnacknowledgedCommand(using: derivedStatusResponse)
             }
-            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, at: podState.deliveryStoppedAt ?? currentDate)
+            if !faultTimeKnown {
+                assumeBolusDeliveredUntilNow()
+            }
+            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: bolusNotDelivered, at: podState.deliveryStoppedAt ?? currentDate)
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
 
             // Now that the cancel dosing *and* the lastInsulinMeasurements have all been updated,
