@@ -280,9 +280,10 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    /// The fault time is in whole minutes, so it can be up to a minute early. A bolus runs at a fixed rate,
-    /// so one still running at the fault places the fault within that minute.
-    private func refineDeliveryStoppedAt(bolusNotDelivered: Double) {
+    /// deliveryStoppedAt has a one minute resolution from the fault time, and is the current time for a reset
+    /// fault with no fault time. If a bolus was interrupted by the fault, its pulses not delivered place the
+    /// fault more precisely: within the fault's minute, or anywhere before now when there is no fault time.
+    private func refineDeliveryStoppedAt(bolusNotDelivered: Double, faultTimeKnown: Bool) {
         guard bolusNotDelivered > 0,
               let stoppedAt = podState.deliveryStoppedAt,
               let bolus = podState.unfinalizedBolus,
@@ -293,7 +294,9 @@ class PodCommsSession: MessageTransportDelegate {
             return
         }
         let bolusStoppedAt = finishTime - .hours(bolusNotDelivered / bolus.rate)
-        if bolusStoppedAt > stoppedAt && bolusStoppedAt < stoppedAt + .minutes(1) {
+        let earliest = faultTimeKnown ? stoppedAt : bolus.startTime
+        let latest = faultTimeKnown ? stoppedAt + .minutes(1) : stoppedAt
+        if bolusStoppedAt >= earliest && bolusStoppedAt < latest {
             podState.deliveryStoppedAt = bolusStoppedAt
         }
     }
@@ -304,7 +307,7 @@ class PodCommsSession: MessageTransportDelegate {
             // First pod fault seen, handle the transition to a faulted state.
             setDeliveryStoppedAt(podTime: fault.faultEventTimeSinceActivation)
             let derivedStatusResponse = StatusResponse(detailedStatus: fault)
-            refineDeliveryStoppedAt(bolusNotDelivered: derivedStatusResponse.bolusNotDelivered)
+            refineDeliveryStoppedAt(bolusNotDelivered: derivedStatusResponse.bolusNotDelivered, faultTimeKnown: fault.faultEventTimeSinceActivation != nil)
             if podState.unacknowledgedCommand != nil {
                 // Process the pending unacknowledgeCommnd to handle any pending doses matters for an unacknowledged
                 // command before calling handleCancelDosing() to deal with the final dosing adjustments from pod fault.
