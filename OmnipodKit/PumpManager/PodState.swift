@@ -465,7 +465,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             let finishTime = bolus.finishTime,
             deliveryType.contains(.bolus),
             bolus.scheduledUnits == nil, // not already canceled, e.g. by a recovered unacknowledged cancel
-            finishTime > now || (bolusNotDelivered > 0 && bolus.rate > 0)
+            finishTime > now || (bolusNotDelivered > 0 && bolusNotDelivered <= bolus.units && bolus.rate > 0)
         {
             // Read after the scheduled end: the undelivered pulses were the last ones.
             let stoppedAt = finishTime > now ? now : finishTime - .hours(bolusNotDelivered / bolus.rate)

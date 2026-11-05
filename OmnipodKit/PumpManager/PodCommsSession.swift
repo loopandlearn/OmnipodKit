@@ -280,22 +280,26 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    /// deliveryStoppedAt has a one minute resolution from the fault time. If a bolus was interrupted
-    /// by the fault, its pulses not delivered place the fault more precisely within the fault's minute.
-    private func refineDeliveryStoppedAt(bolusNotDelivered: Double) {
-        guard bolusNotDelivered > 0,
-              let stoppedAt = podState.deliveryStoppedAt,
-              let bolus = podState.unfinalizedBolus,
-              bolus.scheduledUnits == nil,
-              let finishTime = bolus.finishTime,
-              bolus.rate > 0
-        else {
+    /// The fault time is the start of the pod's minute, and the pod clock estimate can lag a slow pod by up to
+    /// a minute. A bolus interrupted by the fault places it by the phone's clock; otherwise use the latest time
+    /// the fault could have been.
+    private func placeFaultTime(bolusNotDelivered: Double) {
+        guard let faultMinute = podState.deliveryStoppedAt else {
             return
         }
-        let bolusStoppedAt = finishTime - .hours(bolusNotDelivered / bolus.rate)
-        if bolusStoppedAt >= stoppedAt && bolusStoppedAt < stoppedAt + .minutes(1) {
-            podState.deliveryStoppedAt = bolusStoppedAt
+        let stoppedAt: Date
+        if bolusNotDelivered > 0,
+           let bolus = podState.unfinalizedBolus,
+           bolus.scheduledUnits == nil,
+           bolusNotDelivered <= bolus.units,
+           let finishTime = bolus.finishTime,
+           bolus.rate > 0
+        {
+            stoppedAt = max(finishTime - .hours(bolusNotDelivered / bolus.rate), faultMinute)
+        } else {
+            stoppedAt = faultMinute + .minutes(2)
         }
+        podState.deliveryStoppedAt = min(currentDate, stoppedAt)
     }
 
     /// A reset fault has no fault time and its bolus not delivered can't be trusted. A bolus seen still
@@ -321,7 +325,7 @@ class PodCommsSession: MessageTransportDelegate {
             let faultTimeKnown = fault.faultEventTimeSinceActivation != nil
             let bolusNotDelivered = faultTimeKnown ? derivedStatusResponse.bolusNotDelivered : 0
             if faultTimeKnown {
-                refineDeliveryStoppedAt(bolusNotDelivered: bolusNotDelivered)
+                placeFaultTime(bolusNotDelivered: bolusNotDelivered)
             }
             if podState.unacknowledgedCommand != nil {
                 // Process the pending unacknowledgeCommnd to handle any pending doses matters for an unacknowledged
