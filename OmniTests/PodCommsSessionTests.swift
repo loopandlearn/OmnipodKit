@@ -199,8 +199,8 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 
-        // Fault with no fault time ($0000, as a DASH reset fault reports) and 1.0 U (20 pulses) not delivered
-        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000140508001800000000006900001900000000")!)
+        // 0x10 reset fault with no fault time ($0000, as DASH reports) and 1.0 U (20 pulses) not delivered
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000140508001000000000006900001900000000")!)
         mockTransport.addResponse(fault)
 
         XCTAssertThrowsError(try session.getStatus())
