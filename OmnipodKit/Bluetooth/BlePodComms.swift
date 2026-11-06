@@ -18,6 +18,9 @@ class BlePodComms: PodComms {
 
     var manager: PeripheralManager? {
         didSet {
+            if oldValue !== manager {
+                oldValue?.delegate = nil
+            }
             manager?.delegate = self
         }
     }
@@ -56,6 +59,7 @@ class BlePodComms: PodComms {
             log.default("Removing %{public}@ from auto-connect ids", manager.peripheral)
             bluetoothManager.disconnectFromDevice(uuidString: manager.peripheral.identifier.uuidString)
         }
+        manager = nil
         super.forgetPod()
     }
 
