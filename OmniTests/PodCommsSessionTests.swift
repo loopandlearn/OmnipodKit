@@ -214,7 +214,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         XCTAssertEqual(stoppedAt.timeIntervalSince1970, bolus.finishTime!.timeIntervalSince1970, accuracy: 0.01)
     }
 
-    func testFaultWithoutInterruptedBolusUsesTheLatestTimeItCouldHaveBeen() {
+    func testFaultWithoutInterruptedBolusKeepsTheFaultMinute() {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let tempBasalStart = activatedAt + .minutes(90)
@@ -229,25 +229,10 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         XCTAssertThrowsError(try session.getStatus())
 
         let state = lastPodStateUpdate!
-        let stoppedAt = activatedAt + .minutes(102)
+        let stoppedAt = activatedAt + .minutes(100)
         XCTAssertEqual(stoppedAt, state.deliveryStoppedAt)
         let tempBasal = state.finalizedDoses.first { $0.doseType == .tempBasal }!
         XCTAssertEqual(stoppedAt, tempBasal.finishTime)
-    }
-
-    func testFaultReadWithinItsMinuteStopsDeliveryNow() {
-        let activatedAt = Date().addingTimeInterval(.hours(-3))
-        podState.expiresAt = activatedAt + Pod.nominalPodLife
-        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
-        let now = activatedAt + .minutes(100.5)
-        session.mockCurrentDate = now
-
-        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000000508001800640000006900001900000000")!)
-        mockTransport.addResponse(fault)
-
-        XCTAssertThrowsError(try session.getStatus())
-
-        XCTAssertEqual(now, lastPodStateUpdate!.deliveryStoppedAt)
     }
 
     func testResetFaultBeforeBolusEndAssumesDeliveryUntilNow() {
