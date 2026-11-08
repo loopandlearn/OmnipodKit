@@ -15,7 +15,7 @@ import Foundation
 class Id: Equatable {
 
     static func fromInt(_ v: Int) -> Id {
-        return Id(Data(bigEndian: v).subdata(in: 4..<8))
+        return Id(Data(bigEndian: Int64(v)).subdata(in: 4..<8))
     }
 
     static func fromUInt32(_ v: UInt32) -> Id {

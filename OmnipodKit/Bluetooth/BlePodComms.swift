@@ -296,7 +296,7 @@ class BlePodComms: PodComms {
         case .SessionNegotiationResynchronization(let keys):
             log.bleDebug("@@@ Received EAP SQN resynchronization: %@", keys.synchronizedEapSqn.data.hexadecimalString)
             if podState != nil {
-                let eapSeq = keys.synchronizedEapSqn.toInt()
+                let eapSeq = try keys.synchronizedEapSqn.toInt()
                 log.bleDebug("@@@ Updating EAP SQN to: %d", eapSeq)
                 podState!.bleMessageTransportState.eapSeq = eapSeq
             }
