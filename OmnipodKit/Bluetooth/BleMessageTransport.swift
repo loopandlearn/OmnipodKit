@@ -208,7 +208,10 @@ class BlePodMessageTransport: MessageTransport {
     /// The ECDSA signature covers the complete encrypted message: AAD(16) + ciphertext + tag(8).
     func sendMessage(_ message: Message) throws -> Message {
 
-        guard manager.peripheral.state == .connected else {
+        // A pod released to another controller is sent nothing, however the link came up: a session
+        // queued before the release, or a connection that landed as it happened. Before any IO, so
+        // the command is a certain failure.
+        guard manager.peripheral.state == .connected, manager.bluetoothManager?.isReleasedForLoan != true else {
             throw PodCommsError.podNotConnected
         }
 
