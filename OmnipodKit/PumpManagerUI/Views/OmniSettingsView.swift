@@ -216,7 +216,7 @@ struct OmniSettingsView: View  {
         .sheet(isPresented: $showManualTempBasalOptions) {
             ManualTempBasalEntryView(
                 enactBasal: { rate, duration, completion in
-                    viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: rate, for: duration) { error in
+                    viewModel.runTemporaryBasalProgram(doseId: nil, unitsPerHour: rate, for: duration) { error in
                         completion(error)
                         if error == nil {
                             showManualTempBasalOptions = false
@@ -822,7 +822,7 @@ struct OmniSettingsView: View  {
 
     func cancelManualBasal() {
         cancelingTempBasal = true
-        viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: 0, for: 0) { error in
+        viewModel.runTemporaryBasalProgram(doseId: nil, unitsPerHour: 0, for: 0) { error in
             cancelingTempBasal = false
             if let error = error {
                 self.viewModel.activeAlert = .cancelManualBasalError(error)
