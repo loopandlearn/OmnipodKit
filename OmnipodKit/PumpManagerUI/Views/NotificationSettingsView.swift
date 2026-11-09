@@ -10,7 +10,6 @@
 import SwiftUI
 import LoopKit
 import LoopKitUI
-import HealthKit
 
 
 struct NotificationSettingsView: View {
@@ -39,7 +38,7 @@ struct NotificationSettingsView: View {
 
     var onSaveLowReservoirDefault: ((_ selectedValue: Int, _ completion: @escaping (_ error: Error?) -> Void) -> Void)?
 
-    var insulinQuantityFormatter = QuantityFormatter(for: .internationalUnit())
+    var insulinQuantityFormatter = QuantityFormatter(for: .internationalUnit)
 
     var body: some View {
         RoundedCardScrollView {

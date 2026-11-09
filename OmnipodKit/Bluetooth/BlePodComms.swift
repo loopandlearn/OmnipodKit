@@ -343,6 +343,7 @@ class BlePodComms: PodComms {
                 throw PodCommsError.diagnosticMessage(str: "Received resynchronization SQN for the second time")
             }
         }
+        needsSessionEstablishment = false
     }
 
     /// Handles executing the required O5 AID setup commands and updates the podState's transport state as needed.
@@ -697,6 +698,12 @@ class BlePodComms: PodComms {
                 return
             }
 
+            guard !(self.hasLTK && self.needsSessionEstablishment) else {
+                self.log.error("Session '%{public}@' refused: no session established on this connection", name)
+                block(.failure(PodCommsError.podNotConnected))
+                return
+            }
+
             let transport = BlePodMessageTransport(manager: manager, myId: self.myId, podId: self.podId, state: self.podState!.bleMessageTransportState, signingKey: self.podState!.signingKey)
             transport.messageLogger = self.messageLogger
 
@@ -807,6 +814,7 @@ extension BlePodComms: PeripheralManagerDelegate {
                 needsSessionEstablishment = false
                 delegate?.podCommsDidEstablishSession(self)
             } catch {
+                omnipodLogDeviceEvent("[CONFIG] session handshake FAILED: \(error)")
                 log.error("Pod session sync error: %{public}@", String(describing: error))
             }
 

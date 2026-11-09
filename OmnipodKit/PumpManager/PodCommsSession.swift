@@ -82,9 +82,6 @@ extension PodCommsError: LocalizedError {
             let faultDescription = String(describing: fault.faultEventCode)
             return String(format: LocalizedString("Pod Fault: %1$@", comment: "Format string for pod fault code"), faultDescription)
         case .commsError(let error):
-            if isVerboseBluetoothCommsError(error) {
-                return LocalizedString("Possible Bluetooth issue", comment: "Error description for possible bluetooth issue")
-            }
             return error.localizedDescription
         case .unacknowledgedMessage(_, let error):
             return error.localizedDescription
@@ -158,13 +155,8 @@ extension PodCommsError: LocalizedError {
             return LocalizedString("Resume delivery", comment: "Recovery suggestion when pod is suspended")
         case .podFault:
             return nil
-        case .commsError(let error):
-            if isVerboseBluetoothCommsError(error) {
-                return LocalizedString("Try adjusting pod position or toggle Bluetooth off and then on in iPhone Settings", comment: "Recovery suggestion for possible bluetooth issue")
-            }
-            return nil
-        case .unacknowledgedMessage:
-            return nil
+        case .commsError(let error), .unacknowledgedMessage(_, let error):
+            return (error as? LocalizedError)?.recoverySuggestion
         case .unacknowledgedCommandPending:
             return nil
         case .rejectedMessage:
@@ -199,29 +191,6 @@ extension PodCommsError: LocalizedError {
         default:
             return false
         }
-    }
-
-    // BLE pods only
-    func isVerboseBluetoothCommsError(_ error: Error) -> Bool {
-        if let peripheralManagerError = error as? PeripheralManagerError {
-            switch peripheralManagerError {
-            case .cbPeripheralError:
-                print("### Verbose Bluetooth comms error: \(peripheralManagerError.localizedDescription)")
-                return true
-            default:
-                break
-            }
-        }
-        if let podProtocolError = error as? PodProtocolError {
-            switch podProtocolError {
-            case .invalidLTKKey, .pairingException, .messageIOException, .couldNotParseMessageException:
-                print("### Verbose Bluetooth comms error: \(podProtocolError.localizedDescription)")
-                return true
-            default:
-                break
-            }
-        }
-        return false
     }
 }
 
@@ -676,7 +645,7 @@ class PodCommsSession: MessageTransportDelegate {
         case unacknowledged(error: PodCommsError)
     }
 
-    func bolus(units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0) -> DeliveryCommandResult {
+    func bolus(decisionId: UUID?, units: Double, automatic: Bool = false, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0, extendedUnits: Double = 0.0, extendedDuration: TimeInterval = 0) -> DeliveryCommandResult {
 
         if podState.unacknowledgedCommand != nil {
             do {
@@ -723,7 +692,7 @@ class PodCommsSession: MessageTransportDelegate {
             podState.unacknowledgedCommand = PendingCommand.program(.bolus(volume: units, automatic: automatic), transport.messageNumber, currentDate)
             let statusResponse: StatusResponse = try send([bolusScheduleCommand, bolusExtraCommand])
             podState.unacknowledgedCommand = nil
-            podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic)
+            podState.unfinalizedBolus = UnfinalizedDose(decisionId: decisionId, bolusAmount: units, startTime: currentDate, scheduledCertainty: .certain, insulinType: podState.insulinType, automatic: automatic)
             podState.updateFromStatusResponse(statusResponse, at: currentDate)
             return DeliveryCommandResult.success(statusResponse: statusResponse)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
@@ -736,7 +705,7 @@ class PodCommsSession: MessageTransportDelegate {
         }
     }
 
-    func setTempBasal(rate: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0) -> DeliveryCommandResult {
+    func setTempBasal(decisionId: UUID?, rate: Double, duration: TimeInterval, isHighTemp: Bool, automatic: Bool, acknowledgementBeep: Bool = false, completionBeep: Bool = false, programReminderInterval: TimeInterval = 0) -> DeliveryCommandResult {
 
         if podState.unacknowledgedCommand != nil {
             do {
@@ -755,7 +724,7 @@ class PodCommsSession: MessageTransportDelegate {
             podState.unacknowledgedCommand = PendingCommand.program(.tempBasal(unitsPerHour: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic), transport.messageNumber, startTime)
             let status: StatusResponse = try send([tempBasalCommand, tempBasalExtraCommand])
             podState.unacknowledgedCommand = nil
-            podState.unfinalizedTempBasal = UnfinalizedDose(tempBasalRate: rate, startTime: startTime, duration: duration, isHighTemp: isHighTemp, automatic: automatic, scheduledCertainty: .certain, insulinType: podState.insulinType)
+            podState.unfinalizedTempBasal = UnfinalizedDose(decisionId: decisionId, tempBasalRate: rate, startTime: startTime, duration: duration, isHighTemp: isHighTemp, automatic: automatic, scheduledCertainty: .certain, insulinType: podState.insulinType)
             podState.updateFromStatusResponse(status, at: currentDate)
             return DeliveryCommandResult.success(statusResponse: status)
         } catch PodCommsError.unacknowledgedMessage(let seq, let error) {
@@ -1122,7 +1091,7 @@ class PodCommsSession: MessageTransportDelegate {
                 self.log.default("Unacknowledged command was received by pump")
                 unacknowledgedCommandWasReceived(pendingCommand: pendingCommand, podStatus: status)
             } else if checkCommandAgainstStatus(pendingCommand: pendingCommand, podStatus: status) {
-                self.log.default("Accepted unacknowledged command was received based on pod delivery status of ${public}@", String(describing: status.deliveryStatus))
+                self.log.default("Accepted unacknowledged command was received based on pod delivery status of %{public}@", String(describing: status.deliveryStatus))
             } else {
                 self.log.default("Unacknowledged command was not received by pump")
             }

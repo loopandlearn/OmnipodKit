@@ -405,7 +405,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         if deliveryStatus.bolusing && unfinalizedBolus == nil { // active bolus that we aren't tracking
             if podProgressStatus.readyForDelivery {
                 // Create an unfinalizedBolus with the remaining bolus amount to capture what we can.
-                unfinalizedBolus = UnfinalizedDose(bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
+                unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
             }
         }
         if deliveryStatus.tempBasalRunning && unfinalizedTempBasal == nil { // active temp basal that we aren't tracking
@@ -684,11 +684,14 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
             }
 
             // BLE pod type specific values
-            if let ltkString = rawValue["ltk"] as? String,
-                let bleIdentifier = rawValue["bleIdentifier"] as? String
-            {
+            if let ltkString = rawValue["ltk"] as? String {
                 self.ltk = Data(hexadecimalString: ltkString)
+            }
+            if let bleIdentifier = rawValue["bleIdentifier"] as? String {
                 self.bleIdentifier = bleIdentifier
+            }
+            if self.ltk == nil, rawValue["ltk"] != nil {
+                log.error("PodState decode: ltk present in rawValue but did not decode — every pod command will fail")
             }
 
             if podType.isO5 {

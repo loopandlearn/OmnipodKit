@@ -48,7 +48,7 @@ struct CheckInsertedCannulaView: View {
                              .imageScale(.large)
                      }
                      .toggleStyle(FlashlightToggleStyle())
-                     .onChange(of: flashlightOn) { v in
+                     .onChange(of: flashlightOn) { _, v in
                          setFlashlightState(state: v)
                      }
                  }

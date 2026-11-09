@@ -68,6 +68,19 @@ struct PodType: CustomStringConvertible, Equatable {
         }
     }
 
+    var modelName: String? {
+        switch podType {
+        case .productIdEros:
+            return "Omnipod Classic"
+        case .productIdDash:
+            return "Omnipod DASH"
+        case .productIdOmnipod5:
+            return "Omnipod 5"
+        default:
+            return nil
+        }
+    }
+
     // Used for internal logging purposes
     var briefName: String {
         switch podType {

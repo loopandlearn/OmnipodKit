@@ -24,7 +24,7 @@ struct ExpirationReminderSetupView: View {
                 Text(LocalizedString("You will be notified in advance of Pod expiration.\n\nScroll to set the number of hours advance notice you would like to have.", comment: "Description text on ExpirationReminderSetupView")).fixedSize(horizontal: false, vertical: true)
                 Divider()
                 ExpirationReminderPickerView(expirationReminderDefault: $expirationReminderDefault, collapsible: false, showingHourPicker: true)
-                    .onChange(of: expirationReminderDefault) { value in
+                    .onChange(of: expirationReminderDefault) { _, value in
                         valueChanged?(value)
                     }
             }

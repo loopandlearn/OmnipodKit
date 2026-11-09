@@ -10,7 +10,6 @@
 import SwiftUI
 import LoopKitUI
 import LoopKit
-import HealthKit
 
 struct LowReservoirView: View {
     private var reservoirLevel: Double // current reservoir level
@@ -140,7 +139,7 @@ struct LowReservoirView: View {
                 Text(formatLowReservoirAlertValue(value))
             }
         }.pickerStyle(WheelPickerStyle())
-        .onChange(of: selectedValue) { value in
+        .onChange(of: selectedValue) { _, value in
             valueUpdated?(value)
         }
     }

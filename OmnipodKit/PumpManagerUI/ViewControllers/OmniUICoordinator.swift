@@ -542,13 +542,13 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
         }
     }
 
-    var customTraitCollection: UITraitCollection {
+    private func applyCustomTraits(to viewController: UIViewController) {
         // Select height reduced layouts on iPhone SE and iPod Touch,
         // and select regular width layouts on larger screens, for list rendering styles
         if UIScreen.main.bounds.height <= 640 {
-            return UITraitCollection(traitsFrom: [super.traitCollection, UITraitCollection(verticalSizeClass: .compact)])
+            viewController.traitOverrides.verticalSizeClass = .compact
         } else {
-            return UITraitCollection(traitsFrom: [super.traitCollection, UITraitCollection(horizontalSizeClass: .regular)])
+            viewController.traitOverrides.horizontalSizeClass = .regular
         }
     }
 
@@ -565,7 +565,7 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
 
     func navigationController(_ navigationController: UINavigationController, willShow viewController: UIViewController, animated: Bool) {
                 
-        setOverrideTraitCollection(customTraitCollection, forChild: viewController)
+        applyCustomTraits(to: viewController)
         
         if viewControllers.count < screenStack.count {
             // Navigation back

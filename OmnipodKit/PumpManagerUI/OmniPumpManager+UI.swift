@@ -18,6 +18,10 @@ extension OmniPumpManager: PumpManagerUI {
     public static var onboardingImage: UIImage? {
         return UIImage(named: "Onboarding", in: Bundle(for: OmniSettingsViewModel.self), compatibleWith: nil)
     }
+
+    public static var pickerImage: UIImage? {
+        return UIImage(named: "Pod", in: Bundle(for: OmniSettingsViewModel.self), compatibleWith: nil)
+    }
         
     public static func setupViewController(initialSettings settings: PumpManagerSetupSettings, bluetoothProvider: BluetoothProvider, colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool, prefersToSkipUserInteraction: Bool = false, allowedInsulinTypes: [InsulinType]) -> SetupUIResult<PumpManagerViewController, PumpManagerUI>
     {
@@ -67,7 +71,7 @@ public enum OmniStatusBadge: DeviceStatusBadge {
 // MARK: - PumpStatusIndicator
 extension OmniPumpManager {
     
-    public var pumpStatusHighlight: DeviceStatusHighlight? {
+    public var pumpStatusHighlight: PumpStatusHighlight? {
         return buildPumpStatusHighlight(for: state)
     }
 

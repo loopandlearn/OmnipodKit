@@ -67,6 +67,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     var isHighTemp: Bool =
         false // Track this for situations where cancelling temp basal is unacknowledged, and recovery fails, and we have to assume the most possible delivery
     var insulinType: InsulinType?
+    var decisionId: UUID?
 
     var finishTime: Date? {
         get {
@@ -106,6 +107,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     }
 
     init(
+        decisionId: UUID?,
         bolusAmount: Double,
         startTime: Date,
         scheduledCertainty: ScheduledCertainty,
@@ -120,9 +122,11 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         scheduledUnits = nil
         self.automatic = automatic
         self.insulinType = insulinType
+        self.decisionId = decisionId
     }
 
     init(
+        decisionId: UUID?,
         tempBasalRate: Double,
         startTime: Date,
         duration: TimeInterval,
@@ -140,6 +144,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         self.automatic = automatic
         self.isHighTemp = isHighTemp
         self.insulinType = insulinType
+        self.decisionId = decisionId
     }
 
     init(suspendStartTime: Date, scheduledCertainty: ScheduledCertainty) {
@@ -324,6 +329,10 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         if let rawInsulinType = rawValue["insulinType"] as? InsulinType.RawValue {
             insulinType = InsulinType(rawValue: rawInsulinType)
         }
+
+        if let decisionIdString = rawValue["decisionId"] as? String {
+            self.decisionId = UUID(uuidString: decisionIdString)
+        }
     }
 
     public var rawValue: RawValue {
@@ -340,6 +349,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         rawValue["scheduledTempRate"] = scheduledTempRate
         rawValue["duration"] = duration
         rawValue["insulinType"] = insulinType?.rawValue
+        rawValue["decisionId"] = decisionId?.uuidString
 
         return rawValue
     }
@@ -374,6 +384,7 @@ extension DoseEntry {
                 endDate: dose.finishTime,
                 value: dose.scheduledUnits ?? dose.units,
                 unit: .units,
+                decisionId: dose.decisionId,
                 deliveredUnits: dose.finalizedUnits,
                 insulinType: dose.insulinType,
                 automatic: dose.automatic,
@@ -386,6 +397,7 @@ extension DoseEntry {
                 endDate: dose.finishTime,
                 value: dose.scheduledTempRate ?? dose.rate,
                 unit: .unitsPerHour,
+                decisionId: dose.decisionId,
                 deliveredUnits: dose.finalizedUnits,
                 insulinType: dose.insulinType,
                 automatic: dose.automatic,
@@ -408,6 +420,7 @@ extension StartProgram {
         switch self {
         case let .bolus(volume: volume, automatic: automatic):
             return UnfinalizedDose(
+                decisionId: nil,
                 bolusAmount: volume,
                 startTime: programDate,
                 scheduledCertainty: certainty,
@@ -416,6 +429,7 @@ extension StartProgram {
             )
         case let .tempBasal(unitsPerHour: rate, duration: duration, isHighTemp, automatic):
             return UnfinalizedDose(
+                decisionId: nil,
                 tempBasalRate: rate,
                 startTime: programDate,
                 duration: duration,

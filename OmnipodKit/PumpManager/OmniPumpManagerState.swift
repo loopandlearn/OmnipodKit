@@ -20,7 +20,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
     var isOnboarded: Bool = false
 
     // XXX still needs be declared public with the current Trio implementation
-    private(set) public var podState: PodState?
+    public private(set) var podState: PodState?
 
     // State should only be modifiable by PodComms
     mutating func updatePodStateFromPodComms(_ podState: PodState?) {

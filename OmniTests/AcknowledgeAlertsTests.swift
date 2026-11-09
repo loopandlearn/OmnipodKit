@@ -28,4 +28,10 @@ class AcknowledgeAlertsTests: XCTestCase {
             XCTFail("message decoding threw error: \(error)")
         }
     }
+
+    func testAcknowledgeExpiredAlertWithExpirationReminder() {
+        // 11 05 494e532e 88: slot 7 (expired) and slot 3 (expiration reminder) together
+        let encoded = AcknowledgeAlertCommand(nonce: 0x494e532e, alerts: AlertSet(slots: [.slot7Expired, .slot3ExpirationReminder]))
+        XCTAssertEqual("1105494e532e88", encoded.data.hexadecimalString)
+    }
 }

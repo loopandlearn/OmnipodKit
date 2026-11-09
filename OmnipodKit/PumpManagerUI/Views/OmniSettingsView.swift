@@ -11,7 +11,6 @@ import SwiftUI
 import LoopKit
 import LoopKitUI
 import RileyLinkBLEKit
-import HealthKit
 
 
 struct OmniSettingsView: View  {
@@ -92,6 +91,7 @@ struct OmniSettingsView: View  {
                                     LocalizedString("minutes", comment: "Unit for plural minutes in pod life remaining"))
                 }
             }
+            .accessibilityElement(children: .combine)
             ProgressView(progress: CGFloat(self.viewModel.lifeState.progress)).accentColor(self.viewModel.lifeState.progressColor(guidanceColors: guidanceColors))
         }
     }
@@ -119,6 +119,7 @@ struct OmniSettingsView: View  {
                         .font(.system(size: 34))
                         .fixedSize()
                         .foregroundColor(viewModel.suspendResumeButtonColor(guidanceColors: guidanceColors))
+                        .accessibilityHidden(true)
                     FrameworkLocalText("Insulin\nSuspended", comment: "Text shown in insulin delivery space when insulin suspended")
                         .fontWeight(.bold)
                         .fixedSize()
@@ -132,6 +133,7 @@ struct OmniSettingsView: View  {
                             .fixedSize()
                         FrameworkLocalText("U/hr", comment: "Units for showing temp basal rate").foregroundColor(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             } else {
                 HStack(alignment: .center) {
@@ -139,6 +141,7 @@ struct OmniSettingsView: View  {
                         .font(.system(size: 34))
                         .fixedSize()
                         .foregroundColor(guidanceColors.critical)
+                        .accessibilityHidden(true)
                     FrameworkLocalText("No\nDelivery", comment: "Text shown in insulin remaining space when no pod is paired")
                         .fontWeight(.bold)
                         .fixedSize()
@@ -181,6 +184,7 @@ struct OmniSettingsView: View  {
                         .font(.system(size: 34))
                         .fixedSize()
                         .foregroundColor(guidanceColors.critical)
+                        .accessibilityHidden(true)
 
                     Text(podError).fontWeight(.bold)
                 } else if let reservoirLevel = viewModel.reservoirLevel, let reservoirLevelHighlightState = viewModel.reservoirLevelHighlightState {
@@ -194,6 +198,7 @@ struct OmniSettingsView: View  {
                         .font(.system(size: 34))
                         .fixedSize()
                         .foregroundColor(guidanceColors.warning)
+                        .accessibilityHidden(true)
                     
                     FrameworkLocalText("No Pod", comment: "Text shown in insulin remaining space when no pod is paired").fontWeight(.bold)
                 }
@@ -211,7 +216,7 @@ struct OmniSettingsView: View  {
         .sheet(isPresented: $showManualTempBasalOptions) {
             ManualTempBasalEntryView(
                 enactBasal: { rate, duration, completion in
-                    viewModel.runTemporaryBasalProgram(unitsPerHour: rate, for: duration) { error in
+                    viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: rate, for: duration) { error in
                         completion(error)
                         if error == nil {
                             showManualTempBasalOptions = false
@@ -276,9 +281,7 @@ struct OmniSettingsView: View  {
                                 // Executed after playTestBeeps() returns or throws
                                 sendingTestBeepsCommand = false
                             }
-                            do {
-                                try await viewModel.playTestBeeps()
-                            }
+                            try? await viewModel.playTestBeeps()
                             // No errors are displayed when using the sound icon to play test beeps.
                             // Pod Diagnostics->Play Test Beeps will play beeps & display any errors.
                         }
@@ -289,6 +292,7 @@ struct OmniSettingsView: View  {
                             .padding(.top,5)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel(LocalizedString("Play Test Beeps", comment: "Accessibility label for the button that plays test beeps"))
                     // Not gated on hasConnection. That var means different things by pod type — the
                     // pod link for BLE pods, whether ANY RileyLink is connected (independent of pod
                     // availability) for Eros; see OmniPumpManager.hasConnection. In neither case does
@@ -420,6 +424,7 @@ struct OmniSettingsView: View  {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .font(.system(size: 22))
                                     .foregroundColor(guidanceColors.warning)
+                                    .accessibilityHidden(true)
                             }
                             Button(action: {
                                 self.cancelManualBasal()
@@ -835,7 +840,7 @@ struct OmniSettingsView: View  {
 
     func cancelManualBasal() {
         cancelingTempBasal = true
-        viewModel.runTemporaryBasalProgram(unitsPerHour: 0, for: 0) { error in
+        viewModel.runTemporaryBasalProgram(decisionId: nil, unitsPerHour: 0, for: 0) { error in
             cancelingTempBasal = false
             if let error = error {
                 self.viewModel.activeAlert = .cancelManualBasalError(error)
