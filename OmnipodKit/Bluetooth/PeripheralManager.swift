@@ -84,6 +84,7 @@ class PeripheralManager: NSObject {
     // Context for device-log lines. Written on `queue` and on BluetoothManager's queue, so lock-guarded.
     private let traceLock = NSLock()
     private var connectedAt: Date?
+    private var connectedAtLabel = "after connect"
     private var phase = "idle"
     private var setupOutcome = "not run"
 
@@ -107,6 +108,11 @@ class PeripheralManager: NSObject {
         super.init()
 
         peripheral.delegate = self
+        if peripheral.state == .connected {
+            // A link iOS restored at launch: no didConnect will come for it
+            connectedAt = Date()
+            connectedAtLabel = "after restore"
+        }
 
         assertConfiguration()
     }
@@ -185,7 +191,10 @@ extension PeripheralManager {
                     self.log.error("Configured peripheral has no services. Reconfiguring %{public}@", self.peripheral)
                 }
 
-                if self.needsConfiguration || self.peripheral.services == nil {
+                if self.peripheral.state != .connected {
+                    // Setup can't run without a link, and failing it here would blame setup for the connect
+                    self.logDeviceEvent("[connect] not connected, setup not run")
+                } else if self.needsConfiguration || self.peripheral.services == nil {
                     self.setTrace(phase: "setup")
                     self.setupSteps = []
                     self.failedSetupStep = nil
@@ -209,7 +218,7 @@ extension PeripheralManager {
                         self.logDeviceEvent("[connect] configuration failed after \(Self.seconds(since: configurationStart)): \(error); \(self.setupSteps.joined(separator: ", "))")
                         // Will retry
                     }
-                } else if self.peripheral.state == .connected, self.traceSetupOutcome == "not run" {
+                } else if self.traceSetupOutcome == "not run" {
                     self.setTrace(setup: "skipped")
                     self.logDeviceEvent("[connect] configuration skipped: services already discovered")
                 }
@@ -293,7 +302,7 @@ extension PeripheralManager {
     var linkContext: String {
         traceLock.lock()
         defer { traceLock.unlock() }
-        let since = connectedAt.map { "\(Self.seconds(since: $0)) after connect" } ?? "not connected"
+        let since = connectedAt.map { "\(Self.seconds(since: $0)) \(connectedAtLabel)" } ?? "not connected"
         return "\(since), during \(phase), setup \(setupOutcome)"
     }
 
@@ -318,6 +327,7 @@ extension PeripheralManager {
         traceLock.lock()
         defer { traceLock.unlock() }
         connectedAt = connected ? Date() : nil
+        connectedAtLabel = "after connect"
         if connected {
             setupOutcome = "not run"
         }

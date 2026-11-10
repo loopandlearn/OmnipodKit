@@ -431,11 +431,9 @@ class BluetoothManager: NSObject {
     /// True while a real command's connect owns the link (connect-on-demand). The heartbeat probe and
     /// a command connect must never be outstanding together — a command preempts the probe and, while
     /// it's active, the probe is neither armed nor allowed to claim a didConnect. Cleared on the
-    /// idle-disconnect (going idle) so the probe re-arms. managerQueue-isolated.
+    /// idle-disconnect, and when an unheld link is down with no command session, so the probe re-arms.
+    /// managerQueue-isolated.
     private var commandConnectInFlight = false
-
-    /// Set by disconnectUnresponsive until its didDisconnect arrives. managerQueue-isolated.
-    private var unresponsiveTeardownPending = false
 
     /// Set when a delayed-connect probe completes (a heartbeat wake): we disconnect the wake link and
     /// fire the heartbeat from the resulting didDisconnect, so Loop's commands start from a clean
@@ -454,7 +452,26 @@ class BluetoothManager: NSObject {
     }
 
     func endCommandSession() {
-        lockedActiveCommandSessions.mutate { $0 = max(0, $0 - 1) }
+        let remaining = lockedActiveCommandSessions.mutate { $0 = max(0, $0 - 1) }
+        if remaining == 0 {
+            managerQueue.async { [weak self] in
+                self?.handleCommandSessionsEnded()
+            }
+        }
+    }
+
+    private func handleCommandSessionsEnded() {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        guard !hasActiveCommandSession, let peripheral = keepAlivePeripheral else { return }
+        let situation = DisconnectPolicy.Situation(held: shouldHoldConnection, probeActive: delayedConnectProbeActive, autoConnect: true)
+        guard let decision = DisconnectPolicy.sessionsEnded(situation, linkDown: peripheral.state == .disconnected,
+                                                            commandConnectInFlight: commandConnectInFlight) else { return }
+        commandConnectInFlight = decision.commandConnectInFlight
+        connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] sessions ended with the link down — going idle")
+        resumeScanIfNeeded()
+        if case .idle(armProbe: true) = decision.action {
+            issueDelayedConnectProbe(peripheral)
+        }
     }
 
     /// True while the app is foregrounded. While foreground we keep the pod connected (skip the
@@ -1181,7 +1198,6 @@ class BluetoothManager: NSObject {
     func disconnectUnresponsive(_ peripheral: CBPeripheral) {
         managerQueue.async { [weak self] in
             guard let self = self else { return }
-            self.unresponsiveTeardownPending = true
             self.log.default("[connectOnDemand] unresponsive pod — cancelling %{public}@", peripheral.identifier.uuidString)
             self.cancel(peripheral, reason: "unresponsive pod")
         }
@@ -1685,88 +1701,77 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
         connectionDelegate?.omnipodPeripheralDidDisconnect(peripheral: peripheral, error: error)
 
-        if unresponsiveTeardownPending {
-            unresponsiveTeardownPending = false
-            if !shouldHoldConnection {
-                commandConnectInFlight = false
-            }
-            log.default("[connectOnDemand] unresponsive-pod teardown complete (held=%{public}@)", String(describing: shouldHoldConnection))
-        }
-
-        // The system is auto-reconnecting this link itself (EnableAutoReconnect experiment): defer to
-        // it — no app-side reconnect, no probe re-arm; didConnect fires when it re-establishes. The
-        // eager watchdog (if active) stays armed as a bounded supervisor: its cancel would also cancel
-        // the system's auto-reconnect before re-issuing a supervised connect.
-        if isReconnecting {
-            autoReconnectPendingSince[peripheral.identifier.uuidString] = Date()
-            delayedProbeInFlight = false
-            return
-        }
-
-        // The eager watchdog owns this connect's cancel/retry cycle — its own cancelPeripheralConnection
-        // produced THIS callback. Do not independently reconnect (that would race the watchdog's retry,
-        // reviving the old cancel↔"reconnecting after drop" loop); the watchdog re-issues after teardown.
-        if isConnectWatchdogActive(peripheral) {
-            log.default("[eager] didDisconnect under active watchdog for %{public}@ — deferring reconnect to watchdog", peripheral.identifier.uuidString)
-            delayedProbeInFlight = false
-            return
-        }
-
-        if autoConnectIDs.contains(peripheral.identifier.uuidString) {
-            log.debug("Reconnecting disconnected autoconnect peripheral")
-            autoReconnect(peripheral)
-        }
+        let id = peripheral.identifier.uuidString
+        let eager = shouldUseEagerConnect(for: peripheral)
+        let situation = DisconnectPolicy.Situation(
+            systemReconnecting: isReconnecting,
+            watchdogActive: isConnectWatchdogActive(peripheral),
+            eager: eager,
+            held: shouldHoldConnection,
+            foreground: isAppForeground,
+            eagerHeartbeatMode: isEagerHeartbeatMode,
+            probeActive: delayedConnectProbeActive,
+            autoConnect: autoConnectIDs.contains(id),
+            sessionActive: hasActiveCommandSession)
+        let decision = DisconnectPolicy.didDisconnect(situation, commandConnectInFlight: commandConnectInFlight)
+        commandConnectInFlight = decision.commandConnectInFlight
         delayedProbeInFlight = false
 
-        // Eager-gated pods: the recovery strategy differs by app state.
-        //  - FOREGROUND: the user may be waiting to bolus — reconnect eagerly (direct connect + fast
-        //    watchdog cancel/retry), no auto-reconnect.
-        //  - BACKGROUND with a Pod Keep Alive mode: we may be suspended at any moment, so no app-side timer
-        //    can be trusted. Issue a standing connect carrying CBConnectPeripheralOptionEnableAutoReconnect
-        //    and let the system re-establish the link (measured ~27s median) with no app CPU required.
-        //  - BACKGROUND otherwise: connect on demand, like any other pod (falls through to the idle path).
-        if shouldUseEagerConnect(for: peripheral) && shouldHoldConnection {
-            if isAppForeground {
-                log.default("[eager] drop while foreground — reconnecting eagerly")
-                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while foreground — reconnecting eagerly")
-                noteForegroundConnectWait(peripheral)
-                beginCommandConnect(peripheral)
-            } else if isEagerHeartbeatMode {
-                // Disconnect-driven heartbeat: CoreBluetooth just woke us for this drop (State
-                // Restoration delivers it even to a suspended app). Fire the heartbeat, then eagerly
-                // reconnect — the fresh connection re-arms the pod's ~180s inactivity timer, so the
-                // next hangup becomes the next wake, giving a self-sustaining ~3min cadence.
-                fireEagerHeartbeatIfNeeded()
-                log.default("[eager] drop while background (heartbeat mode) — eager reconnect")
-                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background (heartbeat mode) — eager reconnect")
-                eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
-            } else {
-                let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
-                if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
-                    device.manager.peripheral = target
-                }
-                log.default("[eager] drop while background — standing connect with auto-reconnect")
-                connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background — standing connect (auto-reconnect)")
-                manager.connect(target, options: eagerConnectOptions)
-            }
+        switch decision.action {
+        case .deferToSystemReconnect:
+            // The system is auto-reconnecting this link itself (EnableAutoReconnect): didConnect fires
+            // when it re-establishes. The eager watchdog, if active, stays armed as a bounded supervisor.
+            autoReconnectPendingSince[id] = Date()
             return
+        case .deferToWatchdog:
+            // The watchdog's own cancel produced this callback, and it re-issues the connect itself.
+            log.default("[eager] didDisconnect under active watchdog for %{public}@ — deferring reconnect to watchdog", id)
+            return
+        default:
+            break
         }
 
-        if shouldHoldConnection && commandConnectInFlight {
-            // Keep-alive (foreground, or a background Pod Keep Alive mode): an unintended drop while we want
-            // to stay connected, including our own teardown of an unresponsive pod. A deliberate
-            // background/idle disconnect clears commandConnectInFlight first, so it won't reconnect.
+        if situation.autoConnect {
+            autoReconnect(peripheral)
+        }
+
+        switch decision.action {
+        case .eagerReconnect:
+            log.default("[eager] drop while foreground — reconnecting eagerly")
+            connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while foreground — reconnecting eagerly")
+            noteForegroundConnectWait(peripheral)
+            beginCommandConnect(peripheral)
+            return
+        case .eagerHeartbeatReconnect:
+            // Disconnect-driven heartbeat: the fresh connection re-arms the pod's ~180s inactivity timer,
+            // so the next hangup becomes the next wake.
+            fireEagerHeartbeatIfNeeded()
+            log.default("[eager] drop while background (heartbeat mode) — eager reconnect")
+            connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background (heartbeat mode) — eager reconnect")
+            eagerConnect(peripheral, deadline: Date().addingTimeInterval(BluetoothManager.eagerConnectBudgetSeconds))
+            return
+        case .standingConnect:
+            // Background with a Pod Keep Alive mode: let the system re-establish the link, since no
+            // app-side timer can be trusted while we may be suspended.
+            let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+            if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
+                device.manager.peripheral = target
+            }
+            log.default("[eager] drop while background — standing connect with auto-reconnect")
+            connectionDelegate?.omnipodLogDeviceEvent("[eager] drop while background — standing connect (auto-reconnect)")
+            manager.connect(target, options: eagerConnectOptions)
+            return
+        case .keepAliveReconnect:
             log.default("[connectOnDemand] keep-alive — reconnecting after drop")
             connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] keep-alive — reconnecting after drop")
             connectForCommand(peripheral)
-        } else {
-            // Idle: run the fault-listener alarm scan, AND (if a heartbeat is needed) arm the StartDelay
-            // probe alongside it. The two coexist — the scan is light and issueDelayedConnectProbe no
-            // longer stops it. Re-arm the probe only when idle (never while a command owns the link).
+        case .idle(let armProbe):
             resumeScanIfNeeded()
-            if delayedConnectProbeActive && !commandConnectInFlight && autoConnectIDs.contains(peripheral.identifier.uuidString) {
+            if armProbe {
                 issueDelayedConnectProbe(peripheral)
             }
+        case .deferToSystemReconnect, .deferToWatchdog:
+            break
         }
         // If this disconnect ended a heartbeat-probe wake, fire the heartbeat now (clean idle state) so
         // Loop runs its cycle; its commands then preempt the just-armed probe via connect-on-demand.
