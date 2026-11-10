@@ -12,14 +12,14 @@ class SqnEncodingTests: XCTestCase {
 
     func testEapSqnRoundTrip() throws {
         let sqn = try EapSqn(data: Data(hexadecimalString: "000000000423")!)
-        XCTAssertEqual(sqn.toInt(), 1059)
+        XCTAssertEqual(try sqn.toInt(), 1059)
         XCTAssertEqual(EapSqn(int: 1059).data.hexadecimalString, "000000000423")
-        XCTAssertEqual(sqn.increment().data.hexadecimalString, "000000000424")
+        XCTAssertEqual(try sqn.increment().data.hexadecimalString, "000000000424")
     }
 
     func testEapSqnUsesAllSixBytes() throws {
         let sqn = try EapSqn(data: Data(hexadecimalString: "0102030405ff")!)
-        XCTAssertEqual(sqn.toInt(), 0x0102030405ff)
+        XCTAssertEqual(try sqn.toInt(), 0x0102030405ff)
     }
 
     func testNonceSqnBytes() {

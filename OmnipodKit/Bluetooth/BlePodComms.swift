@@ -374,7 +374,7 @@ class BlePodComms: PodComms {
         case .SessionNegotiationResynchronization(let keys):
             log.bleDebug("@@@ Received EAP SQN resynchronization: %@", keys.synchronizedEapSqn.data.hexadecimalString)
             if podState != nil {
-                let podSqn = keys.synchronizedEapSqn.toInt()
+                let podSqn = try keys.synchronizedEapSqn.toInt()
                 log.bleDebug("@@@ Updating EAP SQN to: %d", podSqn)
                 podState!.bleMessageTransportState.eapSeq = podSqn
                 // Any resync counts: after a single foreign session the pod's counter equals the one just sent.

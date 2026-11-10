@@ -11,6 +11,7 @@ import Foundation
 
 enum EapSqnError: Error {
     case InvalidSize
+    case OutOfRange
 }
 
 class EapSqn {
@@ -26,13 +27,15 @@ class EapSqn {
         self.data = Data(bigEndian: Int64(int)).subdata(in: 2..<8)
     }
 
-    func toInt() -> Int {
-        return Int((Data([0x00, 0x00]) + data).withUnsafeBytes {
+    func toInt() throws -> Int {
+        let value = (Data([0x00, 0x00]) + data).withUnsafeBytes {
             $0.loadUnaligned(as: Int64.self).bigEndian
-        })
+        }
+        guard let int = Int(exactly: value) else { throw EapSqnError.OutOfRange }
+        return int
     }
     
-    func increment() -> EapSqn {
-        return EapSqn(int: toInt() + 1)
+    func increment() throws -> EapSqn {
+        return EapSqn(int: try toInt() + 1)
     }
 }
