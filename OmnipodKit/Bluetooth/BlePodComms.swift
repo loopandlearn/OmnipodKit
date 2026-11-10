@@ -18,6 +18,9 @@ class BlePodComms: PodComms {
 
     var manager: PeripheralManager? {
         didSet {
+            if oldValue !== manager {
+                oldValue?.delegate = nil
+            }
             manager?.delegate = self
         }
     }
@@ -56,6 +59,7 @@ class BlePodComms: PodComms {
             log.default("Removing %{public}@ from auto-connect ids", manager.peripheral)
             bluetoothManager.disconnectFromDevice(uuidString: manager.peripheral.identifier.uuidString)
         }
+        manager = nil
         super.forgetPod()
     }
 
@@ -225,7 +229,7 @@ class BlePodComms: PodComms {
 
         log.info("Establish an Eap Session")
         let msgSeq = Int(response.msgSeq)
-        guard let bleMessageTransportState = try establishSession(ltk: ltk, eapSeq: eapSeq, msgSeq: msgSeq) else {
+        guard let bleMessageTransportState = try establishSession(on: manager, ltk: ltk, eapSeq: eapSeq, msgSeq: msgSeq) else {
             log.error("@@@ pairPod: failed to establish session!")
             throw PodCommsError.noPodPaired
         }
@@ -278,11 +282,9 @@ class BlePodComms: PodComms {
         log.bleDebug("@@@ pairPod: podState transport state is %{public}@", self.podState!.bleMessageTransportState.inlineDescription)
     }
 
-    private func establishSession(ltk: Data, eapSeq: Int, msgSeq: Int = 1) throws -> BleMessageTransportState? {
+    private func establishSession(on manager: PeripheralManager, ltk: Data, eapSeq: Int, msgSeq: Int = 1) throws -> BleMessageTransportState? {
         // We should already be holding podStateLock during calls to this function, so try() should fail
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
-
-        guard let manager = manager else { throw PodCommsError.noPodPaired }
 
         // PRIMARY mode (controller initiates challenge).
         // SECONDARY mode was tested for O5 post-pairing reconnections (tests #24, #25)
@@ -328,7 +330,7 @@ class BlePodComms: PodComms {
         }
     }
 
-    private func establishNewSession() throws {
+    private func establishNewSession(on manager: PeripheralManager) throws {
         // We should already be holding podStateLock during calls to this function, so try() should fail
         assert(!podStateLock.try(), "\(#function) should be invoked while holding podStateLock")
 
@@ -336,9 +338,9 @@ class BlePodComms: PodComms {
             throw PodCommsError.noPodPaired
         }
 
-        let mts = try establishSession(ltk: ltk, eapSeq: podState!.incrementEapSeq())
+        let mts = try establishSession(on: manager, ltk: ltk, eapSeq: podState!.incrementEapSeq())
         if mts == nil {
-            let mts = try establishSession(ltk: ltk, eapSeq: podState!.incrementEapSeq())
+            let mts = try establishSession(on: manager, ltk: ltk, eapSeq: podState!.incrementEapSeq())
             if mts == nil {
                 throw PodCommsError.diagnosticMessage(str: "Received resynchronization SQN for the second time")
             }
@@ -617,7 +619,7 @@ class BlePodComms: PodComms {
                     // Paired but no active session: re-establish
                     try manager.sendHello(myId: myId)
                     try manager.enableNotifications()
-                    try establishNewSession()
+                    try establishNewSession(on: manager)
                 }
 
                 guard podState != nil else {
@@ -801,11 +803,17 @@ extension BlePodComms: PeripheralManagerDelegate {
                 podStateLock.unlock()
             }
 
+            guard manager === self.manager else {
+                log.default("completeConfiguration for a manager that is no longer the pod's, skipping login")
+                manager.noteSetupStep("not the pod's current manager, login skipped")
+                return
+            }
+
             do {
                 try manager.setupStep("hello") { try manager.sendHello(myId: myId) }
                 // Seemingly this cannot be done before the hello command, or the pod disconnects
                 try manager.setupStep("notifications") { try manager.enableNotifications() }
-                try manager.setupStep("login") { try establishNewSession() }
+                try manager.setupStep("login") { try establishNewSession(on: manager) }
                 needsSessionEstablishment = false
                 delegate?.podCommsDidEstablishSession(self)
             } catch {
