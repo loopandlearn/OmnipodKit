@@ -81,6 +81,17 @@ class PeripheralManager: NSObject {
     // Confined to `queue`
     private var needsConfiguration = true
 
+    // Context for device-log lines. Written on `queue` and on BluetoothManager's queue, so lock-guarded.
+    private let traceLock = NSLock()
+    private var connectedAt: Date?
+    private var connectedAtLabel = "after connect"
+    private var phase = "idle"
+    private var setupOutcome = "not run"
+
+    // Steps of the current setup, for its device-log line. Confined to `queue`.
+    private var setupSteps: [String] = []
+    private var failedSetupStep: String?
+
     let podType: PodType
 
     weak var delegate: PeripheralManagerDelegate?
@@ -97,6 +108,11 @@ class PeripheralManager: NSObject {
         super.init()
 
         peripheral.delegate = self
+        if peripheral.state == .connected {
+            // A link iOS restored at launch: no didConnect will come for it
+            connectedAt = Date()
+            connectedAtLabel = "after restore"
+        }
 
         assertConfiguration()
     }
@@ -135,6 +151,9 @@ extension PeripheralManager {
             var attempt = 1
             while true {
                 var linkWasUp = self.peripheral.state == .connected
+                if !linkWasUp {
+                    self.setTrace(phase: "connect")
+                }
                 if BluetoothManager.connectOnDemandEnabled {
                     // "Normally disconnected" model: the pod isn't held connected, so connect on demand
                     // for this session (no forceful reconnect — that heuristic is what caused the ~28s
@@ -172,7 +191,14 @@ extension PeripheralManager {
                     self.log.error("Configured peripheral has no services. Reconfiguring %{public}@", self.peripheral)
                 }
 
-                if self.needsConfiguration || self.peripheral.services == nil {
+                if self.peripheral.state != .connected {
+                    // Setup can't run without a link, and failing it here would blame setup for the connect
+                    self.logDeviceEvent("[connect] not connected, setup not run")
+                } else if self.needsConfiguration || self.peripheral.services == nil {
+                    self.setTrace(phase: "setup")
+                    self.setupSteps = []
+                    self.failedSetupStep = nil
+                    let configurationStart = Date()
                     do {
                         self.log.bleDebug("Applying configuration")
                         try self.applyConfiguration()
@@ -181,25 +207,34 @@ extension PeripheralManager {
                         if let delegate = self.delegate {
                             try delegate.completeConfiguration(for: self)
                             self.log.bleDebug("Delegate configuration notified")
+                        } else {
+                            self.noteSetupStep("no delegate, login skipped")
                         }
 
                         self.log.bleDebug("Peripheral configuration completed")
+                        self.setTrace(setup: "ok")
+                        self.logDeviceEvent("[connect] configured in \(Self.seconds(since: configurationStart)): \(self.setupSteps.joined(separator: ", "))")
                     } catch let error {
                         self.log.error("Error applying peripheral configuration: %{public}@", String(describing: error))
+                        self.setTrace(setup: "failed at \(self.failedSetupStep ?? "unknown step")")
+                        self.logDeviceEvent("[connect] configuration failed after \(Self.seconds(since: configurationStart)): \(error); \(self.setupSteps.joined(separator: ", "))")
                         // Will retry
                     }
+                } else if self.traceSetupOutcome == "not run" {
+                    self.setTrace(setup: "skipped")
+                    self.logDeviceEvent("[connect] configuration skipped: services already discovered")
                 }
                 // A pod that drops the link right after connecting usually accepts the next attempt
                 if BluetoothManager.connectOnDemandEnabled, linkWasUp, self.peripheral.state != .connected, attempt == 1 {
                     attempt += 1
-                    self.log.default("[connectOnDemand] link dropped after connecting — retrying")
-                    self.bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] link dropped after connecting — retrying")
+                    self.logDeviceEvent("[connectOnDemand] link dropped after connecting (setup \(self.traceSetupOutcome)) — retrying")
                     Thread.sleep(forTimeInterval: 2)
                     continue
                 }
                 break
             }
 
+            self.setTrace(phase: "idle")
             block(self)
         }
     }
@@ -217,7 +252,9 @@ extension PeripheralManager {
     }
 
     private func applyConfiguration(discoveryTimeout: TimeInterval = 2) throws {
-        try discoverServices(configuration.serviceCharacteristics.keys.map { $0 }, timeout: discoveryTimeout)
+        try setupStep("services") {
+            try discoverServices(configuration.serviceCharacteristics.keys.map { $0 }, timeout: discoveryTimeout)
+        }
 
         for service in peripheral.services ?? [] {
             log.default("Discovered service: %{public}@", service)
@@ -225,7 +262,9 @@ extension PeripheralManager {
                 // Not all services may have characteristics
                 continue
             }
-            try discoverCharacteristics(characteristics, for: service, timeout: discoveryTimeout)
+            try setupStep("characteristics") {
+                try discoverCharacteristics(characteristics, for: service, timeout: discoveryTimeout)
+            }
         }
 
         for (serviceUUID, characteristicUUIDs) in configuration.notifyingCharacteristics {
@@ -245,9 +284,93 @@ extension PeripheralManager {
                     continue
                 }
 
-                try setNotifyValue(true, for: characteristic, timeout: discoveryTimeout)
+                try setupStep("notify") {
+                    try setNotifyValue(true, for: characteristic, timeout: discoveryTimeout)
+                }
             }
         }
+    }
+}
+
+
+// MARK: - Device-log context
+extension PeripheralManager {
+    func logDeviceEvent(_ message: String) {
+        log.default("%{public}@", message)
+        bluetoothManager?.connectionDelegate?.omnipodLogDeviceEvent(message)
+    }
+
+    /// Time since connect, what the link is doing, and how setup went on this connection.
+    var linkContext: String {
+        traceLock.lock()
+        defer { traceLock.unlock() }
+        let since = connectedAt.map { "\(Self.seconds(since: $0)) \(connectedAtLabel)" } ?? "not connected"
+        return "\(since), during \(phase), setup \(setupOutcome)"
+    }
+
+    var traceSetupOutcome: String {
+        traceLock.lock()
+        defer { traceLock.unlock() }
+        return setupOutcome
+    }
+
+    func setTrace(phase: String? = nil, setup: String? = nil) {
+        traceLock.lock()
+        defer { traceLock.unlock() }
+        if let phase {
+            self.phase = phase
+        }
+        if let setup {
+            setupOutcome = setup
+        }
+    }
+
+    private func setTraceConnected(_ connected: Bool) {
+        traceLock.lock()
+        defer { traceLock.unlock() }
+        connectedAt = connected ? Date() : nil
+        connectedAtLabel = "after connect"
+        if connected {
+            setupOutcome = "not run"
+        }
+    }
+
+    /// Runs one setup step and records its duration, or the failure, for the setup's device-log line.
+    func setupStep<T>(_ name: String, _ body: () throws -> T) throws -> T {
+        dispatchPrecondition(condition: .onQueue(queue))
+        let start = Date()
+        do {
+            let result = try body()
+            setupSteps.append("\(name) \(Self.seconds(since: start))")
+            return result
+        } catch {
+            setupSteps.append("\(name) failed after \(Self.seconds(since: start))")
+            failedSetupStep = name
+            throw error
+        }
+    }
+
+    func noteSetupStep(_ step: String) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        setupSteps.append(step)
+    }
+
+    static func seconds(since date: Date) -> String {
+        String(format: "%.3fs", Date().timeIntervalSince(date))
+    }
+
+    var stateDescription: String {
+        let peripheralState: String
+        switch peripheral.state {
+        case .disconnected: peripheralState = "disconnected"
+        case .connecting: peripheralState = "connecting"
+        case .connected: peripheralState = "connected"
+        case .disconnecting: peripheralState = "disconnecting"
+        @unknown default: peripheralState = "state \(peripheral.state.rawValue)"
+        }
+        let centralState = central.map { $0.state == .poweredOn ? "poweredOn" : "state \($0.state.rawValue)" } ?? "none"
+        let characteristics = peripheral.getCommandCharacteristic(profile: profile) != nil && peripheral.getDataCharacteristic(profile: profile) != nil
+        return "peripheral \(peripheralState), central \(centralState), characteristics \(characteristics ? "present" : "missing")"
     }
 }
 
@@ -376,14 +499,14 @@ extension PeripheralManager {
                 addCondition(.connect)
                 // Scan-free connect: the peripheral is a known/recovered CBPeripheral (via
                 // retrievePeripherals), so a plain connect() registers a pending connect and iOS
-                // reacquires the pod on its own — no scan needed. Route through BluetoothManager so
-                // the central call runs on managerQueue (see connectOnDemand helper).
+                // reacquires the pod on its own — no scan needed. BluetoothManager owns the
+                // connect-on-demand state, so the connect goes through it.
                 bluetoothManager?.connectOnDemand(peripheral)
             }
         } catch {
             // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
-            // instead of leaving it wedged in .connecting. Queue-correct cancel via BluetoothManager.
-            bluetoothManager?.disconnectOnDemand(peripheral)
+            // instead of leaving it in .connecting.
+            bluetoothManager?.disconnectOnDemand(peripheral, reason: "connect timed out")
             throw error
         }
         log.default("[connectOnDemand] connected in %{public}@s", String(format: "%.3f", Date().timeIntervalSince(start)))
@@ -593,6 +716,7 @@ extension PeripheralManager {
     func centralManager(_ central: CBCentralManager, didDisconnect peripheral: CBPeripheral, error: Error?) {
         log.error("[DISCONNECT] PeripheralManager didDisconnect: error=%{public}@ peripheral=%{public}@",
                   String(describing: error), peripheral)
+        setTraceConnected(false)
         self.queue.async {
             self.idleStart = nil
         }
@@ -602,6 +726,7 @@ extension PeripheralManager {
         self.log.debug("PeripheralManager - didConnect: %@", peripheral)
         switch peripheral.state {
         case .connected:
+            setTraceConnected(true)
             clearCommsQueues()
 
             /// maximumWriteValueLength (MTU minus 3-byte overhead) is the max bytes to write in a single operation.
@@ -682,7 +807,9 @@ extension PeripheralManager {
             self.perform(enqueuedAt: enqueuedAt) { (manager) in
                 defer { bluetoothManager?.endCommandSession() }
                 manager.log.default("======================== %{public}@ ===========================", name)
+                manager.setTrace(phase: "session \(name)")
                 block()
+                manager.setTrace(phase: "idle")
                 manager.log.default("------------------------ %{public}@ ---------------------------", name)
                 manager.idleStart = Date()
                 manager.log.default("Start of idle at %{public}@", String(describing: manager.idleStart))
@@ -716,9 +843,7 @@ extension PeripheralManager {
             guard self.idleStart == idleAt, self.sessionQueue.operationCount == 0,
                   self.peripheral.state == .connected else { return }
             self.log.default("[connectOnDemand] idle ~%{public}ds, no queued session -> disconnecting", Int(idleDelay))
-            // Queue-correct cancel: route through BluetoothManager so it runs on managerQueue. Cancelling
-            // from this (PeripheralManager) queue raced CoreBluetooth's teardown and wedged the next connect.
-            self.bluetoothManager?.disconnectOnDemand(self.peripheral)
+            self.bluetoothManager?.disconnectOnDemand(self.peripheral, reason: "idle")
         }
     }
 }
