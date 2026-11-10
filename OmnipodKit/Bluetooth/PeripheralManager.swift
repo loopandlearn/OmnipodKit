@@ -207,6 +207,8 @@ extension PeripheralManager {
                         if let delegate = self.delegate {
                             try delegate.completeConfiguration(for: self)
                             self.log.bleDebug("Delegate configuration notified")
+                        } else {
+                            self.noteSetupStep("no delegate, login skipped")
                         }
 
                         self.log.bleDebug("Peripheral configuration completed")
