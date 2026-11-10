@@ -34,6 +34,30 @@ enum PodLifeState {
         }
     }
     
+    // Components of the time until expiration shown on the pod life row.
+    // A day or more remaining shows days and hours, less than a day shows
+    // hours and minutes, and less than an hour shows only minutes.
+    var daysRemaining: Int? {
+        if case .timeRemaining(let remaining, _) = self, remaining >= .days(1) {
+            return Int(remaining.days)
+        }
+        return nil
+    }
+
+    var hoursRemaining: Int? {
+        if case .timeRemaining(let remaining, _) = self, remaining >= .hours(1) {
+            return Int(remaining.hours.truncatingRemainder(dividingBy: 24))
+        }
+        return nil
+    }
+
+    var minutesRemaining: Int? {
+        if case .timeRemaining(let remaining, _) = self, remaining < .days(1) {
+            return Int(remaining.minutes.truncatingRemainder(dividingBy: 60))
+        }
+        return nil
+    }
+
     func progressColor(guidanceColors: GuidanceColors) -> Color {
         switch self {
         case .expired:
