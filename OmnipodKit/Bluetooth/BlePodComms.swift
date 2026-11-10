@@ -794,6 +794,7 @@ extension BlePodComms: PeripheralManagerDelegate {
                     attempts += 1
                 }
                 log.bleDebug("maximumWriteValueLength settled after %{public}d polls: maximumWriteValueLength=%{public}d (required=%{public}d)", attempts, maxWriteValue, requiredMaxPayload)
+                manager.noteSetupStep("write size \(maxWriteValue) after \(attempts) polls")
                 if maxWriteValue < requiredMaxPayload {
                     log.error("WARNING: maximumWriteValueLength (%{public}d) below required minimum (%{public}d). Large writes may be truncated!", maxWriteValue, requiredMaxPayload)
                 }
@@ -805,17 +806,20 @@ extension BlePodComms: PeripheralManagerDelegate {
             }
 
             do {
-                try manager.sendHello(myId: myId)
-                try manager.enableNotifications() // Seemingly this cannot be done before the hello command, or the pod disconnects
-                try establishNewSession()
+                try manager.setupStep("hello") { try manager.sendHello(myId: myId) }
+                // Seemingly this cannot be done before the hello command, or the pod disconnects
+                try manager.setupStep("notifications") { try manager.enableNotifications() }
+                try manager.setupStep("login") { try establishNewSession() }
                 needsSessionEstablishment = false
                 delegate?.podCommsDidEstablishSession(self)
             } catch {
                 log.error("Pod session sync error: %{public}@", String(describing: error))
+                throw error
             }
 
         } else {
             log.default("Session already established.")
+            manager.noteSetupStep(hasLTK ? "login already done" : "not paired")
         }
     }
 }
