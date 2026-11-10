@@ -271,7 +271,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 {
                     self.pumpDelegate.notify({ (delegate) in
                         self.log.info("DU: updating reservoir level %{public}@", String(describing: reservoirLevel))
-                        delegate?.pumpManager(self, didReadReservoirValue: reservoirLevel, at: lastInsulinMeasurements.validTime) { _ in }
+                        _ = try? await delegate?.pumpManager(self, didReadReservoirValue: reservoirLevel, at: lastInsulinMeasurements.validTime)
                     })
                 }
             }
@@ -282,7 +282,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
                     let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump))
-                    delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false) { _ in }
+                    try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
                     delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
                 }
             }
@@ -297,7 +297,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         // Ideally we ensure that oldValue.rawValue != newValue.rawValue, but the types aren't
         // defined as equatable
         pumpDelegate.notify { (delegate) in
-            delegate?.pumpManagerDidUpdateState(self)
+            await delegate?.pumpManagerDidUpdateState(self)
         }
 
         if let oldStatus = oldStatus, shouldNotifyStatusUpdate {
@@ -400,7 +400,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         if self.provideHeartbeat, dateGenerator().timeIntervalSince(lastHeartbeat) > .minutes(2) {
             logDeviceCommunication("[heartbeat] pumpManagerBLEHeartbeatDidFire — Loop cycle triggered", type: .connection)
             self.pumpDelegate.notify { (delegate) in
-                delegate?.pumpManagerBLEHeartbeatDidFire(self)
+                await delegate?.pumpManagerBLEHeartbeatDidFire(self)
             }
             self.lastHeartbeat = Date()
         }
@@ -524,7 +524,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
     public override func deviceTimerDidTick(_ device: RileyLinkDevice) {
         pumpDelegate.notify { (delegate) in
-            delegate?.pumpManagerBLEHeartbeatDidFire(self)
+            await delegate?.pumpManagerBLEHeartbeatDidFire(self)
         }
         if state.podKeepAlive == .rileyLink {
             rileyLinkTimerDidTick()
@@ -541,11 +541,11 @@ public class OmniPumpManager: RileyLinkPumpManager {
             self.setState { state in
                 state.lastRileyLinkBatteryAlertDate = Date()
             }
-            Task {
-                let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: "lowRLBattery")
-                let alertBody = String(format: LocalizedString("\"%1$@\" has a low battery", comment: "Format string for low battery alert body for RileyLink. (1: device name)"), device.name ?? "unnamed")
-                let content = Alert.Content(title: LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert"), body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
-                await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
+            let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: "lowRLBattery")
+            let alertBody = String(format: LocalizedString("\"%1$@\" has a low battery", comment: "Format string for low battery alert body for RileyLink. (1: device name)"), device.name ?? "unnamed")
+            let content = Alert.Content(title: LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert"), body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
+            pumpDelegate.notify { delegate in
+                await delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
             }
         }
     }
@@ -1272,7 +1272,7 @@ extension OmniPumpManager {
         pumpDelegate.notify { (delegate) in
             let date = Date()
             let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Removed \(date)".data(using: .utf8)!, title: title)
-            delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false) { _ in }
+            try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
             delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Ended", properties: properties)
         }
     }
@@ -1502,7 +1502,7 @@ extension OmniPumpManager {
                         self.resetPerPodPumpManagerState()
 
                         self.pumpDelegate.notify { (delegate) in
-                            delegate?.pumpManagerPumpWasReplaced(self)
+                            await delegate?.pumpManagerPumpWasReplaced(self)
                         }
 
                         // Calls completion
@@ -1532,7 +1532,7 @@ extension OmniPumpManager {
                             }
 
                             self.pumpDelegate.notify { (delegate) in
-                                delegate?.pumpManagerPumpWasReplaced(self)
+                                await delegate?.pumpManagerPumpWasReplaced(self)
                             }
 
                             blePairSetupPrimePod(blePodComms: blePodComms)
@@ -2537,15 +2537,6 @@ extension OmniPumpManager: PumpManager {
         }
     }
 
-    public var delegateQueue: DispatchQueue! {
-        get {
-            return pumpDelegate.queue
-        }
-        set {
-            pumpDelegate.queue = newValue
-        }
-    }
-
 
     // MARK: Methods
 
@@ -2664,9 +2655,9 @@ extension OmniPumpManager: PumpManager {
     }
 
     fileprivate func clearSuspendReminder() {
-        Task {
-            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
-            await self.pumpDelegate.delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
+        pumpDelegate.notify { delegate in
+            await delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).alertIdentifier))
+            await delegate?.retractAlert(identifier: Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: PumpManagerAlert.suspendEnded(triggeringSlot: nil).repeatingAlertIdentifier))
         }
     }
 
@@ -3204,16 +3195,16 @@ extension OmniPumpManager: PumpManager {
     func issueAlert(alert: PumpManagerAlert) {
         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
         let loopAlert = Alert(identifier: identifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .immediate)
-        Task {
-            await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+        pumpDelegate.notify { delegate in
+            await delegate?.issueAlert(loopAlert)
         }
 
         if let repeatInterval = alert.repeatInterval {
             // Schedule an additional repeating 15 minute reminder for suspend period ended.
             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
             let loopAlert = Alert(identifier: repeatingIdentifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .repeating(repeatInterval: repeatInterval))
-            Task {
-                await self.pumpDelegate.delegate?.issueAlert(loopAlert)
+            pumpDelegate.notify { delegate in
+                await delegate?.issueAlert(loopAlert)
             }
         }
 
@@ -3224,13 +3215,13 @@ extension OmniPumpManager: PumpManager {
 
     func retractAlert(alert: PumpManagerAlert) {
         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
-        Task {
-            await self.pumpDelegate.delegate?.retractAlert(identifier: identifier)
+        pumpDelegate.notify { delegate in
+            await delegate?.retractAlert(identifier: identifier)
         }
         if alert.isRepeating {
             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
-            Task {
-                await self.pumpDelegate.delegate?.retractAlert(identifier: repeatingIdentifier)
+            pumpDelegate.notify { delegate in
+                await delegate?.retractAlert(identifier: repeatingIdentifier)
             }
         }
         self.setState { (state) in
@@ -3380,14 +3371,12 @@ extension OmniPumpManager: PumpManager {
                                      raw: "Pod Fault \(fault.faultEventCode.rawValue) \(date)".data(using: .utf8)!,
                                      title: fault.faultEventCode.description,
                                      type: .alarm)
-            delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false) { _ in }
-        }
+            try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
 
-        Task {
             let content = Alert.Content(title: fault.faultEventCode.notificationTitle,
                                         body: fault.faultEventCode.notificationBody,
                                         acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Alert acknowledgment OK button"))
-            await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
+            await delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
                                                                     alertIdentifier: fault.faultEventCode.description),
                                        foregroundContent: content, backgroundContent: content,
                                        trigger: .immediate))
@@ -3410,8 +3399,8 @@ extension OmniPumpManager: PumpManager {
             semaphore.signal()
         }
 
-        // Bounded wait to guarantee liveness. The completion is dispatched to the delegate queue (Loop's
-        // is .main), while this runs on the pod command queue HOLDING podStateLock (BlePodComms.bleRunSession).
+        // Bounded wait to guarantee liveness. The delegate stores the doses where it chooses (Loop: the main
+        // actor), while this runs on the pod command queue HOLDING podStateLock (BlePodComms.bleRunSession).
         // If the main thread is itself blocked acquiring podStateLock — e.g. a concurrent forgetPod /
         // handleDiscardedPodDosing during pod deactivation — an untimed wait() deadlocks the command queue
         // forever (observed: deactivating a faulted pod hung ~10 min until force-kill). On timeout, bail and
@@ -3439,13 +3428,12 @@ extension OmniPumpManager: PumpManager {
                 preconditionFailure("pumpManagerDelegate cannot be nil")
             }
 
-            delegate.pumpManager(self, hasNewPumpEvents: doses.map { NewPumpEvent($0) }, lastReconciliation: lastSync, replacePendingEvents: true) { (error) in
-                if let error = error {
-                    self.log.error("Error storing pod events: %@", String(describing: error))
-                } else {
-                    self.log.info("DU: Stored pod events: %@", String(describing: doses))
-                }
-
+            do {
+                try await delegate.pumpManager(self, hasNewPumpEvents: doses.map { NewPumpEvent($0) }, lastReconciliation: lastSync, replacePendingEvents: true)
+                self.log.info("DU: Stored pod events: %@", String(describing: doses))
+                completion(nil)
+            } catch {
+                self.log.error("Error storing pod events: %@", String(describing: error))
                 completion(error)
             }
         }
