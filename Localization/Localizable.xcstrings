@@ -9657,19 +9657,79 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Back"
+            "value" : "返回"
           }
         }
       }
     },
     "Background keep alive enabled using a selected RileyLink-compatible device in the pump view that is in Bluetooth range. This method uses less iPhone battery than the Silent Tune method." : {
-      "comment" : "Description for PodKeepAlive.rileyLink"
+      "comment" : "Description for PodKeepAlive.rileyLink",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app blijft op de achtergrond actief via het RileyLink-compatibele apparaat dat je in het pompscherm hebt geselecteerd. Dit apparaat moet binnen Bluetooth-bereik zijn. Deze methode verbruikt minder iPhone-batterij dan de Silent Tune-methode."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menținerea în viață în fundal activată folosind un dispozitiv compatibil RileyLink selectat în vizualizarea pompei, aflat în raza de acoperire Bluetooth. Această metodă utilizează mai puțină baterie din iPhone decât metoda melodie silențioasă."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后台保持连接功能，只需在泵视图中选择一台在蓝牙范围内的 RileyLink 兼容设备即可。此方法比静音调谐方法更省电。"
+          }
+        }
+      }
     },
     "Background keep alive enabled using a silent tune. If silent tune is interrupted by other apps, pod keep alive will stop working. The silent tune consumes extra iPhone battery." : {
-      "comment" : "Description for PodKeepAlive.silentTune"
+      "comment" : "Description for PodKeepAlive.silentTune",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app blijft op de achtergrond actief door een geluidloos deuntje af te spelen. Als andere apps dit onderbreken, werkt het actief houden van de podverbinding niet meer. Deze methode verbruikt extra iPhone-batterij."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menținerea în viață în fundal activată folosind o melodie silențioasă. Dacă melodia silențioasă este întreruptă de alte aplicații, menținerea în viață a pompei va înceta să funcționeze. Melodia silențioasă consumă în plus din bateria iPhone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台保持连接功能已启用，并使用了静音曲调。如果静音曲调被其他应用中断，后台保持连接功能将停止工作。静音曲调会消耗额外的 iPhone 电量。"
+          }
+        }
+      }
     },
     "Background keep alive is off (default)." : {
-      "comment" : "Description for PodKeepAlive.disabled"
+      "comment" : "Description for PodKeepAlive.disabled",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app op de achtergrond actief houden staat uit (standaard)."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menținerea în viață în fundal este dezactivată (implicit)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台保持活动状态已关闭（默认）。"
+          }
+        }
+      }
     },
     "Background wake-ups from the pod are less frequent on this pod and phone combination." : {
       "comment" : "Subtitle of BLE heartbeat degraded notice row",
@@ -10031,7 +10091,27 @@
       }
     },
     "blue" : {
-      "comment" : "Tab color for DASH Pods"
+      "comment" : "Tab color for DASH Pods",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blauwe"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "albastru"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蓝色"
+          }
+        }
+      }
     },
     "Bluetooth is powered off" : {
       "comment" : "Error description for BluetoothManagerError.bluetoothNotAvailable(.poweredOff)",
@@ -13883,7 +13963,27 @@
       }
     },
     "clear" : {
-      "comment" : "Tab color for Classic and Omnipod 5 Pods"
+      "comment" : "Tab color for Classic and Omnipod 5 Pods",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "doorzichtige"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "transparent"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
     },
     "Command error %1$@: %2$@" : {
       "comment" : "Format string for invalid message error code (1: error code number) (2: error description)",
@@ -15331,7 +15431,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mementourile de confirmare vor suna pentru comenzile pe care le inițiați, precum bolus, anularea bolusului, suspendare, reluare, salvarea mementourilor de confirmare etc. Când %@ ajustează automat administrarea, nu sunt folosite mementouri de confirmare."
+            "value" : "Mementourile de confirmare vor suna pentru comenzile pe care le inițiați, precum bolus, anularea bolusului, suspendare, reluare, salvarea mementourilor de confirmare șamd. Când %@ ajustează automat administrarea, nu sunt folosite mementouri de confirmare."
           }
         },
         "ru" : {
@@ -16357,7 +16457,27 @@
       }
     },
     "Connecting to pod…" : {
-      "comment" : "Status shown while deactivation waits for a pod connection"
+      "comment" : "Status shown while deactivation waits for a pod connection",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinding maken met de Pod"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se stabilește conexiunea cu pompa…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在连接 Pod……"
+          }
+        }
+      }
     },
     "Connecting to the pod may sometimes take noticeably longer than usual — occasionally up to 30 seconds — while stalled attempts are detected and retried automatically. Commands still complete once the connection is made." : {
       "comment" : "InPlay connection info: what to expect body 1",
@@ -23756,7 +23876,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A eșuat citirea jurnalului de impulsuri plus"
+            "value" : "A eșuat citirea jurnalului extra de impulsuri"
           }
         },
         "ru" : {
@@ -24566,7 +24686,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A eșuat actualizarea preferinței de reamintire a încrederii"
+            "value" : "A eșuat actualizarea preferinței de reamintire a confirmării"
           }
         },
         "ru" : {
@@ -25376,7 +25496,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A avut loc un eveniment de eroare"
+            "value" : "A apărut un eveniment de eroare"
           }
         },
         "ru" : {
@@ -29063,7 +29183,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Administrarea insulinei suspendată"
+            "value" : "Administrarea insulinei \nSuspendată"
           }
         },
         "ru" : {
@@ -32086,7 +32206,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dacă țineți telefonul lângă pompă, conexiunile se finalizează mai rapid. Nu toate pompele această frecvență radio - este posibil ca o pompă viitoare să se conecteze normal."
+            "value" : "Dacă țineți telefonul lângă pompă, conexiunile se finalizează mai rapid. Nu toate pompele această frecvență radio — este posibil ca o pompă viitoare să se conecteze normal."
           }
         },
         "zh-Hans" : {
@@ -33543,7 +33663,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rezervor scăzut implicit"
+            "value" : "Valoare implicită rezervor scăzut"
           }
         },
         "ru" : {
@@ -37472,7 +37592,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fără livrare"
+            "value" : "Nicio administrare"
           }
         },
         "ru" : {
@@ -37520,7 +37640,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不送货"
+            "value" : "停止输注"
           }
         }
       }
@@ -47199,7 +47319,27 @@
       }
     },
     "Pod Change (%@)" : {
-      "comment" : "Pump event title for a newly paired pod (1: pod type)"
+      "comment" : "Pump event title for a newly paired pod (1: pod type)",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod wissel (%@)"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schimbare pompă (%@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod 更换（%@）"
+          }
+        }
+      }
     },
     "Pod Connections" : {
       "comment" : "Navigation bar title for InPlay connection info view",
@@ -51299,7 +51439,27 @@
       }
     },
     "Pod keep alive options to issue background status requests to minimize pod disconnects. Should no longer be needed for any iPhone and pod combination." : {
-      "comment" : "Summary of the Pod Keep Alive concept"
+      "comment" : "Summary of the Pod Keep Alive concept",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opties om op de achtergrond de status van de pod op te vragen en zo verbindingsverlies te beperken. Dit zou bij geen enkele combinatie van iPhone en pod meer nodig moeten zijn."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opțiuni de menținere activă a pompelor pentru a emite solicitări de stare în fundal, în vederea reducerii la minimum a deconectărilor. Nu ar trebui să mai fie necesare pentru nicio combinație de iPhone și pompă."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod 保留了“保持活动”选项，用于发送后台状态请求，以最大限度地减少 Pod 断开连接的情况。对于任何 iPhone 与 Pod 的组合，此功能应已不再需要。"
+          }
+        }
+      }
     },
     "Pod not connected" : {
       "comment" : "Error message shown when the pod is not connected.",
@@ -51950,7 +52110,27 @@
       }
     },
     "Pod Removed after %@" : {
-      "comment" : "Pump event title when a pod ends (1: pod lifetime)"
+      "comment" : "Pump event title when a pod ends (1: pod lifetime)",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod verwijderd na %@"
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pompa îndepărtată după %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@之后Pod 已移除"
+          }
+        }
+      }
     },
     "Pod sent ack instead of response" : {
       "comment" : "Error message shown when pod sends ack instead of response",
@@ -55707,7 +55887,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Citiți pulsul Log Plus"
+            "value" : "Citiți jurnalul extra de impulsuri"
           }
         },
         "ru" : {
@@ -56355,7 +56535,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Citirea jurnalului de impulsuri plus..."
+            "value" : "Citirea jurnalului extra de impulsuri..."
           }
         },
         "ru" : {
@@ -56517,7 +56697,7 @@
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Citirea jurnalul de impulsuri..."
+            "value" : "Citirea jurnalului de impulsuri..."
           }
         },
         "ru" : {
@@ -68727,7 +68907,27 @@
       }
     },
     "The pod is not responding. Still trying…" : {
-      "comment" : "Status shown when a deactivation connection attempt is taking a while"
+      "comment" : "Status shown when a deactivation connection attempt is taking a while",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je Pod reageert niet. Nog steeds aan het proberen..."
+          }
+        },
+        "ro" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pompa nu răspunde. Încă se încearcă…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该设备没有响应。仍在尝试……"
+          }
+        }
+      }
     },
     "The reminders above will not sound on your device when it is in Silent or Do Not Disturb mode. There are other critical Pod alerts that will sound on your device even when set to Silent or Do Not Disturb mode.\n\nThe Pod will also use audible beeps for all Pod reminders and alerts except when the Pod is Silenced." : {
       "comment" : "Description text for critical alerts",
