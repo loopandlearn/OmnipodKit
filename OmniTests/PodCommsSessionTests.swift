@@ -10,6 +10,7 @@
 import Foundation
 
 import XCTest
+import LoopKit
 @testable import OmnipodKit
 
 class MockMessageTransport: MessageTransport {

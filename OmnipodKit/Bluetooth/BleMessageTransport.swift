@@ -46,8 +46,9 @@ struct BleMessageTransportState: MessageTransportState {
             else {
                 return nil
         }
-        self.ck = Data(hex: ckString)
-        self.noncePrefix = Data(hex: noncePrefixString)
+        // A missing key is saved as "" and reads back missing, not as an empty key.
+        self.ck = ckString.isEmpty ? nil : Data(hex: ckString)
+        self.noncePrefix = noncePrefixString.isEmpty ? nil : Data(hex: noncePrefixString)
         self.eapSeq = rawValue["eapSeq"] as? Int ?? 1
         self.msgSeq = msgSeq
         self.nonceSeq = nonceSeq
@@ -183,7 +184,8 @@ class BlePodMessageTransport: MessageTransport {
         self.podId = podId
         self.state = state
         
-        guard let noncePrefix = self.noncePrefix, let ck = self.ck else { return }
+        // Without both session keys nothing is encrypted, and every send throws podNotConnected.
+        guard let noncePrefix = self.noncePrefix, noncePrefix.count == Nonce.prefixLength, let ck = self.ck, !ck.isEmpty else { return }
         self.nonce = Nonce(prefix: noncePrefix)
         self.enDecrypt = EnDecrypt(nonce: self.nonce!, ck: ck)
         self.signingKey = signingKey
@@ -206,7 +208,10 @@ class BlePodMessageTransport: MessageTransport {
     /// The ECDSA signature covers the complete encrypted message: AAD(16) + ciphertext + tag(8).
     func sendMessage(_ message: Message) throws -> Message {
 
-        guard manager.peripheral.state == .connected else {
+        // A pod released to another controller is sent nothing, however the link came up: a session
+        // queued before the release, or a connection that landed as it happened. Before any IO, so
+        // the command is a certain failure.
+        guard manager.peripheral.state == .connected, manager.bluetoothManager?.isReleasedForLoan != true else {
             throw PodCommsError.podNotConnected
         }
 
