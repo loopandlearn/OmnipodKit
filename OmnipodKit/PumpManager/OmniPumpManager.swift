@@ -3524,7 +3524,7 @@ extension OmniPumpManager: PodCommsDelegate {
 
         // ExclusiveDeviceControl readiness, before the setup guard: a taken pod is already set up.
         pumpDelegate.notify { (delegate) in
-            delegate?.deviceManagerControlDidBecomeReady(self)
+            await delegate?.deviceManagerControlDidBecomeReady(self)
         }
 
         guard podComms.podState?.isSetupComplete == true else {

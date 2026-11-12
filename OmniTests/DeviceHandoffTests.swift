@@ -33,7 +33,7 @@ final class DeviceHandoffTests: XCTestCase {
                                eapSeq: 41, msgSeq: 7, nonceSeq: 9, messageNumber: 3),
                            ltk: ltk, bleIdentifier: "0B1D2C3E-0000-4000-8000-00000000A001")
         pod.setupProgress = .completed
-        pod.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 2.0, startTime: bolusStart,
+        pod.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 2.0, startTime: bolusStart,
                                                scheduledCertainty: .certain, insulinType: .novolog)
         pod.unacknowledgedCommand = .stopProgram(.tempBasal, 3, Date(), false)
         pod.lastInsulinMeasurements = PodInsulinMeasurements(insulinDelivered: 12.35, reservoirLevel: nil,
@@ -278,7 +278,7 @@ final class DeviceHandoffTests: XCTestCase {
     func testAReleaseWithNothingInFlightKeepsTheFinishedRecords() throws {
         var pod = makePodState()
         pod.unfinalizedBolus = nil
-        pod.finalizedDoses = [UnfinalizedDose(decisionId: nil, bolusAmount: 1.0, startTime: Date(timeIntervalSinceNow: -3600),
+        pod.finalizedDoses = [UnfinalizedDose(doseId: nil, bolusAmount: 1.0, startTime: Date(timeIntervalSinceNow: -3600),
                                               scheduledCertainty: .certain, insulinType: .novolog)]
         var state = makeState(pod: pod)
         state.releaseControl()
