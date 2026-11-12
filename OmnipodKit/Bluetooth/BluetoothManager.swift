@@ -1287,10 +1287,18 @@ class BluetoothManager: NSObject {
     /// A known pod is connected with a plain connect(); iOS completes it on the pod's next advertisement.
     private func connectForCommand(_ peripheral: CBPeripheral) {
         dispatchPrecondition(condition: .onQueue(managerQueue))
+        let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
+        // One pending connect per pod. A second caller (a hand-over's dial, then its first command)
+        // waits on the connect already asked for: didConnect satisfies every waiting session. Asking
+        // again made the system refuse one of the two with "maximum number of connections".
+        if target.state == .connecting || peripheral.state == .connecting {
+            log.default("[connectOnDemand] connect already pending for %{public}@", peripheral.identifier.uuidString)
+            connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connect already pending")
+            return
+        }
         log.default("[connectOnDemand] connect %{public}@", peripheral.identifier.uuidString)
         connectionDelegate?.omnipodLogDeviceEvent("[connectOnDemand] connect")
         connectRequestedAt[peripheral.identifier.uuidString] = Date()
-        let target = manager.retrievePeripherals(withIdentifiers: [peripheral.identifier]).first ?? peripheral
         if let device = devices.first(where: { $0.manager.peripheral.identifier == peripheral.identifier }) {
             device.manager.peripheral = target
         }
