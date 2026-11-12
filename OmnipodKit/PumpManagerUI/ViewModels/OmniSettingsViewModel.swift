@@ -355,8 +355,8 @@ class OmniSettingsViewModel: ObservableObject {
         }
     }
 
-    func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
-        pumpManager.runTemporaryBasalProgram(decisionId: decisionId, unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
+    func runTemporaryBasalProgram(doseId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
+        pumpManager.runTemporaryBasalProgram(doseId: doseId, unitsPerHour: unitsPerHour, for: duration, automatic: false, completion: completion)
     }
 
     func saveScheduledExpirationReminder(_ selectedDate: Date?, _ completion: @escaping (Error?) -> Void) {

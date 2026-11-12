@@ -418,7 +418,7 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         if deliveryStatus.bolusing && unfinalizedBolus == nil { // active bolus that we aren't tracking
             if podProgressStatus.readyForDelivery && !untrackedDeliveryIsForeign {
                 // Create an unfinalizedBolus with the remaining bolus amount to capture what we can.
-                unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
+                unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: bolusNotDelivered, startTime: date, scheduledCertainty: .certain, insulinType: insulinType, automatic: false)
             }
         }
         if deliveryStatus.tempBasalRunning && unfinalizedTempBasal == nil { // active temp basal that we aren't tracking
