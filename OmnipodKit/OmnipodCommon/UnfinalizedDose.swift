@@ -67,7 +67,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     var isHighTemp: Bool =
         false // Track this for situations where cancelling temp basal is unacknowledged, and recovery fails, and we have to assume the most possible delivery
     var insulinType: InsulinType?
-    var decisionId: UUID?
+    var doseId: UUID?
 
     var finishTime: Date? {
         get {
@@ -107,7 +107,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
     }
 
     init(
-        decisionId: UUID?,
+        doseId: UUID?,
         bolusAmount: Double,
         startTime: Date,
         scheduledCertainty: ScheduledCertainty,
@@ -122,11 +122,11 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         scheduledUnits = nil
         self.automatic = automatic
         self.insulinType = insulinType
-        self.decisionId = decisionId
+        self.doseId = doseId
     }
 
     init(
-        decisionId: UUID?,
+        doseId: UUID?,
         tempBasalRate: Double,
         startTime: Date,
         duration: TimeInterval,
@@ -144,7 +144,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         self.automatic = automatic
         self.isHighTemp = isHighTemp
         self.insulinType = insulinType
-        self.decisionId = decisionId
+        self.doseId = doseId
     }
 
     init(suspendStartTime: Date, scheduledCertainty: ScheduledCertainty) {
@@ -330,8 +330,8 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
             insulinType = InsulinType(rawValue: rawInsulinType)
         }
 
-        if let decisionIdString = rawValue["decisionId"] as? String {
-            self.decisionId = UUID(uuidString: decisionIdString)
+        if let doseIdString = (rawValue["doseId"] ?? rawValue["decisionId"]) as? String {
+            self.doseId = UUID(uuidString: doseIdString)
         }
     }
 
@@ -349,7 +349,7 @@ public struct UnfinalizedDose: RawRepresentable, Equatable, CustomStringConverti
         rawValue["scheduledTempRate"] = scheduledTempRate
         rawValue["duration"] = duration
         rawValue["insulinType"] = insulinType?.rawValue
-        rawValue["decisionId"] = decisionId?.uuidString
+        rawValue["doseId"] = doseId?.uuidString
 
         return rawValue
     }
@@ -384,7 +384,7 @@ extension DoseEntry {
                 endDate: dose.finishTime,
                 value: dose.scheduledUnits ?? dose.units,
                 unit: .units,
-                decisionId: dose.decisionId,
+                doseId: dose.doseId,
                 deliveredUnits: dose.finalizedUnits,
                 insulinType: dose.insulinType,
                 automatic: dose.automatic,
@@ -397,7 +397,7 @@ extension DoseEntry {
                 endDate: dose.finishTime,
                 value: dose.scheduledTempRate ?? dose.rate,
                 unit: .unitsPerHour,
-                decisionId: dose.decisionId,
+                doseId: dose.doseId,
                 deliveredUnits: dose.finalizedUnits,
                 insulinType: dose.insulinType,
                 automatic: dose.automatic,
@@ -420,7 +420,7 @@ extension StartProgram {
         switch self {
         case let .bolus(volume: volume, automatic: automatic):
             return UnfinalizedDose(
-                decisionId: nil,
+                doseId: nil,
                 bolusAmount: volume,
                 startTime: programDate,
                 scheduledCertainty: certainty,
@@ -429,7 +429,7 @@ extension StartProgram {
             )
         case let .tempBasal(unitsPerHour: rate, duration: duration, isHighTemp, automatic):
             return UnfinalizedDose(
-                decisionId: nil,
+                doseId: nil,
                 tempBasalRate: rate,
                 startTime: programDate,
                 duration: duration,

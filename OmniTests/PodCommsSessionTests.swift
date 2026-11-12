@@ -66,7 +66,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
 
     func testBolusFinishedEarlyOnPodIsMarkedNonMutable() {
          let mockStart = Date()
-         podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 4.45, startTime: mockStart, scheduledCertainty: .certain, insulinType: .novolog)
+         podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4.45, startTime: mockStart, scheduledCertainty: .certain, insulinType: .novolog)
          let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
 
          // Simulate a status request a bit before the bolus is expected to finish
@@ -99,7 +99,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let bolusStart = activatedAt + .minutes(98.5)
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 
@@ -118,7 +118,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let bolusStart = activatedAt + .minutes(98.5)
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
 
         // 0x18 empty reservoir fault at 100 minutes with 1.8 U (36 pulses) of the bolus not delivered
         let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000240508001800640000006900001900000000")!)
@@ -143,7 +143,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         podState.setupProgress = .completed
         let bolusStart = activatedAt + .minutes(98.5)
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
 
         // 0x18 empty reservoir fault at 100 minutes with 1.8 U (36 pulses) of the bolus not delivered
         let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000240508001800640000006900001900000000")!)
@@ -171,7 +171,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         // A 2 U bolus started 5 s into the fault's minute, so the fault time (minute 100) is before it started
         let bolusStart = activatedAt + .minutes(100) + 5
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 
@@ -196,7 +196,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         // A slow pod clock: the bolus started 50 s into the fault's minute and stopped after that minute
         let bolusStart = activatedAt + .minutes(100) + 50
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 
@@ -218,7 +218,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let tempBasalStart = activatedAt + .minutes(90)
-        podState.unfinalizedTempBasal = UnfinalizedDose(decisionId: nil, tempBasalRate: 1, startTime: tempBasalStart, duration: .minutes(30), isHighTemp: false, automatic: true, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedTempBasal = UnfinalizedDose(doseId: nil, tempBasalRate: 1, startTime: tempBasalStart, duration: .minutes(30), isHighTemp: false, automatic: true, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 
@@ -239,7 +239,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let bolusStart = activatedAt + .minutes(100)
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         let now = bolusStart + 45
         session.mockCurrentDate = now
@@ -262,7 +262,7 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife
         let bolusStart = activatedAt + .minutes(100)
-        podState.unfinalizedBolus = UnfinalizedDose(decisionId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
         let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
         session.mockCurrentDate = activatedAt + .minutes(105)
 

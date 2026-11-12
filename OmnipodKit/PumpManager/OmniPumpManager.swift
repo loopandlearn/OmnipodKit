@@ -2710,7 +2710,7 @@ extension OmniPumpManager: PumpManager {
 
     // MARK: - Programming Delivery
 
-    public func enactBolus(decisionId: UUID?, units: Double, activationType: BolusActivationType, completion: @escaping (PumpManagerError?) -> Void) {
+    public func enactBolus(doseId: UUID, units: Double, activationType: BolusActivationType, completion: @escaping (PumpManagerError?) -> Void) {
         guard self.hasActivePod else {
             completion(.configuration(OmniPumpManagerError.noPodPaired))
             return
@@ -2775,7 +2775,7 @@ extension OmniPumpManager: PumpManager {
             //      in 63 minutes if bolus had not completed by then.
             let bolusWasAutomaticIndicator: TimeInterval = activationType.isAutomatic ? TimeInterval(minutes: 0x3F) : 0
 
-            let result = session.bolus(decisionId: decisionId, units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator)
+            let result = session.bolus(doseId: doseId, units: enactUnits, automatic: activationType.isAutomatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep, programReminderInterval: bolusWasAutomaticIndicator)
 
             switch result {
             case .success:
@@ -2858,11 +2858,11 @@ extension OmniPumpManager: PumpManager {
         }
     }
 
-    public func enactTempBasal(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
-        runTemporaryBasalProgram(decisionId: decisionId, unitsPerHour: unitsPerHour, for: duration, automatic: true, completion: completion)
+    public func enactTempBasal(doseId: UUID, unitsPerHour: Double, for duration: TimeInterval, completion: @escaping (PumpManagerError?) -> Void) {
+        runTemporaryBasalProgram(doseId: doseId, unitsPerHour: unitsPerHour, for: duration, automatic: true, completion: completion)
     }
 
-    public func runTemporaryBasalProgram(decisionId: UUID?, unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
+    public func runTemporaryBasalProgram(doseId: UUID?, unitsPerHour: Double, for duration: TimeInterval, automatic: Bool, completion: @escaping (PumpManagerError?) -> Void) {
         if unitsPerHour > state.maxBasalRateUnitsPerHour {
             /// The app is trying to set a TBR above the configured max basal. This can happen if the
             /// app isn't properly sync'ing its max basal rate to the Pump Manager. Rather than returning
@@ -2992,7 +2992,7 @@ extension OmniPumpManager: PumpManager {
                 let scheduledRate = self.state.basalSchedule.currentRate(using: calendar, at: self.dateGenerator())
                 let isHighTemp = rate > scheduledRate
 
-                let result = session.setTempBasal(decisionId: decisionId, rate: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep)
+                let result = session.setTempBasal(doseId: doseId, rate: rate, duration: duration, isHighTemp: isHighTemp, automatic: automatic, acknowledgementBeep: acknowledgementBeep, completionBeep: completionBeep)
                 switch result {
                 case .success:
                     session.dosesForStorage() { (doses) -> Bool in
