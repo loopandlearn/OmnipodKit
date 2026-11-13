@@ -148,7 +148,9 @@ class PairPodViewModel: ObservableObject, Identifiable {
     }
 
     @Published var state: PairPodViewModelState = .ready
-    
+
+    @Published var showsCertificateWarning = false
+
     var podIsActivated: Bool {
         return podPairer.podCommState != .noPod
     }
@@ -191,7 +193,7 @@ class PairPodViewModel: ObservableObject, Identifiable {
         }
     }
 
-    private func pairAndPrime() {
+    private func pairAndPrime(acceptingNonInsuletCertificate: Bool = false) {
         if podPairer.podCommState == .noPod {
             state = .pairing
         } else {
@@ -199,11 +201,15 @@ class PairPodViewModel: ObservableObject, Identifiable {
            state = .priming(finishTime: nil)
         }
 
-        podPairer.pairAndPrimePod { (status) in
+        podPairer.pairAndPrimePod(acceptingNonInsuletCertificate: acceptingNonInsuletCertificate) { (status) in
             DispatchQueue.main.async {
                 switch status {
                 case .failure(let error):
-                    if self.podPairer.podCommState == .noPod {
+                    if case .communication(let commsError) = error,
+                       case .podCertificateNotGenuine? = commsError as? PodCommsError {
+                        self.state = .error(OmniPairingError.pumpManagerError(error))
+                        self.showsCertificateWarning = true
+                    } else if self.podPairer.podCommState == .noPod {
                         let pairAndPrimeError = OmniPairingError.pumpManagerError(error)
                         self.state = .error(pairAndPrimeError)
                     } else if case .fault = self.podPairer.podCommState {
@@ -238,6 +244,10 @@ class PairPodViewModel: ObservableObject, Identifiable {
                 }
             }
         }
+    }
+
+    func continuePairingWithNonInsuletCertificate() {
+        pairAndPrime(acceptingNonInsuletCertificate: true)
     }
 
     func continueButtonTapped() {
@@ -313,7 +323,7 @@ enum OmniPairingError : LocalizedError {
 }
 
 protocol PodPairer {
-    func pairAndPrimePod(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void)
+    func pairAndPrimePod(acceptingNonInsuletCertificate: Bool, completion: @escaping (PumpManagerResult<TimeInterval>) -> Void)
     func discardPod(completion: @escaping (Bool) -> ())
     var podCommState: PodCommState { get }
     var podType: PodType { get }
@@ -322,7 +332,7 @@ protocol PodPairer {
 extension OmniPumpManager: PodPairer {
     func discardPod(completion: @escaping (Bool) -> ()) { }
 
-    func pairAndPrimePod(completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
-        pairAndPrime(completion: completion)
+    func pairAndPrimePod(acceptingNonInsuletCertificate: Bool, completion: @escaping (PumpManagerResult<TimeInterval>) -> Void) {
+        pairAndPrime(acceptingNonInsuletCertificate: acceptingNonInsuletCertificate, completion: completion)
     }
 }
