@@ -326,7 +326,7 @@ final class DeviceHandoffTests: XCTestCase {
         pod.unacknowledgedCommand = .program(.bolus(volume: 1.0, automatic: true), 5, Date(), false)
         pod.lastDeliveryStatusReceived = .scheduledBasal
 
-        XCTAssertTrue(pod.resolveAfterSessionResync())
+        XCTAssertEqual(pod.resolveAfterSessionResync(), .anotherController)
 
         XCTAssertNil(pod.unacknowledgedCommand, "nobody can settle it now")
         XCTAssertTrue(makeState(pod: pod).mayReleaseControl, "so it no longer keeps the pod")
@@ -343,9 +343,63 @@ final class DeviceHandoffTests: XCTestCase {
         pod.lastDeliveryStatusReceived = .scheduledBasal
         let before = pod
 
-        XCTAssertFalse(pod.resolveAfterSessionResync())
+        XCTAssertEqual(pod.resolveAfterSessionResync(), .ownCounter)
         XCTAssertEqual(pod, before)
         XCTAssertNotNil(pod.unacknowledgedCommand)
+    }
+
+    /// A take or an adopt expects one resync, from the other controller's sessions before it: the
+    /// command is dropped as before, and sessions go on.
+    func testTheResyncATakeExpectsDoesNotStopThisController() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        pod.allowSessionsAfterTake()
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(), .expected)
+        XCTAssertFalse(pod.refusesSessions)
+        XCTAssertNil(pod.foreignSessionDetectedAt)
+    }
+
+    /// Any other resync on a shared pod: another controller is using it now. This controller stops
+    /// and keeps when it found out, for its host.
+    func testAResyncNobodyExpectedStopsThisControllerUntilItTakesControl() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(at: at), .anotherController)
+        XCTAssertTrue(pod.refusesSessions)
+        XCTAssertEqual(pod.foreignSessionDetectedAt, at)
+
+        pod.allowSessionsAfterTake()
+        XCTAssertFalse(pod.refusesSessions, "a take is the host's claim")
+        XCTAssertNil(pod.foreignSessionDetectedAt)
+        XCTAssertTrue(pod.expectsSessionResync, "and its first session may meet the other controller's")
+    }
+
+    /// The stop survives a relaunch, and the copy handed to another controller carries none of it.
+    func testTheStopIsKeptAcrossARelaunchAndNotExported() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        _ = pod.resolveAfterSessionResync(at: at)
+
+        let restored = PodState(rawValue: pod.rawValue)
+        XCTAssertEqual(restored?.refusesSessions, true)
+        XCTAssertEqual(restored?.foreignSessionDetectedAt, at)
+
+        let exported = pod.sharedFacts
+        XCTAssertFalse(exported.refusesSessions)
+        XCTAssertNil(exported.foreignSessionDetectedAt)
+        XCTAssertFalse(exported.expectsSessionResync)
+    }
+
+    /// An adopter expects the one resync its first session may meet.
+    func testAnAdopterExpectsOneResync() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        let adopted = makeState(pod: pod).adopted(handle: nil)
+        XCTAssertEqual(adopted.podState?.expectsSessionResync, true)
     }
 
     // MARK: - Untracked delivery (stock behaviour unchanged)

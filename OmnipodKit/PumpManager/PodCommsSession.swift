@@ -43,6 +43,7 @@ enum PodCommsError: Error {
     case tooManyPodsFound // BLE pods only
     case setupNotComplete
     case noCertificateFound // O5 only
+    case podUsedByAnotherController
 }
 
 extension PodCommsError: LocalizedError {
@@ -112,6 +113,8 @@ extension PodCommsError: LocalizedError {
             return LocalizedString("Pod setup is not complete", comment: "Error description when pod setup is not complete")
         case .noCertificateFound:
             return LocalizedString("No certificate found", comment: "Error message when no certificate found")
+        case .podUsedByAnotherController:
+            return LocalizedString("Another device is using the pod", comment: "Error message when the pod shows another controller has run it since this one")
         }
     }
 
@@ -181,6 +184,8 @@ extension PodCommsError: LocalizedError {
             return nil
         case .noCertificateFound:
             return LocalizedString("Retrieve an Omnipod 5 Pod Certificate to continue.", comment: "Recovery suggestion with missing certificate")
+        case .podUsedByAnotherController:
+            return nil
         }
     }
 

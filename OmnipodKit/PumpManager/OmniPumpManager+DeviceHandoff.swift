@@ -84,6 +84,7 @@ extension OmniPumpManagerState {
         pod?.bleIdentifier = handle
         pod?.untrackedDeliveryIsForeign = true
         pod?.sharedWithAnotherController = true
+        pod?.expectsSessionResync = true
         state.updatePodStateFromPodComms(pod)
         state.podConnectionReleased = false
         state.configuredByAnotherController = true
@@ -113,6 +114,9 @@ extension PodState {
         pod.unacknowledgedCommand = nil
         pod.lastDeliveryStatusReceived = nil
         pod.untrackedDeliveryIsForeign = false
+        pod.expectsSessionResync = false
+        pod.foreignSessionDetectedAt = nil
+        pod.refusesSessions = false
         pod.bleMessageTransportState = BleMessageTransportState(ck: nil, noncePrefix: nil,
                                                                 eapSeq: bleMessageTransportState.eapSeq,
                                                                 messageNumber: bleMessageTransportState.messageNumber)
@@ -134,14 +138,34 @@ extension PodState {
         }
     }
 
+    /// What a session resync means for this controller.
+    enum SessionResync: Equatable {
+        /// A pod never shared: only this controller's own counter, saved late, can be behind.
+        case ownCounter
+        /// The one resync a take or an adopt expects: the other controller's sessions before it.
+        case expected
+        /// Another controller has used the pod since this one last did.
+        case anotherController
+    }
+
     /// The pod's session counter was found ahead of this controller's. On a shared pod, another
-    /// controller may have run it: resolve as after foreign control, keeping in-flight copies. A pod
-    /// never shared resyncs as before: only this controller's own counter, saved late, can be
-    /// behind. Returns whether another controller may have run the pod.
-    mutating func resolveAfterSessionResync() -> Bool {
-        guard sharedWithAnotherController else { return false }
+    /// controller may have run it: resolve as after foreign control, keeping in-flight copies. A
+    /// resync a take or an adopt did not expect also stops this controller: nothing more is sent
+    /// until its host takes control again, and the host can read when it happened.
+    mutating func resolveAfterSessionResync(at now: Date = Date()) -> SessionResync {
+        guard sharedWithAnotherController else { return .ownCounter }
         resolveAfterForeignControl(dropInFlight: false)
-        return true
+        if expectsSessionResync { return .expected }
+        foreignSessionDetectedAt = now
+        refusesSessions = true
+        return .anotherController
+    }
+
+    /// The host takes control: sessions may run again, and the first may meet one resync.
+    mutating func allowSessionsAfterTake() {
+        refusesSessions = false
+        foreignSessionDetectedAt = nil
+        if sharedWithAnotherController { expectsSessionResync = true }
     }
 }
 
@@ -151,6 +175,13 @@ extension PodComms {
     func forgetHandle() {
         podStateLock.lock()
         podState?.bleIdentifier = nil
+        podStateLock.unlock()
+    }
+
+    /// See PodState.allowSessionsAfterTake.
+    func allowSessionsAfterTake() {
+        podStateLock.lock()
+        podState?.allowSessionsAfterTake()
         podStateLock.unlock()
     }
 
@@ -169,6 +200,11 @@ extension OmniPumpManager: ExclusiveDeviceControl {
 
     public var isControlReleased: Bool {
         state.podConnectionReleased
+    }
+
+    /// See PodState.foreignSessionDetectedAt and refusesSessions.
+    public var otherControllerDetectedAt: Date? {
+        state.podState?.foreignSessionDetectedAt
     }
 
     /// Stops bidding for the pod's one BLE connection; pod state, pairing and keys are kept.
@@ -200,6 +236,10 @@ extension OmniPumpManager: ExclusiveDeviceControl {
         if state.podConnectionReleased {
             resumeControl()
         }
+        if state.podState?.refusesSessions == true {
+            omnipodLogDeviceEvent("[trust] taking control again after another controller was detected")
+        }
+        podComms.allowSessionsAfterTake()
         guard let ble = podComms as? BlePodComms else { return }
         if takeControlNeedsSearch, let address = state.podState?.address {
             ble.beginTakeoverSearch(podId: address)

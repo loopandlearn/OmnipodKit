@@ -148,6 +148,17 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
     /// resyncs as before. Kept for the pod's life.
     var sharedWithAnotherController: Bool = false
 
+    /// A take or an adopt expects one session resync: the other controller's sessions before it.
+    /// Cleared once a session is established.
+    var expectsSessionResync: Bool = false
+
+    /// When a resync on a shared pod showed another controller using it, other than the one expected.
+    var foreignSessionDetectedAt: Date?
+
+    /// Set with `foreignSessionDetectedAt`: no session runs and nothing is sent to the pod until the
+    /// host takes control again (`OmniPumpManager.takeControl()`).
+    var refusesSessions: Bool = false
+
 
     init(
         address: UInt32,
@@ -667,6 +678,9 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
 
         self.untrackedDeliveryIsForeign = rawValue["untrackedDeliveryIsForeign"] as? Bool ?? false
         self.sharedWithAnotherController = rawValue["sharedWithAnotherController"] as? Bool ?? false
+        self.expectsSessionResync = rawValue["expectsSessionResync"] as? Bool ?? false
+        self.foreignSessionDetectedAt = rawValue["foreignSessionDetectedAt"] as? Date
+        self.refusesSessions = rawValue["refusesSessions"] as? Bool ?? false
 
         if let podTypeRaw = rawValue["podType"] as? UInt8 {
             self.podType = PodType(rawValue: podTypeRaw)
@@ -774,6 +788,13 @@ public struct PodState: RawRepresentable, Equatable, CustomDebugStringConvertibl
         }
         if sharedWithAnotherController {
             rawValue["sharedWithAnotherController"] = true
+        }
+        if expectsSessionResync {
+            rawValue["expectsSessionResync"] = true
+        }
+        rawValue["foreignSessionDetectedAt"] = foreignSessionDetectedAt
+        if refusesSessions {
+            rawValue["refusesSessions"] = true
         }
 
         if configuredAlerts.count > 0 {

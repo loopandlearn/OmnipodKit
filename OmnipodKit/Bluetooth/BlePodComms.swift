@@ -381,9 +381,16 @@ class BlePodComms: PodComms {
                 podState!.bleMessageTransportState.eapSeq = podSqn
                 // Any resync counts: after a single foreign session the pod's counter equals the one just sent.
                 let pending = podState!.unacknowledgedCommand
-                if podState!.resolveAfterSessionResync() {
-                    let dropped = pending.map { " · unconfirmed \($0) dropped, nothing booked" } ?? ""
-                    omnipodLogDeviceEvent("[trust] EAP SQN RESYNC — pod=\(podSqn) ours=\(eapSeq): another controller may have run this shared pod [sqn-resync]\(dropped)")
+                let dropped = pending.map { " · unconfirmed \($0) dropped, nothing booked" } ?? ""
+                switch podState!.resolveAfterSessionResync() {
+                case .ownCounter:
+                    break
+                case .expected:
+                    omnipodLogDeviceEvent("[trust] EAP SQN RESYNC — pod=\(podSqn) ours=\(eapSeq): the other controller's sessions before this take [sqn-resync]\(dropped)")
+                case .anotherController:
+                    // No second handshake: this controller leaves the pod's counter where the other one has it.
+                    omnipodLogDeviceEvent("[trust] EAP SQN RESYNC — pod=\(podSqn) ours=\(eapSeq): another controller has used this pod; sending nothing until control is taken again [sqn-resync]\(dropped)")
+                    throw PodCommsError.podUsedByAnotherController
                 }
             }
             return nil
@@ -407,6 +414,7 @@ class BlePodComms: PodComms {
             if podState != nil {
                 log.bleDebug("@@@ Setting podState transport state to %{public}@", transportState.inlineDescription)
                 podState!.bleMessageTransportState = transportState
+                podState!.expectsSessionResync = false
             } else {
                 log.bleDebug("@@@ Used keys %{public}@ to create transport state %{public}@", String(describing: keys), transportState.inlineDescription)
             }
@@ -746,6 +754,14 @@ class BlePodComms: PodComms {
 
     func bleRunSession(withName name: String, _ block: @escaping (_ result: SessionRunResult) -> Void) {
 
+        // Another controller has used the pod: nothing is sent, and the pod is not dialled, until the
+        // host takes control again.
+        if podState?.refusesSessions == true {
+            log.default("Session '%{public}@' refused: another controller has used the pod", name)
+            block(.failure(PodCommsError.podUsedByAnotherController))
+            return
+        }
+
         // In connect-on-demand mode the pod is normally disconnected, and self.manager (set only in
         // omnipodPeripheralDidConnect / on restore) is nil on a fresh launch — nothing has connected
         // yet. Adopt the pod's PeripheralManager from the device list (it exists while disconnected)
@@ -795,6 +811,11 @@ class BlePodComms: PodComms {
 
             guard self.podState != nil else {
                 block(.failure(PodCommsError.noPodPaired))
+                return
+            }
+
+            guard self.podState?.refusesSessions != true else {
+                block(.failure(PodCommsError.podUsedByAnotherController))
                 return
             }
 
@@ -912,6 +933,12 @@ extension BlePodComms: PeripheralManagerDelegate {
                 log.default("completeConfiguration for a manager that is no longer the pod's, skipping login")
                 manager.noteSetupStep("not the pod's current manager, login skipped")
                 return
+            }
+
+            // A connection made while stopped (a reconnect, a heartbeat) logs in to nothing.
+            guard podState?.refusesSessions != true else {
+                manager.noteSetupStep("another controller has used the pod, login skipped")
+                throw PodCommsError.podUsedByAnotherController
             }
 
             do {
