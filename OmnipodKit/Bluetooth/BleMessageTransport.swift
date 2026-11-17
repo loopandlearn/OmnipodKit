@@ -209,9 +209,11 @@ class BlePodMessageTransport: MessageTransport {
     func sendMessage(_ message: Message) throws -> Message {
 
         // A pod released to another controller is sent nothing, however the link came up: a session
-        // queued before the release, or a connection that landed as it happened. Before any IO, so
-        // the command is a certain failure.
-        guard manager.peripheral.state == .connected, manager.bluetoothManager?.isReleasedForLoan != true else {
+        // queued before the release, or a connection that landed as it happened. Nor is anything sent
+        // through a handle let go of for a loan, after a take as well: the link is the take's. Before any
+        // IO, so the command is a certain failure.
+        guard manager.peripheral.state == .connected, manager.bluetoothManager?.isReleasedForLoan != true,
+              !manager.isRetiredForLoan else {
             throw PodCommsError.podNotConnected
         }
 

@@ -223,8 +223,8 @@ class BluetoothManager: NSObject {
     /// An exchange under way on a live link finishes first, bounded by `loanReleaseWaitLimit`: released
     /// in the middle of an exchange, the pod was left answering nobody and accepted no session until it
     /// was restarted, and whether it took the command was unknown. A command still waiting for its
-    /// connection has no exchange to protect: the release is at once, and cancels that connection.
-    /// No new command dials meanwhile, and nothing more is sent (`isReleasedForLoan`).
+    /// connection has no exchange to protect: the release is at once, cancels that connection and ends
+    /// its wait. No new command dials meanwhile, and nothing more is sent (`isReleasedForLoan`).
     func releaseConnectionForLoan(uuidString: String) {
         managerQueue.async {
             self.commandConnectInFlight = false
@@ -232,7 +232,7 @@ class BluetoothManager: NSObject {
             let linkUp = self.devices.first(where: { $0.manager.peripheral.identifier.uuidString == uuidString })?
                 .manager.peripheral.state == .connected
             guard self.hasActiveCommandSession, linkUp else {
-                self.disconnectFromDevice(uuidString: uuidString)
+                self.dropPodForLoan(uuidString: uuidString)
                 return
             }
             self.pendingLoanRelease = uuidString
@@ -255,6 +255,15 @@ class BluetoothManager: NSObject {
         guard let uuidString = pendingLoanRelease else { return }
         pendingLoanRelease = nil
         connectionDelegate?.omnipodLogDeviceEvent("[release] releasing the pod — \(why)")
+        dropPodForLoan(uuidString: uuidString)
+    }
+
+    /// Drops the pod's link and handle for a loan. The handle is retired first
+    /// (`PeripheralManager.retireForLoan`): it shares its CBPeripheral with the one a later take makes,
+    /// so nothing queued or waiting on it may act on the radio after the take.
+    private func dropPodForLoan(uuidString: String) {
+        dispatchPrecondition(condition: .onQueue(managerQueue))
+        devices.first(where: { $0.manager.peripheral.identifier.uuidString == uuidString })?.manager.retireForLoan()
         disconnectFromDevice(uuidString: uuidString)
     }
 
