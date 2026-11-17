@@ -935,9 +935,11 @@ extension BlePodComms: PeripheralManagerDelegate {
                 return
             }
 
-            // A connection made while stopped (a reconnect, a heartbeat) logs in to nothing.
+            // A connection made while stopped (a reconnect, a heartbeat) logs in to nothing and hangs up:
+            // the pod has one connection, and the controller using it needs it.
             guard podState?.refusesSessions != true else {
                 manager.noteSetupStep("another controller has used the pod, login skipped")
+                bluetoothManager.disconnectOnDemand(manager.peripheral, reason: "another controller has used the pod")
                 throw PodCommsError.podUsedByAnotherController
             }
 
@@ -951,6 +953,11 @@ extension BlePodComms: PeripheralManagerDelegate {
                 bluetoothManager.endLoanReclaimEscalation()
                 delegate?.podCommsDidEstablishSession(self)
             } catch {
+                if case PodCommsError.podUsedByAnotherController = error {
+                    // Stopped at the resync: hang up, so the controller using the pod can connect, and so
+                    // the session after a take dials afresh and logs in.
+                    bluetoothManager.disconnectOnDemand(manager.peripheral, reason: "another controller has used the pod")
+                }
                 omnipodLogDeviceEvent("[CONFIG] session handshake FAILED: \(error)")
                 log.error("Pod session sync error: %{public}@", String(describing: error))
                 throw error
