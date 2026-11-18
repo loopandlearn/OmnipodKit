@@ -31,6 +31,18 @@ class PodStateTests: XCTestCase {
         }
     }
 
+    func testPodChangeRawIncludesPodDetails() throws {
+        let pod = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
+                           lotNo: 43620, lotSeq: 560313, insulinType: .novolog, podType: dashType)
+        let raw = OmniPumpManager.podChangeRaw(date: Date(timeIntervalSince1970: 1_700_000_000), podState: pod)
+        let details = try XCTUnwrap(JSONSerialization.jsonObject(with: raw) as? [String: Any])
+
+        XCTAssertEqual(details["lotNumber"] as? String, "43620")
+        XCTAssertEqual(details["sequenceNumber"] as? String, "560313")
+        XCTAssertEqual(details["primeVolume"] as? Double, Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)
+        XCTAssertEqual(details["date"] as? String, "2023-11-14T22:13:20Z")
+    }
+
     func testLTKAndBLEIdentifierDecodeIndependently() throws {
         let ltk = Data(hexadecimalString: "fedcba98765432100123456789abcdef")!
         let handle = "0B1D2C3E-0000-4000-8000-00000000A001"

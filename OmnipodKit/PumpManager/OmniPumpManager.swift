@@ -278,10 +278,11 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
             if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
                 let podType = newValue.podType
+                let podState = newValue.podState
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
-                    let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump))
+                    let event = NewPumpEvent(date: date, dose: nil, raw: Self.podChangeRaw(date: date, podState: podState), title: title, type: .replaceComponent(componentType: .pump))
                     try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
                     delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
                 }
@@ -3591,5 +3592,17 @@ extension OmniPumpManager {
         if !found {
             log.error("@@@ acknowledge alert %{public}@ not found!", alertIdentifier)
         }
+    }
+}
+
+extension OmniPumpManager {
+    static func podChangeRaw(date: Date, podState: PodState?) -> Data {
+        var details: [String: Any] = ["event": "Pod Change", "date": ISO8601DateFormatter().string(from: date)]
+        if let podState {
+            details["lotNumber"] = String(podState.lotNo)
+            details["sequenceNumber"] = String(podState.lotSeq)
+            details["primeVolume"] = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+        }
+        return (try? JSONSerialization.data(withJSONObject: details, options: .sortedKeys)) ?? Data("Pod Change \(date)".utf8)
     }
 }
