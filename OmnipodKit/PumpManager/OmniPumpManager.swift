@@ -278,10 +278,11 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
             if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
                 let podType = newValue.podType
+                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previousPod: newValue.previousPodState) }
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
-                    let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump))
+                    let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump), componentReplacement: replacement)
                     try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
                     delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
                 }
@@ -3591,5 +3592,35 @@ extension OmniPumpManager {
         if !found {
             log.error("@@@ acknowledge alert %{public}@ not found!", alertIdentifier)
         }
+    }
+}
+
+extension OmniPumpManager {
+    static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
+        var replacement = ComponentReplacement(
+            primes: [
+                .init(target: .tubing, volume: Pod.primeUnits),
+                .init(target: .cannula, volume: Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)
+            ],
+            expirationDate: newPod.expiresAt ?? newPod.activatedAt.map { $0 + Pod.nominalPodLife },
+            componentIdentifier: "\(newPod.lotNo)-\(newPod.lotSeq)"
+        )
+
+        guard let previousPod, previousPod.setupProgress == .completed else {
+            return replacement
+        }
+        replacement.previousStopDate = previousPod.deliveryStoppedAt
+        if let reservoirLevel = previousPod.lastInsulinMeasurements?.reservoirLevel, reservoirLevel != Pod.reservoirLevelAboveThresholdMagicNumber {
+            replacement.previousRemainingUnits = reservoirLevel
+        }
+        if let fault = previousPod.fault?.faultEventCode, fault.faultType != .exceededMaximumPodLife80Hrs {
+            replacement.reason = fault.isOcclusion ? .occlusion : .fault
+            replacement.faultCode = String(format: "0x%02X", fault.rawValue)
+        } else if let stopped = previousPod.deliveryStoppedAt, let expiresAt = previousPod.expiresAt {
+            replacement.reason = stopped >= expiresAt ? .expired : .userInitiated
+        } else {
+            replacement.reason = .unknown
+        }
+        return replacement
     }
 }

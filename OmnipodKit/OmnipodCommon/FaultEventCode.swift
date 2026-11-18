@@ -639,13 +639,23 @@ struct FaultEventCode: CustomStringConvertible, Equatable {
         }
     }
 
+    var isOcclusion: Bool {
+        switch faultType {
+        case .occluded, .occlusionCheckStartup1, .occlusionCheckStartup2, .occlusionCheckTimeouts1, .occlusionCheckTimeouts2, .occlusionCheckTimeouts3, .occlusionCheckPulseIssue, .occlusionCheckBolusProblem:
+            return true
+        default:
+            return false
+        }
+    }
+
     // Convenience alert notification strings
     var notificationTitle: String {
+        if isOcclusion {
+            return LocalizedString("Occlusion Detected", comment: "The title for Occlusion alarm notification")
+        }
         switch self.faultType {
         case .reservoirEmpty:
             return LocalizedString("Empty Reservoir", comment: "The title for Empty Reservoir alarm notification")
-        case .occluded, .occlusionCheckStartup1, .occlusionCheckStartup2, .occlusionCheckTimeouts1, .occlusionCheckTimeouts2, .occlusionCheckTimeouts3, .occlusionCheckPulseIssue, .occlusionCheckBolusProblem:
-            return LocalizedString("Occlusion Detected", comment: "The title for Occlusion alarm notification")
         case .exceededMaximumPodLife80Hrs:
             return LocalizedString("Pod Expired", comment: "The title for Pod Expired alarm notification")
         default:
