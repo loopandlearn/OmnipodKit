@@ -141,6 +141,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
             .store(in: &cancellables)
 
+#if os(iOS)
         /// Register for app foreground / background notifications needed for at least Pod Keep Alive timer based options
         if !podType.isEros {
             let nc = NotificationCenter.default
@@ -157,6 +158,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 object: nil
             )
         }
+#endif
 
         /// Initialize or disable the podKeepAlive state as needed
         self.podKeepAlive = state.podKeepAlive
@@ -453,6 +455,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         }
     }
 
+#if os(iOS)
     private let silentTune = SilentTune()
 
     @objc func appMovedToBackground() {
@@ -467,6 +470,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         podKeepAliveAppWillEnterForeground()
         silentTune.stopPlayer()
     }
+#endif
 
 
     // MARK: - RileyLink specific vars and funcs
@@ -1034,6 +1038,7 @@ extension OmniPumpManager {
         return false
     }
 
+#if os(iOS)
     var reservoirLevelHighlightState: ReservoirLevelHighlightState? {
         guard let reservoirLevel = reservoirLevel else {
             return nil
@@ -1052,6 +1057,7 @@ extension OmniPumpManager {
             }
         }
     }
+#endif
 
     func buildPumpLifecycleProgress(for state: OmniPumpManagerState) -> PumpLifecycleProgress? {
         switch podCommState {
