@@ -3609,18 +3609,20 @@ extension OmniPumpManager {
         guard let previousPod, previousPod.setupProgress == .completed else {
             return replacement
         }
-        replacement.previousStopDate = previousPod.deliveryStoppedAt
-        if let reservoirLevel = previousPod.lastInsulinMeasurements?.reservoirLevel, reservoirLevel != Pod.reservoirLevelAboveThresholdMagicNumber {
-            replacement.previousRemainingUnits = reservoirLevel
-        }
+        let reason: ComponentReplacement.Reason
         if let fault = previousPod.fault?.faultEventCode, fault.faultType != .exceededMaximumPodLife80Hrs {
-            replacement.reason = fault.isOcclusion ? .occlusion : .fault
-            replacement.faultCode = String(format: "0x%02X", fault.rawValue)
+            let code = String(format: "0x%02X", fault.rawValue)
+            reason = fault.isOcclusion ? .occlusion(code: code) : .fault(code: code)
         } else if let stopped = previousPod.deliveryStoppedAt, let expiresAt = previousPod.expiresAt {
-            replacement.reason = stopped >= expiresAt ? .expired : .userInitiated
+            reason = stopped >= expiresAt ? .expired : .userInitiated
         } else {
-            replacement.reason = .unknown
+            reason = .unknown
         }
+        var remainingUnits = previousPod.lastInsulinMeasurements?.reservoirLevel
+        if remainingUnits == Pod.reservoirLevelAboveThresholdMagicNumber {
+            remainingUnits = nil
+        }
+        replacement.previous = .init(stopDate: previousPod.deliveryStoppedAt, remainingUnits: remainingUnits, reason: reason)
         return replacement
     }
 }

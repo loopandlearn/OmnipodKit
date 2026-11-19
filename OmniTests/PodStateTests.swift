@@ -50,10 +50,7 @@ class PodStateTests: XCTestCase {
 
         let replacement = OmniPumpManager.componentReplacement(newPod: new, previousPod: previous)
 
-        XCTAssertEqual(replacement.reason, .occlusion)
-        XCTAssertEqual(replacement.faultCode, "0x14")
-        XCTAssertEqual(replacement.previousStopDate, start + .hours(40))
-        XCTAssertEqual(replacement.previousRemainingUnits, 23.5)
+        XCTAssertEqual(replacement.previous, .init(stopDate: start + .hours(40), remainingUnits: 23.5, reason: .occlusion(code: "0x14")))
         XCTAssertEqual(replacement.expirationDate, start + .hours(41) + Pod.nominalPodLife)
         XCTAssertEqual(replacement.componentIdentifier, "43620-2")
         XCTAssertEqual(replacement.primes, [.init(target: .tubing, volume: Pod.primeUnits),
@@ -67,8 +64,7 @@ class PodStateTests: XCTestCase {
         previous.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020f0000000900345c000103ff0001000005ae056029")!)
 
         let replacement = OmniPumpManager.componentReplacement(newPod: pod(lotSeq: 2, activatedAt: start + .hours(11)), previousPod: previous)
-        XCTAssertEqual(replacement.reason, .fault)
-        XCTAssertEqual(replacement.faultCode, "0x5C")
+        XCTAssertEqual(replacement.previous?.reason, .fault(code: "0x5C"))
     }
 
     func testComponentReplacementReasonFromTheStopTime() {
@@ -79,9 +75,9 @@ class PodStateTests: XCTestCase {
         late.deliveryStoppedAt = start + Pod.nominalPodLife + .hours(2)
         let new = pod(lotSeq: 2, activatedAt: start + .hours(80))
 
-        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: early).reason, .userInitiated)
-        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: late).reason, .expired)
-        XCTAssertNil(OmniPumpManager.componentReplacement(newPod: new, previousPod: nil).reason)
+        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: early).previous?.reason, .userInitiated)
+        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: late).previous?.reason, .expired)
+        XCTAssertNil(OmniPumpManager.componentReplacement(newPod: new, previousPod: nil).previous)
     }
 
     func testLTKAndBLEIdentifierDecodeIndependently() throws {
