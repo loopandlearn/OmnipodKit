@@ -70,6 +70,10 @@ class PeripheralManager: NSObject {
     /// Any error surfaced during the active operation
     private var commandError: Error?
 
+    // PODLOAN: set once the pod driver lets go of this handle for a loan (`retireForLoan`).
+    private var retiredForLoan = false
+    private let retiredForLoanLock = NSLock()
+
     private(set) weak var central: CBCentralManager?
 
     /// Owning BluetoothManager, for the fresh-discovery connect-on-demand path (it sees didDiscover).
@@ -148,6 +152,13 @@ extension PeripheralManager {
 
     func configureAndRun(_ block: @escaping (_ manager: PeripheralManager) -> Void, enqueuedAt: Date? = nil) -> (() -> Void) {
         return {
+            // PODLOAN: a handle let go of for a loan neither connects nor sets up; the session's
+            // transport then sends nothing.
+            if self.isRetiredForLoan {
+                self.logDeviceEvent("[connect] this pod handle was let go of for a loan: not connecting")
+                block(self)
+                return
+            }
             var attempt = 1
             while true {
                 var linkWasUp = self.peripheral.state == .connected
@@ -506,7 +517,10 @@ extension PeripheralManager {
         } catch {
             // Unstick a connect that never completed, so didDisconnect/didFailToConnect fires
             // instead of leaving it in .connecting.
-            bluetoothManager?.disconnectOnDemand(peripheral, reason: "connect timed out")
+            // PODLOAN: not on a handle let go of for a loan: the link may be a later take's.
+            if !isRetiredForLoan {
+                bluetoothManager?.disconnectOnDemand(peripheral, reason: "connect timed out")
+            }
             throw error
         }
         log.default("[connectOnDemand] connected in %{public}@s", String(format: "%.3f", Date().timeIntervalSince(start)))
@@ -762,6 +776,40 @@ extension PeripheralManager {
     }
 }
 
+// MARK: - PODLOAN: a handle let go of for a loan
+
+extension PeripheralManager {
+    /// Whether the pod driver let go of this handle for a loan.
+    var isRetiredForLoan: Bool {
+        retiredForLoanLock.lock()
+        defer { retiredForLoanLock.unlock() }
+        return retiredForLoan
+    }
+
+    /// The pod driver let go of the pod for a loan and drops this handle; a later take makes a new one.
+    /// Both share one CBPeripheral, so anything this one still did would land on the new link: a session
+    /// waiting here for its connection timed out after a take and cancelled the take's link. From here it
+    /// does nothing more: a command waiting for its connection fails at once, and it never connects, sets
+    /// up, sends, or drops a link again.
+    func retireForLoan() {
+        retiredForLoanLock.lock()
+        retiredForLoan = true
+        retiredForLoanLock.unlock()
+
+        commandLock.lock()
+        let waitingToConnect = commandConditions.contains { if case .connect = $0 { return true } else { return false } }
+        if waitingToConnect {
+            commandError = PeripheralManagerError.notReady
+            commandConditions = []
+            commandLock.broadcast()
+        }
+        commandLock.unlock()
+        if waitingToConnect {
+            logDeviceEvent("[release] a session waiting to connect on the released pod handle ends now")
+        }
+    }
+}
+
 extension CBPeripheral {
     func getCommandCharacteristic(profile: BlePodProfile) -> CBCharacteristic? {
         guard let service = services?.itemWithUUID(profile.serviceUUID) else {
@@ -840,8 +888,9 @@ extension PeripheralManager {
                 return
             }
             // Only disconnect if we're still idle (no newer session) and nothing is queued/running.
+            // PODLOAN: never on a handle let go of for a loan: the link may be a later take's.
             guard self.idleStart == idleAt, self.sessionQueue.operationCount == 0,
-                  self.peripheral.state == .connected else { return }
+                  self.peripheral.state == .connected, !self.isRetiredForLoan else { return }
             self.log.default("[connectOnDemand] idle ~%{public}ds, no queued session -> disconnecting", Int(idleDelay))
             self.bluetoothManager?.disconnectOnDemand(self.peripheral, reason: "idle")
         }
