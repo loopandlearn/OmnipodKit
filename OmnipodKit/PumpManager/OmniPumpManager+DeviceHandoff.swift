@@ -167,11 +167,13 @@ extension PodState {
         return .anotherController
     }
 
-    /// The host takes control: sessions may run again, and the first may meet one resync.
-    mutating func allowSessionsAfterTake() {
+    /// The host takes control: sessions may run again. The first may meet one resync only after this
+    /// controller had let the pod go: then another controller may have run it since. Without a release
+    /// nobody else should have, so any resync stops this controller again.
+    mutating func allowSessionsAfterTake(afterRelease: Bool) {
         refusesSessions = false
         foreignSessionDetectedAt = nil
-        if sharedWithAnotherController { expectsSessionResync = true }
+        if sharedWithAnotherController, afterRelease { expectsSessionResync = true }
     }
 }
 
@@ -212,9 +214,9 @@ extension PodComms {
     }
 
     /// See PodState.allowSessionsAfterTake.
-    func allowSessionsAfterTake() {
+    func allowSessionsAfterTake(afterRelease: Bool) {
         podStateLock.lock()
-        podState?.allowSessionsAfterTake()
+        podState?.allowSessionsAfterTake(afterRelease: afterRelease)
         podStateLock.unlock()
     }
 
@@ -266,13 +268,15 @@ extension OmniPumpManager: ExclusiveDeviceControl {
     /// without this one releasing it (a watch's offline start), and the take's settle waits for this
     /// link.
     public func takeControl() {
-        if state.podConnectionReleased {
+        let afterRelease = state.podConnectionReleased
+        if afterRelease {
             resumeControl()
         }
         if state.podState?.refusesSessions == true {
             omnipodLogDeviceEvent("[trust] taking control again after another controller was detected")
         }
-        podComms.allowSessionsAfterTake()
+        // PODLOAN: an adopt's expected resync is set where the adopt is; a take adds one only after a release.
+        podComms.allowSessionsAfterTake(afterRelease: afterRelease)
         guard let ble = podComms as? BlePodComms else { return }
         if takeControlNeedsSearch, let address = state.podState?.address {
             ble.beginTakeoverSearch(podId: address)

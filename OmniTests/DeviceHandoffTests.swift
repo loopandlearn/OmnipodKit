@@ -348,12 +348,12 @@ final class DeviceHandoffTests: XCTestCase {
         XCTAssertNotNil(pod.unacknowledgedCommand)
     }
 
-    /// A take or an adopt expects one resync, from the other controller's sessions before it: the
-    /// command is dropped as before, and sessions go on.
+    /// A take after a release, or an adopt, expects one resync, from the other controller's sessions
+    /// before it: the command is dropped as before, and sessions go on.
     func testTheResyncATakeExpectsDoesNotStopThisController() {
         var pod = makePodState()
         pod.sharedWithAnotherController = true
-        pod.allowSessionsAfterTake()
+        pod.allowSessionsAfterTake(afterRelease: true)
 
         XCTAssertEqual(pod.resolveAfterSessionResync(), .expected)
         XCTAssertFalse(pod.refusesSessions)
@@ -371,10 +371,32 @@ final class DeviceHandoffTests: XCTestCase {
         XCTAssertTrue(pod.refusesSessions)
         XCTAssertEqual(pod.foreignSessionDetectedAt, at)
 
-        pod.allowSessionsAfterTake()
+        pod.allowSessionsAfterTake(afterRelease: false)
         XCTAssertFalse(pod.refusesSessions, "a take is the host's claim")
         XCTAssertNil(pod.foreignSessionDetectedAt)
-        XCTAssertTrue(pod.expectsSessionResync, "and its first session may meet the other controller's")
+        XCTAssertFalse(pod.expectsSessionResync, "this controller never let the pod go: a resync is not expected")
+        XCTAssertEqual(pod.resolveAfterSessionResync(), .anotherController, "another controller's next session stops it again")
+        XCTAssertTrue(pod.refusesSessions)
+    }
+
+    /// A take after this controller let the pod go: the other controller ran it meanwhile, and the
+    /// first session may meet its sessions.
+    func testATakeAfterAReleaseExpectsOneResync() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        pod.allowSessionsAfterTake(afterRelease: true)
+        XCTAssertTrue(pod.expectsSessionResync)
+        XCTAssertEqual(pod.resolveAfterSessionResync(), .expected)
+    }
+
+    /// An adopt's expected resync is not undone by the take that follows it (a watch's Start: adopt,
+    /// then take, with no release on this device).
+    func testATakeKeepsTheResyncAnAdoptExpects() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        pod.expectsSessionResync = true
+        pod.allowSessionsAfterTake(afterRelease: false)
+        XCTAssertTrue(pod.expectsSessionResync)
     }
 
     /// The stop survives a relaunch, and the copy handed to another controller carries none of it.
@@ -429,7 +451,7 @@ final class DeviceHandoffTests: XCTestCase {
     func testAnOwnCounterResyncLeavesTheTakesExpectedResync() {
         var pod = makePodState()
         pod.sharedWithAnotherController = true
-        pod.allowSessionsAfterTake()
+        pod.allowSessionsAfterTake(afterRelease: true)
 
         XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 60, acceptedSqn: 60), .ownCounter)
         XCTAssertTrue(pod.expectsSessionResync)
