@@ -394,6 +394,67 @@ final class DeviceHandoffTests: XCTestCase {
         XCTAssertFalse(exported.expectsSessionResync)
     }
 
+    /// This controller's own counter, saved late (the app was killed before its host saved the pod
+    /// state): the pod's counter is the last one it accepted from this controller. Not another
+    /// controller: nothing stops, and the unconfirmed command is still this controller's to settle.
+    func testAResyncToTheCounterThePodLastAcceptedFromThisControllerIsItsOwn() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 60, acceptedSqn: 60), .ownCounter)
+        XCTAssertFalse(pod.refusesSessions)
+        XCTAssertNil(pod.foreignSessionDetectedAt)
+        XCTAssertNotNil(pod.unacknowledgedCommand, "still this controller's command")
+    }
+
+    /// Another controller's session moves the pod's counter past the last one this controller sent.
+    func testAResyncPastTheCounterThePodLastAcceptedIsAnotherController() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 61, acceptedSqn: 60), .anotherController)
+        XCTAssertTrue(pod.refusesSessions)
+    }
+
+    /// Nothing saved for this pod (a first adopt, or a pod this device never ran): the rule is as before.
+    func testWithoutASavedCounterAResyncNobodyExpectedStillStopsThisController() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 61, acceptedSqn: nil), .anotherController)
+    }
+
+    /// A take's own counter, saved late, does not use up the one resync the take expects from the
+    /// other controller.
+    func testAnOwnCounterResyncLeavesTheTakesExpectedResync() {
+        var pod = makePodState()
+        pod.sharedWithAnotherController = true
+        pod.allowSessionsAfterTake()
+
+        XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 60, acceptedSqn: 60), .ownCounter)
+        XCTAssertTrue(pod.expectsSessionResync)
+        XCTAssertEqual(pod.resolveAfterSessionResync(podSqn: 75, acceptedSqn: 60), .expected)
+    }
+
+    /// The accepted counter is kept per pod on this device; another pod's entry is not read.
+    func testTheAcceptedCounterIsKeptForOnePodOnly() throws {
+        let suite = "DeviceHandoffTests.acceptedEapSqn"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let saved = AcceptedEapSqn(defaults: defaults)
+        let pod = makePodState()
+        let other = try XCTUnwrap(PodState(rawValue: pod.rawValue.merging(["lotSeq": UInt32(560314)]) { $1 }))
+
+        XCTAssertNil(saved.value(for: pod))
+        saved.record(60, for: pod)
+        XCTAssertEqual(AcceptedEapSqn(defaults: defaults).value(for: pod), 60, "read back as after a relaunch")
+        XCTAssertNil(saved.value(for: other))
+
+        saved.record(5, for: other)
+        XCTAssertNil(saved.value(for: pod), "a new pod replaces the entry")
+        XCTAssertNil(pod.rawValue["acceptedEapSqn"], "never part of the pod state the host saves or exports")
+    }
+
     /// An adopter expects the one resync its first session may meet.
     func testAnAdopterExpectsOneResync() {
         var pod = makePodState()

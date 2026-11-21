@@ -152,8 +152,14 @@ extension PodState {
     /// controller may have run it: resolve as after foreign control, keeping in-flight copies. A
     /// resync a take or an adopt did not expect also stops this controller: nothing more is sent
     /// until its host takes control again, and the host can read when it happened.
-    mutating func resolveAfterSessionResync(at now: Date = Date()) -> SessionResync {
+    ///
+    /// A pod counter no higher than the last one the pod accepted from this controller
+    /// (`AcceptedEapSqn`) is this controller's own: its saved state was behind, for example after the
+    /// app was killed before the host saved it. Another controller's session would have moved the
+    /// pod's counter past it.
+    mutating func resolveAfterSessionResync(podSqn: Int? = nil, acceptedSqn: Int? = nil, at now: Date = Date()) -> SessionResync {
         guard sharedWithAnotherController else { return .ownCounter }
+        if let podSqn, let acceptedSqn, podSqn <= acceptedSqn { return .ownCounter }
         resolveAfterForeignControl(dropInFlight: false)
         if expectsSessionResync { return .expected }
         foreignSessionDetectedAt = now
@@ -166,6 +172,33 @@ extension PodState {
         refusesSessions = false
         foreignSessionDetectedAt = nil
         if sharedWithAnotherController { expectsSessionResync = true }
+    }
+}
+
+/// The last session counter (EAP SQN) a shared pod accepted from this controller, saved the moment
+/// the pod accepts it, apart from the pod state the host saves later. Per device: never exported.
+/// One pod at a time; a new pod replaces the entry.
+struct AcceptedEapSqn {
+    static let key = "OmnipodKit.acceptedEapSqn"
+    let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func value(for pod: PodState) -> Int? {
+        guard let saved = defaults.dictionary(forKey: Self.key), saved["pod"] as? String == Self.identity(of: pod) else {
+            return nil
+        }
+        return saved["sqn"] as? Int
+    }
+
+    func record(_ sqn: Int, for pod: PodState) {
+        defaults.set(["pod": Self.identity(of: pod), "sqn": sqn], forKey: Self.key)
+    }
+
+    static func identity(of pod: PodState) -> String {
+        "\(pod.address)-\(pod.lotNo)-\(pod.lotSeq)"
     }
 }
 

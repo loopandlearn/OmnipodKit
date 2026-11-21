@@ -33,6 +33,9 @@ class BlePodComms: PodComms {
 
     private var needsSessionEstablishment: Bool = false
 
+    /// PODLOAN: see AcceptedEapSqn.
+    private let acceptedEapSqn = AcceptedEapSqn()
+
     /// Internal, not private: OmniPumpManager+DeviceHandoff reads `loanBleDiagnostics` off it.
     private(set) var bluetoothManager: BluetoothManager!
 
@@ -382,9 +385,12 @@ class BlePodComms: PodComms {
                 // Any resync counts: after a single foreign session the pod's counter equals the one just sent.
                 let pending = podState!.unacknowledgedCommand
                 let dropped = pending.map { " · unconfirmed \($0) dropped, nothing booked" } ?? ""
-                switch podState!.resolveAfterSessionResync() {
+                // PODLOAN: a counter the pod already accepted from this controller is its own, saved late.
+                switch podState!.resolveAfterSessionResync(podSqn: podSqn, acceptedSqn: acceptedEapSqn.value(for: podState!)) {
                 case .ownCounter:
-                    break
+                    if podState!.sharedWithAnotherController {
+                        omnipodLogDeviceEvent("[trust] EAP SQN RESYNC — pod=\(podSqn) ours=\(eapSeq): this controller's own sessions, saved late [sqn-resync]")
+                    }
                 case .expected:
                     omnipodLogDeviceEvent("[trust] EAP SQN RESYNC — pod=\(podSqn) ours=\(eapSeq): the other controller's sessions before this take [sqn-resync]\(dropped)")
                 case .anotherController:
@@ -415,6 +421,10 @@ class BlePodComms: PodComms {
                 log.bleDebug("@@@ Setting podState transport state to %{public}@", transportState.inlineDescription)
                 podState!.bleMessageTransportState = transportState
                 podState!.expectsSessionResync = false
+                // PODLOAN: saved at once, so a late save of the pod state is not taken for another controller.
+                if podState!.sharedWithAnotherController {
+                    acceptedEapSqn.record(eapSeq, for: podState!)
+                }
             } else {
                 log.bleDebug("@@@ Used keys %{public}@ to create transport state %{public}@", String(describing: keys), transportState.inlineDescription)
             }
