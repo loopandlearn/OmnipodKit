@@ -31,6 +31,55 @@ class PodStateTests: XCTestCase {
         }
     }
 
+    private func pod(lotSeq: UInt32, activatedAt: Date) -> PodState {
+        var pod = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
+                           lotNo: 43620, lotSeq: lotSeq, insulinType: .novolog, podType: dashType)
+        pod.setupProgress = .completed
+        pod.activatedAt = activatedAt
+        pod.expiresAt = activatedAt + Pod.nominalPodLife
+        return pod
+    }
+
+    func testComponentReplacementAfterAnOcclusion() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        var previous = pod(lotSeq: 1, activatedAt: start)
+        previous.deliveryStoppedAt = start + .hours(40)
+        previous.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020d0000000407eb140e0c03ff0e1400002817080000")!)
+        previous.lastInsulinMeasurements = PodInsulinMeasurements(insulinDelivered: 100, reservoirLevel: 23.5, validTime: start + .hours(40))
+        let new = pod(lotSeq: 2, activatedAt: start + .hours(41))
+
+        let replacement = OmniPumpManager.componentReplacement(newPod: new, previousPod: previous)
+
+        XCTAssertEqual(replacement.previous, .init(stopDate: start + .hours(40), remainingUnits: 23.5, reason: .occlusion(code: "0x14")))
+        XCTAssertEqual(replacement.expirationDate, start + .hours(41) + Pod.nominalPodLife)
+        XCTAssertEqual(replacement.componentIdentifier, "43620-2")
+        XCTAssertEqual(replacement.primes, [.init(target: .tubing, volume: Pod.primeUnits),
+                                           .init(target: .cannula, volume: Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)])
+    }
+
+    func testComponentReplacementAfterAFault() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        var previous = pod(lotSeq: 1, activatedAt: start)
+        previous.deliveryStoppedAt = start + .hours(10)
+        previous.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020f0000000900345c000103ff0001000005ae056029")!)
+
+        let replacement = OmniPumpManager.componentReplacement(newPod: pod(lotSeq: 2, activatedAt: start + .hours(11)), previousPod: previous)
+        XCTAssertEqual(replacement.previous?.reason, .fault(code: "0x5C"))
+    }
+
+    func testComponentReplacementReasonFromTheStopTime() {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        var early = pod(lotSeq: 1, activatedAt: start)
+        early.deliveryStoppedAt = start + .hours(50)
+        var late = pod(lotSeq: 1, activatedAt: start)
+        late.deliveryStoppedAt = start + Pod.nominalPodLife + .hours(2)
+        let new = pod(lotSeq: 2, activatedAt: start + .hours(80))
+
+        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: early).previous?.reason, .userInitiated)
+        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: late).previous?.reason, .expired)
+        XCTAssertNil(OmniPumpManager.componentReplacement(newPod: new, previousPod: nil).previous)
+    }
+
     func testLTKAndBLEIdentifierDecodeIndependently() throws {
         let ltk = Data(hexadecimalString: "fedcba98765432100123456789abcdef")!
         let handle = "0B1D2C3E-0000-4000-8000-00000000A001"
