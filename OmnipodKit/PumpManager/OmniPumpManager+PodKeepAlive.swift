@@ -49,7 +49,9 @@ extension OmniPumpManager {
         /// Create a timer to trigger a getPodStatus call after the specified time from now.
         podKeepAliveTimer?.invalidate()
         podKeepAliveTimer = Timer(timeInterval: when, repeats: false) { _ in
+            #if os(iOS)
             podKeepAliveAppInBackground = UIApplication.shared.applicationState == .background
+            #endif
             if self.hasPairedNonFaultedPod, self.podKeepAliveTimerAllowed {
                 print("@@@ timer expired, reading pod status to stay connected at \(self.timeStr(Date()))")
                 self.getPodStatus(canOptimize: false) { _ in }
