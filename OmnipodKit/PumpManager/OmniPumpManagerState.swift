@@ -47,6 +47,13 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
     var defaultLowReservoirReminderValue: Double
 
+    // Units the current pod was filled with, used to approximate its reservoir level while it reads 50+ U.
+    // Nil when not set. Copied from defaultReservoirFillAmount when pairing a new pod.
+    var reservoirFillAmount: Double?
+
+    // Fill amount to use when pairing a new pod, nil to not approximate the reservoir level
+    var defaultReservoirFillAmount: Double?
+
     var podAttachmentConfirmed: Bool
 
     public internal(set) var activeAlerts: Set<PumpManagerAlert>
@@ -78,6 +85,19 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             return nil
         }
         return ReservoirLevel(rawValue: level)
+    }
+
+    // Approximate insulin left in the current pod while it reads 50+ U, from its fill amount
+    var approximateReservoirLevel: Double? {
+        // a faulted pod no longer delivers, so its remaining insulin no longer matters
+        guard let podState, podState.isActive else {
+            return nil
+        }
+        return ReservoirEstimate.approximateUnitsRemaining(
+            fillAmount: reservoirFillAmount,
+            reservoirLevel: podState.lastInsulinMeasurements?.reservoirLevel,
+            insulinDispensed: podState.totalInsulinDispensed
+        )
     }
 
     var podType: PodType
@@ -330,6 +350,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
         self.defaultLowReservoirReminderValue = rawValue["defaultLowReservoirReminderValue"] as? Double ?? self.lowReservoirReminderValue
 
+        self.reservoirFillAmount = rawValue["reservoirFillAmount"] as? Double
+
+        self.defaultReservoirFillAmount = rawValue["defaultReservoirFillAmount"] as? Double
+
         self.podAttachmentConfirmed = rawValue["podAttachmentConfirmed"] as? Bool ?? false
 
         self.initialConfigurationCompleted = rawValue["initialConfigurationCompleted"] as? Bool ?? true
@@ -402,6 +426,8 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         value["defaultExpirationReminderOffset"] = defaultExpirationReminderOffset
         value["lowReservoirReminderValue"] = lowReservoirReminderValue
         value["defaultLowReservoirReminderValue"] = defaultLowReservoirReminderValue
+        value["reservoirFillAmount"] = reservoirFillAmount
+        value["defaultReservoirFillAmount"] = defaultReservoirFillAmount
         value["lastPumpDataReportDate"] = lastPumpDataReportDate
         value["silencePodEnd"] = silencePodEnd
         value["previousPodState"] = previousPodState?.rawValue
@@ -453,6 +479,8 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             "* defaultExpirationReminderOffset: \(defaultExpirationReminderOffset.timeIntervalStr)",
             "* lowReservoirReminderValue: \(lowReservoirReminderValue)",
             "* defaultLowReservoirReminderValue: \(defaultLowReservoirReminderValue)",
+            "* reservoirFillAmount: \(optionalString(reservoirFillAmount))",
+            "* defaultReservoirFillAmount: \(optionalString(defaultReservoirFillAmount))",
             "* podAttachmentConfirmed: \(podAttachmentConfirmed)",
             "* activeAlerts: \(activeAlerts)",
             "* alertsWithPendingAcknowledgment: \(alertsWithPendingAcknowledgment)",

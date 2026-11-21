@@ -76,6 +76,10 @@ internal class OmniHUDProvider: NSObject, HUDProvider {
             rawValue["reservoirLevel"] = reservoirLevel.rawValue
         }
 
+        if let approximateReservoirLevel = pumpManager.approximateReservoirLevel {
+            rawValue["approximateReservoirLevel"] = approximateReservoirLevel
+        }
+
         if let reservoirLevelHighlightState = pumpManager.reservoirLevelHighlightState {
             rawValue["reservoirLevelHighlightState"] = reservoirLevelHighlightState.rawValue
         }
@@ -97,7 +101,7 @@ internal class OmniHUDProvider: NSObject, HUDProvider {
 
         if let lastStatusDate = rawValue["lastStatusDate"] as? Date {
             reservoirView = OmniReservoirView.instantiate()
-            reservoirView!.update(level: reservoirLevel, at: lastStatusDate, reservoirLevelHighlightState: reservoirLevelHighlightState)
+            reservoirView!.update(level: reservoirLevel, approximateLevel: rawValue["approximateReservoirLevel"] as? Double, at: lastStatusDate, reservoirLevelHighlightState: reservoirLevelHighlightState)
         } else {
             reservoirView = nil
         }
@@ -121,7 +125,7 @@ internal class OmniHUDProvider: NSObject, HUDProvider {
             return
         }
             
-        reservoirView.update(level: pumpManager.reservoirLevel, at: lastStatusDate, reservoirLevelHighlightState: reservoirLevelHighlightState)
+        reservoirView.update(level: pumpManager.reservoirLevel, approximateLevel: pumpManager.approximateReservoirLevel, at: lastStatusDate, reservoirLevelHighlightState: reservoirLevelHighlightState)
     }
 }
 
