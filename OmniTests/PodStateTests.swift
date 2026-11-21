@@ -33,7 +33,7 @@ class PodStateTests: XCTestCase {
 
     private func pod(lotSeq: UInt32, activatedAt: Date) -> PodState {
         var pod = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
-                           lotNo: 43620, lotSeq: lotSeq, insulinType: .novolog, podType: dashType)
+                           lotNo: 139173265, lotSeq: lotSeq, insulinType: .novolog, podType: dashType)
         pod.setupProgress = .completed
         pod.activatedAt = activatedAt
         pod.expiresAt = activatedAt + Pod.nominalPodLife
@@ -52,7 +52,7 @@ class PodStateTests: XCTestCase {
 
         XCTAssertEqual(replacement.previous, .init(stopDate: start + .hours(40), remainingUnits: 23.5, reason: .occlusion(code: "0x14")))
         XCTAssertEqual(replacement.expirationDate, start + .hours(41) + Pod.nominalPodLife)
-        XCTAssertEqual(replacement.componentIdentifier, "43620-2")
+        XCTAssertEqual(replacement.componentIdentifier, "139173265-2")
         XCTAssertEqual(replacement.primes, [.init(target: .tubing, volume: Pod.primeUnits),
                                            .init(target: .cannula, volume: Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)])
     }
@@ -65,6 +65,19 @@ class PodStateTests: XCTestCase {
 
         let replacement = OmniPumpManager.componentReplacement(newPod: pod(lotSeq: 2, activatedAt: start + .hours(11)), previousPod: previous)
         XCTAssertEqual(replacement.previous?.reason, .fault(code: "0x5C"))
+    }
+
+    func testComponentReplacementAfterAFailedActivation() {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let new = pod(lotSeq: 3, activatedAt: start + .hours(1))
+        for setupProgress in [SetupProgress.activationTimeout, .podIncompatible] {
+            var failed = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
+                                  lotNo: 139173265, lotSeq: 2, insulinType: .novolog, podType: dashType)
+            failed.setupProgress = setupProgress
+            failed.deliveryStoppedAt = start
+            XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: failed).previous,
+                           .init(stopDate: start, reason: .fault(code: nil)))
+        }
     }
 
     func testComponentReplacementReasonFromTheStopTime() {
@@ -84,7 +97,7 @@ class PodStateTests: XCTestCase {
         let ltk = Data(hexadecimalString: "fedcba98765432100123456789abcdef")!
         let handle = "0B1D2C3E-0000-4000-8000-00000000A001"
         let pod = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
-                           lotNo: 43620, lotSeq: 560313, insulinType: .novolog, podType: dashType,
+                           lotNo: 139173265, lotSeq: 560313, insulinType: .novolog, podType: dashType,
                            ltk: ltk, bleIdentifier: handle)
 
         var withoutHandle = pod.rawValue
@@ -101,7 +114,7 @@ class PodStateTests: XCTestCase {
     }
 
     func testCancelAfterScheduledEndAppliesBolusNotDelivered() {
-        var podState = PodState(address: 521580830, firmwareVersion: "2.7.0", iFirmwareVersion: "2.7.0", lotNo: 43620, lotSeq: 560313, insulinType: .novolog, podType: dashType, ltk: Data(hexadecimalString: "fedcba98765432100123456789abcdef")!, bleIdentifier: "0000-0000")
+        var podState = PodState(address: 521580830, firmwareVersion: "2.7.0", iFirmwareVersion: "2.7.0", lotNo: 139173265, lotSeq: 560313, insulinType: .novolog, podType: dashType, ltk: Data(hexadecimalString: "fedcba98765432100123456789abcdef")!, bleIdentifier: "0000-0000")
         let start = Date().addingTimeInterval(.hours(-1))
         podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4, startTime: start, scheduledCertainty: .certain, insulinType: .novolog)
         let rate = podState.unfinalizedBolus!.rate
@@ -113,7 +126,7 @@ class PodStateTests: XCTestCase {
     }
 
     func testCancelDoesNotSubtractBolusNotDeliveredTwice() {
-        var podState = PodState(address: 521580830, firmwareVersion: "2.7.0", iFirmwareVersion: "2.7.0", lotNo: 43620, lotSeq: 560313, insulinType: .novolog, podType: dashType, ltk: Data(hexadecimalString: "fedcba98765432100123456789abcdef")!, bleIdentifier: "0000-0000")
+        var podState = PodState(address: 521580830, firmwareVersion: "2.7.0", iFirmwareVersion: "2.7.0", lotNo: 139173265, lotSeq: 560313, insulinType: .novolog, podType: dashType, ltk: Data(hexadecimalString: "fedcba98765432100123456789abcdef")!, bleIdentifier: "0000-0000")
         let start = Date().addingTimeInterval(.hours(-1))
         podState.unfinalizedBolus = UnfinalizedDose(doseId: nil, bolusAmount: 4, startTime: start, scheduledCertainty: .certain, insulinType: .novolog)
         let canceledAt = start.addingTimeInterval(.seconds(30))

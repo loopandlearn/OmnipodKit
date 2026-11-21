@@ -3606,13 +3606,15 @@ extension OmniPumpManager {
             componentIdentifier: "\(newPod.lotNo)-\(newPod.lotSeq)"
         )
 
-        guard let previousPod, previousPod.setupProgress == .completed else {
+        guard let previousPod else {
             return replacement
         }
         let reason: ComponentReplacement.Reason
         if let fault = previousPod.fault?.faultEventCode, fault.faultType != .exceededMaximumPodLife80Hrs {
             let code = String(format: "0x%02X", fault.rawValue)
             reason = fault.isOcclusion ? .occlusion(code: code) : .fault(code: code)
+        } else if previousPod.isFaulted {
+            reason = .fault(code: nil)
         } else if let stopped = previousPod.deliveryStoppedAt, let expiresAt = previousPod.expiresAt {
             reason = stopped >= expiresAt ? .expired : .userInitiated
         } else {
