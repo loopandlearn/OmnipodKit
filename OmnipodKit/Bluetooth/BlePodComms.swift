@@ -786,6 +786,10 @@ class BlePodComms: PodComms {
             omnipodLogDeviceEvent("[connectOnDemand] ** STALE PeripheralManager ** (superseded by re-adopt) — switching before the session runs")
             manager = registered
         }
+        // PODLOAN: a handle let go of for a loan never sends again; look the pod up afresh.
+        if manager?.isRetiredForLoan == true {
+            manager = nil
+        }
         if manager == nil, BluetoothManager.connectOnDemandEnabled, let bleId = podState?.bleIdentifier {
             self.manager = bluetoothManager.peripheralManager(forIdentifier: bleId)
             if self.manager == nil {
