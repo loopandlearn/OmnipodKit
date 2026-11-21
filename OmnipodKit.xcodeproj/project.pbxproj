@@ -584,9 +584,9 @@
 			targets = (
 				D8F83F872D155ADA0005D165 /* OmnipodKit */,
 				D889B2382D2B4BFE00C8E64C /* OmnipodKitPlugin */,
+				FADE00000000000000000102 /* OmnipodKit-watchOS */,
 				D8D0EB692D744A24000B0AF4 /* OmniParser */,
 				D8D0ED172D74EF41000B0AF4 /* OmniTests */,
-				FADE00000000000000000102 /* OmnipodKit-watchOS */,
 			);
 		};
 /* End PBXProject section */
