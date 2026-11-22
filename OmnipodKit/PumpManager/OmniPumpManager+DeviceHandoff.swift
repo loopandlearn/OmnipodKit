@@ -106,6 +106,14 @@ extension OmniPumpManagerState {
 
 extension PodState {
 
+    /// Whether a newly started app may send on the session keys it saved, without a handshake first. Not on a
+    /// pod shared with another controller: the handshake is where a resync shows that the other controller has
+    /// used the pod. A link that stayed up across the relaunch would otherwise skip it, and one the system
+    /// reconnected while the app was not running can look the same. On a pod never shared, as before.
+    var savedSessionKeysUsableAtLaunch: Bool {
+        !sharedWithAnotherController && !(bleMessageTransportState.ck?.isEmpty ?? true)
+    }
+
     /// The pod without this controller's handle, session keys, per-session counters or pending
     /// command. The EAP sequence and message number travel; the pod resynchronizes both.
     var sharedFacts: PodState {

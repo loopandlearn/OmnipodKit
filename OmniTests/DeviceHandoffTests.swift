@@ -317,6 +317,16 @@ final class DeviceHandoffTests: XCTestCase {
         XCTAssertEqual(adopted.podState?.sharedWithAnotherController, true, "this one started from a copy")
     }
 
+    /// A newly started app handshakes before sending on a shared pod: the handshake is where it learns that
+    /// the other controller has used the pod. Saved keys still serve a pod never shared, as before.
+    func testOnASharedPodANewlyStartedAppHandshakesFirst() {
+        var pod = makePodState()
+        XCTAssertTrue(pod.savedSessionKeysUsableAtLaunch, "a pod never shared keeps its saved keys")
+        pod.sharedWithAnotherController = true
+        XCTAssertFalse(pod.savedSessionKeysUsableAtLaunch)
+        XCTAssertFalse(pod.sharedFacts.savedSessionKeysUsableAtLaunch, "an exported copy carries no keys")
+    }
+
     /// This controller's command was unconfirmed when another started from its copy. The pod's status
     /// now answers for the other controller's commands, so the command is dropped with nothing booked.
     func testOnASharedPodAResyncDropsTheUnconfirmedCommandAndBooksNothing() {
