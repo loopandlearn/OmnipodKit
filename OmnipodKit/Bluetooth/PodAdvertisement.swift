@@ -28,6 +28,12 @@ struct PodAdvertisement {
 
     var serviceUUIDs: [CBUUID]
 
+    /// O5 only: the pdmId embedded in the advertised service UUID (0xFFFFFFFE before pairing).
+    private(set) var o5PdmId: UInt32? = nil
+
+    /// O5 only: the 1-byte status suffix that ends the advertised service UUID (00 normally).
+    private(set) var o5StatusSuffix: UInt8? = nil
+
     var pairable: Bool {
         if podType.isDash {
             // For DASH, serviceUUIDs 3 & 4 are the podId and will be "FFFF" & "FFFE" only before pairing
@@ -38,7 +44,7 @@ struct PodAdvertisement {
 
         if podType.isO5 {
             // For O5, serviceUUID[0] will have an imbedded pdmId of "FFFFFFFE" only before pairing
-            return serviceUUIDs[0].uuidString == o5OmnipodServiceUUID.advertisement.rawValue
+            return o5UnpairedAdvertisementUUIDs.contains(serviceUUIDs[0])
         }
 
         return false
@@ -95,14 +101,16 @@ struct PodAdvertisement {
                 return nil
             }
 
-            // idString is "CE1F923D-C539-48EA-7300-0A<hexPdmId>00" (pdmID = 0xFFFFFFFE before pairing)
-            //              012345678901234567890123456789012345
+            // idString is "CE1F923D-C539-48EA-7300-0A<hexPdmId><suffix>" (pdmID = 0xFFFFFFFE before pairing,
+            //              012345678901234567890123456789012345              suffix 00 normally)
             //                        1         2         3
             let pdmIdStr = idString.subString(location: 26, length: 8)
             guard let decodedPdmId = UInt32(pdmIdStr, radix: 16) else {
                 print("Could not decode pdmId from \(idString)")
                 return nil
             }
+            self.o5PdmId = decodedPdmId
+            self.o5StatusSuffix = UInt8(idString.subString(location: 34, length: 2), radix: 16)
 
             print("O5 advertisement PDM id: \(decodedPdmId)")
 

@@ -141,12 +141,12 @@ class BluetoothManager: NSObject {
     /// once (captures the fault transition without flooding the device log).
     private var lastLoggedAdvKey: [String: String] = [:]
 
-    /// Last …FE02 advert (name|mfg) logged per unpaired O5 during the current discovery, so each pod is
+    /// Last advert (suffix|name|mfg) logged per unpaired O5 with a suffix other than 00, so each pod is
     /// logged once per pairing attempt.
-    private var lastLoggedUnpairedStatus02AdvKey: [String: String] = [:]
+    private var lastLoggedUnpairedSuffixAdvKey: [String: String] = [:]
 
-    /// Whether this discovery also hears unpaired O5s advertising …FE02, only to log them.
-    private var listensForUnpairedStatus02Adverts: Bool {
+    /// Whether this discovery scans for unpaired O5s on all four status suffixes (…FE00 to …FE03).
+    private var listensForAllUnpairedO5Suffixes: Bool {
         discoveryModeEnabled && podType.isO5 && uuidPdmId == nil
     }
 
@@ -835,7 +835,7 @@ class BluetoothManager: NSObject {
 
         // We will attempt to connect to all pairable devices when in discovery mode
         discoveryModeEnabled = true
-        lastLoggedUnpairedStatus02AdvKey.removeAll()
+        lastLoggedUnpairedSuffixAdvKey.removeAll()
         connectionDelegate?.omnipodLogDeviceEvent("[pairing] discoverPods — scanning for a pairable pod")
         // Quiet any in-flight heartbeat probe / stale connect churn so it doesn't clobber discovery.
         delayedProbeInFlight = false
@@ -1183,9 +1183,9 @@ class BluetoothManager: NSObject {
             // Pairing: scan for the pod's main advertisement service so a new/unpaired pod is found.
             // MUST take precedence over the low-power alarm scan (which filters on C005/C00A and would
             // never see a pairing pod) and over scanningEnabled (pairing has to scan regardless).
-            // Also hear unpaired O5s advertising …FE02, only to log them: what 02 means before pairing is unknown.
-            if listensForUnpairedStatus02Adverts {
-                services = [serviceUUID, o5UnpairedStatus02AdvertisementUUID]
+            // An unpaired O5 can advertise …FE00 to …FE03.
+            if listensForAllUnpairedO5Suffixes {
+                services = o5UnpairedAdvertisementUUIDs
             } else {
                 services = [serviceUUID]
             }
@@ -1526,20 +1526,22 @@ extension BluetoothManager: CBCentralManagerDelegate {
             surfacePodConditionAndQuiet(alertSet: AlertSet(rawValue: 0))
         }
 
-        if listensForUnpairedStatus02Adverts, advSvcUUIDs.contains(o5UnpairedStatus02AdvertisementUUID) {
-            let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
-            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
-            let advKey = "\(name)|\(mfg)"
-            if lastLoggedUnpairedStatus02AdvKey[peripheral.identifier.uuidString] != advKey {
-                lastLoggedUnpairedStatus02AdvKey[peripheral.identifier.uuidString] = advKey
-                log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE02, not pairing: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
-                            peripheral.identifier.uuidString, RSSI, name, mfg)
-                connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE02, not pairing: rssi=\(RSSI) name=\(name) mfg=\(mfg)")
-            }
-            return
-        }
-
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {
+            // Log an unpaired O5 with a suffix other than 00 once per pairing attempt, then pair it as usual.
+            if listensForAllUnpairedO5Suffixes, podAdvertisement.pairable,
+               let suffix = podAdvertisement.o5StatusSuffix, suffix != 0 {
+                let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
+                let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
+                let suffixHex = String(format: "%02X", suffix)
+                let advKey = "\(suffixHex)|\(name)|\(mfg)"
+                if lastLoggedUnpairedSuffixAdvKey[peripheral.identifier.uuidString] != advKey {
+                    lastLoggedUnpairedSuffixAdvKey[peripheral.identifier.uuidString] = advKey
+                    log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE%{public}@: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
+                                peripheral.identifier.uuidString, suffixHex, RSSI, name, mfg)
+                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE\(suffixHex): rssi=\(RSSI) name=\(name) mfg=\(mfg)")
+                }
+            }
+
             addPeripheral(peripheral, podAdvertisement: podAdvertisement)
 
             if discoveryModeEnabled {
