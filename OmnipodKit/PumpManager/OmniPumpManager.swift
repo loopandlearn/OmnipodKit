@@ -278,7 +278,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
             if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
                 let podType = newValue.podType
-                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previous: newValue.replacedPod) }
+                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previousPod: newValue.previousPodState) }
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
@@ -1176,7 +1176,14 @@ extension OmniPumpManager {
         let podType = state.podType
         setState { state in
             // Don't wipe out the previous PodState when switching pod types
-            state.retirePod(at: Date())
+            if let podState = state.podState {
+                state.previousPodState = podState
+                /// If deliveryStoppedAt hasn't been already set during pod fault handling or pod deactivation
+                /// (always the case for a simulator), set deliveryStoppedAt with the current time
+                if podState.deliveryStoppedAt == nil {
+                    state.previousPodState?.deliveryStoppedAt = Date()
+                }
+            }
 
             switch podType {
             case erosType:
@@ -3589,7 +3596,9 @@ extension OmniPumpManager {
 }
 
 extension OmniPumpManager {
-    static func componentReplacement(newPod: PodState, previous: ComponentReplacement.PreviousComponent?) -> ComponentReplacement {
+    static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
+        // A previous pod that never finished setup didn't replace anything, so it isn't reported
+        let previous = previousPod.flatMap { $0.setupProgress == .completed ? previousComponent(for: $0) : nil }
         let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
         var primeUnits = Pod.primeUnits
         if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
