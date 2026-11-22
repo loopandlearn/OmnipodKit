@@ -154,7 +154,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
             }
             .store(in: &cancellables)
 
-#if os(iOS) // watchOS: no UIApplication lifecycle notifications or audio keepalive; the watch host owns process lifetime
+#if os(iOS)
         /// Register for app foreground / background notifications needed for at least Pod Keep Alive timer based options
         if !podType.isEros {
             let nc = NotificationCenter.default
@@ -479,7 +479,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
         }
     }
 
-#if os(iOS) // watchOS: SilentTune (audio keepalive; depends on PumpManagerUI) is excluded from the watchOS target
+#if os(iOS)
     private let silentTune = SilentTune()
 
     @objc func appMovedToBackground() {
@@ -1062,7 +1062,7 @@ extension OmniPumpManager {
         return false
     }
 
-#if os(iOS) // watchOS: ReservoirLevelHighlightState is declared in PumpManagerUI (excluded); only UI consumes this property
+#if os(iOS)
     var reservoirLevelHighlightState: ReservoirLevelHighlightState? {
         guard let reservoirLevel = reservoirLevel else {
             return nil
