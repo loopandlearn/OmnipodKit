@@ -48,7 +48,7 @@ class PodStateTests: XCTestCase {
         previous.lastInsulinMeasurements = PodInsulinMeasurements(insulinDelivered: 100, reservoirLevel: 23.5, validTime: start + .hours(40))
         let new = pod(lotSeq: 2, activatedAt: start + .hours(41))
 
-        let replacement = OmniPumpManager.componentReplacement(newPod: new, previousPod: previous)
+        let replacement = OmniPumpManager.componentReplacement(newPod: new, previous: OmniPumpManager.previousComponent(for: previous))
 
         XCTAssertEqual(replacement.previous, .init(stopDate: start + .hours(40), remainingUnits: 23.5, reason: .occlusion(code: "0x14")))
         XCTAssertEqual(replacement.expirationDate, start + .hours(41) + Pod.nominalPodLife)
@@ -57,40 +57,64 @@ class PodStateTests: XCTestCase {
                                            .init(target: .cannula, volume: Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)])
     }
 
-    func testComponentReplacementAfterAFault() throws {
-        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-        var previous = pod(lotSeq: 1, activatedAt: start)
-        previous.deliveryStoppedAt = start + .hours(10)
+    func testComponentReplacementPrimeFromTheSetupUnitsDelivered() {
+        var new = pod(lotSeq: 2, activatedAt: Date(timeIntervalSinceReferenceDate: 800_000_000))
+        new.setupUnitsDelivered = 2.95
+        let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+        let primes = OmniPumpManager.componentReplacement(newPod: new, previous: nil).primes
+        XCTAssertEqual(primes[0].target, .tubing)
+        XCTAssertEqual(primes[0].volume, 2.95 - cannulaUnits, accuracy: 0.001)
+        XCTAssertEqual(primes[1], .init(target: .cannula, volume: cannulaUnits))
+    }
+
+    func testPreviousComponentAfterAFault() throws {
+        var previous = pod(lotSeq: 1, activatedAt: Date(timeIntervalSinceReferenceDate: 800_000_000))
         previous.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020f0000000900345c000103ff0001000005ae056029")!)
-
-        let replacement = OmniPumpManager.componentReplacement(newPod: pod(lotSeq: 2, activatedAt: start + .hours(11)), previousPod: previous)
-        XCTAssertEqual(replacement.previous?.reason, .fault(code: "0x5C"))
+        XCTAssertEqual(OmniPumpManager.previousComponent(for: previous).reason, .fault(code: "0x5C"))
     }
 
-    func testComponentReplacementAfterAFailedActivation() {
-        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-        let new = pod(lotSeq: 3, activatedAt: start + .hours(1))
-        for setupProgress in [SetupProgress.activationTimeout, .podIncompatible] {
-            var failed = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
-                                  lotNo: 139173265, lotSeq: 2, insulinType: .novolog, podType: dashType)
-            failed.setupProgress = setupProgress
-            failed.deliveryStoppedAt = start
-            XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: failed).previous,
-                           .init(stopDate: start, reason: .fault(code: nil)))
-        }
+    func testPreviousComponentAfterTheMaximumPodLife() throws {
+        var previous = pod(lotSeq: 1, activatedAt: Date(timeIntervalSinceReferenceDate: 800_000_000))
+        previous.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020f0000000900341c000103ff0001000005ae056029")!)
+        XCTAssertEqual(previous.fault?.faultEventCode.faultType, .exceededMaximumPodLife80Hrs)
+        XCTAssertEqual(OmniPumpManager.previousComponent(for: previous).reason, .expired)
     }
 
-    func testComponentReplacementReasonFromTheStopTime() {
+    func testPreviousComponentReasonFromTheStopTime() {
         let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
         var early = pod(lotSeq: 1, activatedAt: start)
         early.deliveryStoppedAt = start + .hours(50)
         var late = pod(lotSeq: 1, activatedAt: start)
         late.deliveryStoppedAt = start + Pod.nominalPodLife + .hours(2)
-        let new = pod(lotSeq: 2, activatedAt: start + .hours(80))
 
-        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: early).previous?.reason, .userInitiated)
-        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: new, previousPod: late).previous?.reason, .expired)
-        XCTAssertNil(OmniPumpManager.componentReplacement(newPod: new, previousPod: nil).previous)
+        XCTAssertEqual(OmniPumpManager.previousComponent(for: early).reason, .userInitiated)
+        XCTAssertEqual(OmniPumpManager.previousComponent(for: late).reason, .expired)
+    }
+
+    func testPodAbandonedDuringSetupKeepsTheReplacedPod() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        var state = OmniPumpManagerState(isOnboarded: true, podState: nil, timeZone: .current,
+                                         basalSchedule: BasalSchedule(entries: [BasalScheduleEntry(rate: 1, startTime: 0, podType: dashType)]),
+                                         maxBasalRateUnitsPerHour: 5, maxBolusUnits: 10, insulinType: .novolog,
+                                         podType: dashType, podKeepAlive: .disabled)
+
+        var podA = pod(lotSeq: 1, activatedAt: start)
+        podA.deliveryStoppedAt = start + .hours(40)
+        podA.fault = try DetailedStatus(encodedData: Data(hexadecimalString: "020d0000000407eb140e0c03ff0e1400002817080000")!)
+        state.updatePodStateFromPodComms(podA)
+        state.retirePod(at: start + .hours(41))
+
+        var podB = PodState(address: 0x17A6219A, firmwareVersion: "4.10.0", iFirmwareVersion: "1.1.0",
+                            lotNo: 139173265, lotSeq: 2, insulinType: .novolog, podType: dashType)
+        podB.setupProgress = .priming
+        state.updatePodStateFromPodComms(podB)
+        state.retirePod(at: start + .hours(42))
+
+        XCTAssertEqual(state.previousPodState?.lotSeq, 2)
+        XCTAssertEqual(state.replacedPod, .init(stopDate: start + .hours(40), reason: .occlusion(code: "0x14")))
+
+        let restored = try XCTUnwrap(OmniPumpManagerState(rawValue: state.rawValue))
+        XCTAssertEqual(restored.replacedPod, state.replacedPod)
     }
 
     func testLTKAndBLEIdentifierDecodeIndependently() throws {

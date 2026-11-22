@@ -278,7 +278,7 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
             if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
                 let podType = newValue.podType
-                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previousPod: newValue.previousPodState) }
+                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previous: newValue.replacedPod) }
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
@@ -1176,14 +1176,7 @@ extension OmniPumpManager {
         let podType = state.podType
         setState { state in
             // Don't wipe out the previous PodState when switching pod types
-            if let podState = state.podState {
-                state.previousPodState = podState
-                /// If deliveryStoppedAt hasn't been already set during pod fault handling or pod deactivation
-                /// (always the case for a simulator), set deliveryStoppedAt with the current time
-                if podState.deliveryStoppedAt == nil {
-                    state.previousPodState?.deliveryStoppedAt = Date()
-                }
-            }
+            state.retirePod(at: Date())
 
             switch podType {
             case erosType:
@@ -3596,23 +3589,32 @@ extension OmniPumpManager {
 }
 
 extension OmniPumpManager {
-    static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
-        var replacement = ComponentReplacement(
+    static func componentReplacement(newPod: PodState, previous: ComponentReplacement.PreviousComponent?) -> ComponentReplacement {
+        let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+        var primeUnits = Pod.primeUnits
+        if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
+            primeUnits = setupUnitsDelivered - cannulaUnits
+        }
+        return ComponentReplacement(
+            previous: previous,
             primes: [
-                .init(target: .tubing, volume: Pod.primeUnits),
-                .init(target: .cannula, volume: Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra)
+                .init(target: .tubing, volume: primeUnits),
+                .init(target: .cannula, volume: cannulaUnits)
             ],
             expirationDate: newPod.expiresAt ?? newPod.activatedAt.map { $0 + Pod.nominalPodLife },
             componentIdentifier: "\(newPod.lotNo)-\(newPod.lotSeq)"
         )
+    }
 
-        guard let previousPod else {
-            return replacement
-        }
+    static func previousComponent(for previousPod: PodState) -> ComponentReplacement.PreviousComponent {
         let reason: ComponentReplacement.Reason
-        if let fault = previousPod.fault?.faultEventCode, fault.faultType != .exceededMaximumPodLife80Hrs {
-            let code = String(format: "0x%02X", fault.rawValue)
-            reason = fault.isOcclusion ? .occlusion(code: code) : .fault(code: code)
+        if let fault = previousPod.fault?.faultEventCode {
+            if fault.faultType == .exceededMaximumPodLife80Hrs {
+                reason = .expired
+            } else {
+                let code = String(format: "0x%02X", fault.rawValue)
+                reason = fault.isOcclusion ? .occlusion(code: code) : .fault(code: code)
+            }
         } else if previousPod.isFaulted {
             reason = .fault(code: nil)
         } else if let stopped = previousPod.deliveryStoppedAt, let expiresAt = previousPod.expiresAt {
@@ -3624,7 +3626,6 @@ extension OmniPumpManager {
         if remainingUnits == Pod.reservoirLevelAboveThresholdMagicNumber {
             remainingUnits = nil
         }
-        replacement.previous = .init(stopDate: previousPod.deliveryStoppedAt, remainingUnits: remainingUnits, reason: reason)
-        return replacement
+        return .init(stopDate: previousPod.deliveryStoppedAt, remainingUnits: remainingUnits, reason: reason)
     }
 }

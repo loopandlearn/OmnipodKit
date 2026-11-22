@@ -63,6 +63,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
     // for user review and manufacturer reporting.
     internal var previousPodState: PodState?
 
+    // The last pod that completed setup and was replaced, for the next pod's Pod Change event.
+    // Unlike previousPodState, a pod that fails or is abandoned during setup doesn't replace it.
+    internal var replacedPod: ComponentReplacement.PreviousComponent?
+
     // Indicates that the user has completed initial configuration
     // which means they have configured any parameters, but may not have paired a pod yet.
     var initialConfigurationCompleted: Bool = false
@@ -364,6 +368,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             self.previousPodState = nil
         }
 
+        if let replacedPodData = rawValue["replacedPod"] as? Data {
+            self.replacedPod = try? JSONDecoder().decode(ComponentReplacement.PreviousComponent.self, from: replacedPodData)
+        }
+
         if podType.isEros {
             // Some more Eros specific values
             if let pairingAttemptAddress = rawValue["pairingAttemptAddress"] as? UInt32 {
@@ -405,6 +413,7 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
         value["lastPumpDataReportDate"] = lastPumpDataReportDate
         value["silencePodEnd"] = silencePodEnd
         value["previousPodState"] = previousPodState?.rawValue
+        value["replacedPod"] = replacedPod.flatMap { try? JSONEncoder().encode($0) }
 
         return value
     }
@@ -427,6 +436,22 @@ extension OmniPumpManagerState {
         let pumpStatusAgeTolerance = TimeInterval(minutes: 6)
         let pumpDataAge = -(self.lastPumpDataReportDate ?? .distantPast).timeIntervalSinceNow
         return pumpDataAge > pumpStatusAgeTolerance
+    }
+}
+
+extension OmniPumpManagerState {
+    mutating func retirePod(at date: Date) {
+        guard var podState else {
+            return
+        }
+        // deliveryStoppedAt is already set by fault handling or deactivation, except with the simulator
+        if podState.deliveryStoppedAt == nil {
+            podState.deliveryStoppedAt = date
+        }
+        previousPodState = podState
+        if podState.setupProgress == .completed {
+            replacedPod = OmniPumpManager.previousComponent(for: podState)
+        }
     }
 }
 
@@ -484,6 +509,8 @@ extension OmniPumpManagerState: CustomDebugStringConvertible {
             "* podState: \(optionalString(podState))",
             "",
             "* previousPodState: \(optionalString(previousPodState))",
+            "",
+            "* replacedPod: \(optionalString(replacedPod))",
             "",
         ].joined(separator: "\n")
         return retVal
