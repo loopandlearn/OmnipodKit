@@ -276,15 +276,18 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 }
             }
 
-            if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
+            if Self.isPodChange(from: oldValue.podState, to: newValue.podState) {
                 let podType = newValue.podType
+                let isPaired = newValue.podState?.isSetupComplete == true
                 let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previousPod: newValue.previousPodState) }
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
                     let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump), componentReplacement: replacement)
                     try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
-                    delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
+                    if isPaired {
+                        delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
+                    }
                 }
             }
         }
@@ -1175,15 +1178,7 @@ extension OmniPumpManager {
 
         let podType = state.podType
         setState { state in
-            // Don't wipe out the previous PodState when switching pod types
-            if let podState = state.podState {
-                state.previousPodState = podState
-                /// If deliveryStoppedAt hasn't been already set during pod fault handling or pod deactivation
-                /// (always the case for a simulator), set deliveryStoppedAt with the current time
-                if podState.deliveryStoppedAt == nil {
-                    state.previousPodState?.deliveryStoppedAt = Date()
-                }
-            }
+            state.previousPodState = Self.previousPod(retiring: state.podState, current: state.previousPodState)
 
             switch podType {
             case erosType:
@@ -3596,9 +3591,36 @@ extension OmniPumpManager {
 }
 
 extension OmniPumpManager {
+    /// A pod that completed setup or faulted. A pod abandoned during setup isn't kept as the previous pod or reported.
+    static func isNotable(_ pod: PodState) -> Bool {
+        return pod.isSetupComplete || pod.isFaulted
+    }
+
+    /// The previous pod after `podState` is retired. It's unchanged when switching pod types (no pod) or when the pod was abandoned during setup.
+    static func previousPod(retiring podState: PodState?, current previous: PodState?) -> PodState? {
+        guard var retired = podState, isNotable(retired) else {
+            return previous
+        }
+        // Not already set by fault handling or deactivation (always the case for a simulator)
+        if retired.deliveryStoppedAt == nil {
+            retired.deliveryStoppedAt = Date()
+        }
+        return retired
+    }
+
+    /// A Pod Change is reported when a pod completes setup, or faults before completing it
+    static func isPodChange(from old: PodState?, to new: PodState?) -> Bool {
+        guard let new else {
+            return false
+        }
+        if new.isSetupComplete {
+            return old?.setupProgress != new.setupProgress
+        }
+        return new.isFaulted && old?.isFaulted != true
+    }
+
     static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
-        // A previous pod that never finished setup didn't replace anything, so it isn't reported
-        let previous = previousPod.flatMap { $0.setupProgress == .completed ? previousComponent(for: $0) : nil }
+        let previous = previousPod.flatMap { isNotable($0) ? previousComponent(for: $0) : nil }
         let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
         var primeUnits = Pod.primeUnits
         if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
