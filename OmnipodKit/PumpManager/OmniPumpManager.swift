@@ -3621,17 +3621,22 @@ extension OmniPumpManager {
 
     static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
         let previous = previousPod.flatMap { isNotable($0) ? previousComponent(for: $0) : nil }
-        let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
-        var primeUnits = Pod.primeUnits
-        if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
-            primeUnits = setupUnitsDelivered - cannulaUnits
+        // A pod that didn't complete setup may not have primed, and never inserted its cannula
+        var primes: [ComponentReplacement.Prime] = []
+        if newPod.isSetupComplete {
+            let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+            var primeUnits = Pod.primeUnits
+            if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
+                primeUnits = setupUnitsDelivered - cannulaUnits
+            }
+            primes = [
+                .init(target: .tubing, volume: primeUnits),
+                .init(target: .cannula, volume: cannulaUnits)
+            ]
         }
         return ComponentReplacement(
             previous: previous,
-            primes: [
-                .init(target: .tubing, volume: primeUnits),
-                .init(target: .cannula, volume: cannulaUnits)
-            ],
+            primes: primes,
             expirationDate: newPod.expiresAt ?? newPod.activatedAt.map { $0 + Pod.nominalPodLife },
             componentIdentifier: "\(newPod.lotNo)-\(newPod.lotSeq)"
         )

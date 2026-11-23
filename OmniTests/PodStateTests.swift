@@ -131,7 +131,9 @@ class PodStateTests: XCTestCase {
         let c = pod(lotSeq: 3, activatedAt: start + .hours(41))
 
         XCTAssertTrue(OmniPumpManager.isPodChange(from: podInSetup(lotSeq: 2), to: b))
-        XCTAssertEqual(OmniPumpManager.componentReplacement(newPod: b, previousPod: a).previous?.stopDate, start + .hours(40))
+        let replacementForB = OmniPumpManager.componentReplacement(newPod: b, previousPod: a)
+        XCTAssertEqual(replacementForB.previous?.stopDate, start + .hours(40))
+        XCTAssertEqual(replacementForB.primes, [])
 
         let previous = OmniPumpManager.previousPod(retiring: b, current: a)
         XCTAssertEqual(previous?.lotSeq, 2)
