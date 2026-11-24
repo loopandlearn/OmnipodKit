@@ -50,6 +50,7 @@ struct PairPodView: View {
                 .padding(.bottom, 8)
             }
             .accessibility(sortPriority: 1)
+            .alert(isPresented: $viewModel.showsCertificateWarning) { certificateWarningModal }
         }) {
             VStack {
                 if self.viewModel.state.showProgressDetail {
@@ -138,6 +139,15 @@ struct PairPodView: View {
             message: FrameworkLocalText("If you cancel Pod setup, the current Pod will be deactivated and will be unusable.", comment: "Alert message body for confirm pod attachment"),
             primaryButton: .destructive(FrameworkLocalText("Yes, Deactivate Pod", comment: "Button title for confirm deactivation option"), action: { viewModel.didRequestDeactivation?() }),
             secondaryButton: .default(FrameworkLocalText("No, Continue With Pod", comment: "Continue pairing button title of in pairing cancel modal"))
+        )
+    }
+
+    var certificateWarningModal: Alert {
+        Alert(
+            title: FrameworkLocalText("Pod Certificate Not From Insulet", comment: "Alert title when the pod's certificate is not from Insulet"),
+            message: FrameworkLocalText("This pod's certificate was not issued by Insulet.\n\nIf you are pairing with a pod simulator, you can continue. If not, someone may be intercepting communication with your pod: cancel, move to a new area with your pod, and try again.", comment: "Alert message when the pod's certificate is not from Insulet"),
+            primaryButton: .destructive(FrameworkLocalText("Continue Pairing", comment: "Button title to pair with a pod whose certificate is not from Insulet"), action: { viewModel.continuePairingWithNonInsuletCertificate() }),
+            secondaryButton: .cancel()
         )
     }
 
