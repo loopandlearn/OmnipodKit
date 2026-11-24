@@ -37,7 +37,8 @@ class O5LTKExchanger {
 
     /// What the pod's SPS2 certificate said about it, once it has shown one.
     private var podAuthenticity: O5PodAuthenticity = .unverified
-    /// The public key of the intermediate certificate the pod showed in SPS2.1.
+    /// The intermediate certificate the pod showed in SPS2.1, and its public key.
+    private var podIntermediateCertificate: Data?
     private var podIntermediateKey: Data?
 
     /// Whether the user chose to pair with this pod even if its certificate is not Insulet's.
@@ -413,6 +414,7 @@ class O5LTKExchanger {
 
         // Short path: entire decrypted payload is the pod certificate DER (no signature)
         let podCertDER = decryptedPayload
+        podIntermediateCertificate = podCertDER
         log.default("Pod SPS2.1 decrypted: %{public}d bytes (pod cert DER, short path)", podCertDER.count)
         log.info("Pod cert DER (%{public}d bytes): %{public}@", podCertDER.count, podCertDER.hexadecimalString)
 
@@ -548,19 +550,28 @@ class O5LTKExchanger {
 
         // A certificate is only the pod's if the pod signed this exchange with
         // its key; anyone can replay a real pod's certificate.
-        podAuthenticity = signatureValid ? O5PodIdentity.authenticity(leafCertificate: podCertDER) : .unverified
+        podAuthenticity = signatureValid
+            ? O5PodIdentity.authenticity(leafCertificate: podCertDER, intermediateCertificate: podIntermediateCertificate)
+            : .unverified
         log.default("Pod certificate is %{public}@", podAuthenticity.rawValue)
         if podAuthenticity != .genuine {
-            // Enough to tell a new Insulet intermediate from anything else: if the
-            // pod's certificate chains to the intermediate it showed, that key is
-            // the one to add to O5PodIdentity.insuletPodAnchorKeys once confirmed.
+            // Enough to see why: whether the intermediate it showed is under a
+            // pinned root, that intermediate's key, and whether the pod's
+            // certificate chains to it.
+            let intermediateUnderRoot = O5PodIdentity.intermediateKey(
+                podIntermediateCertificate, signedByOneOf: O5PodIdentity.insuletPodRootKeys) != nil
+            let podCertificate = SignedCertificate(der: podCertDER)
             let chainsToShownIntermediate = podIntermediateKey.map {
-                SignedCertificate(der: podCertDER)?.isSigned(byPublicKey: $0) ?? false
+                podCertificate?.isSigned(byPublicKey: $0) ?? false
             } ?? false
-            log.default("Pod certificate not Insulet's: signature %{public}@, SPS2.1 intermediate key %{public}@, pod certificate signed by it: %{public}@",
+            log.default("Pod certificate not Insulet's: signature %{public}@, SPS2.1 intermediate under a pinned root: %{public}@, its key %{public}@, pod certificate signed by it: %{public}@, its roles: %{public}@",
                         signatureValid ? "valid" : "invalid",
+                        String(describing: intermediateUnderRoot),
                         podIntermediateKey?.hexadecimalString ?? "none",
-                        String(describing: chainsToShownIntermediate))
+                        String(describing: chainsToShownIntermediate),
+                        podCertificate?.subjectAlternativeNameURIs?
+                            .filter { $0.hasPrefix("devicetype:") }
+                            .joined(separator: ",") ?? "unreadable")
         }
 
         // Stop before the LTK is agreed so the user can decide, and so that
