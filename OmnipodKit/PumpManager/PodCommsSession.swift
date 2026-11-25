@@ -332,7 +332,12 @@ class PodCommsSession: MessageTransportDelegate {
             if !faultTimeKnown {
                 assumeBolusDeliveredUntilNow()
             }
-            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: bolusNotDelivered, at: podState.deliveryStoppedAt ?? currentDate)
+            var faultBolusNotDelivered = bolusNotDelivered
+            if faultBolusNotDelivered > (podState.unfinalizedBolus?.units ?? 0) {
+                log.default("Fault bolus not delivered %{public}@ U is more than the bolus in progress; using 0", String(describing: faultBolusNotDelivered))
+                faultBolusNotDelivered = 0
+            }
+            podState.handleCancelDosing(deliveryType: .all, bolusNotDelivered: faultBolusNotDelivered, at: podState.deliveryStoppedAt ?? currentDate)
             podState.updateFromStatusResponse(derivedStatusResponse, at: currentDate)
 
             // Now that the cancel dosing *and* the lastInsulinMeasurements have all been updated,
