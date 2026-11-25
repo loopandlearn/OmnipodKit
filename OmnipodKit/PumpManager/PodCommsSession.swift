@@ -508,9 +508,19 @@ class PodCommsSession: MessageTransportDelegate {
         } else {
             // Not the first time through, check to see if prime bolus was successfully started
             let status = try getStatus()
-            if status.podProgressStatus == .priming || status.podProgressStatus == .primingCompleted {
+            switch status.podProgressStatus {
+            case .priming, .primingCompleted:
                 podState.setupProgress = .priming
                 return podState.primeFinishTime?.timeIntervalSinceNow ?? primeDuration
+            case .basalInitialized, .insertingCannula, .aboveFiftyUnits, .fiftyOrLessUnits:
+                // Past priming: a prime bolus sent now would be taken as the cannula insertion bolus
+                log.default("Pod progress is %{public}@, so the prime is already done", String(describing: status.podProgressStatus))
+                if podState.setupProgress.primingNeeded {
+                    podState.setupProgress = .priming
+                }
+                return 0
+            default:
+                break
             }
         }
 
