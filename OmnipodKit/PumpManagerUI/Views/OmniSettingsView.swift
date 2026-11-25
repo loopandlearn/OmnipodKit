@@ -40,27 +40,6 @@ struct OmniSettingsView: View  {
     @Environment(\.guidanceColors) var guidanceColors
     @Environment(\.insulinTintColor) var insulinTintColor
 
-    private var daysRemaining: Int? {
-        if case .timeRemaining(let remaining, _) = viewModel.lifeState, remaining > .days(1) {
-            return Int(remaining.days)
-        }
-        return nil
-    }
-
-    private var hoursRemaining: Int? {
-        if case .timeRemaining(let remaining, _) = viewModel.lifeState, remaining > .hours(1) {
-            return Int(remaining.hours.truncatingRemainder(dividingBy: 24))
-        }
-        return nil
-    }
-    
-    private var minutesRemaining: Int? {
-        if case .timeRemaining(let remaining, _) = viewModel.lifeState, remaining < .hours(2) {
-            return Int(remaining.minutes.truncatingRemainder(dividingBy: 60))
-        }
-        return nil
-    }
-    
     func timeComponent(value: Int, units: String) -> some View {
         Group {
             Text(String(value)).font(.system(size: 28)).fontWeight(.heavy)
@@ -75,17 +54,17 @@ struct OmniSettingsView: View  {
                 Text(self.viewModel.lifeState.localizedLabelText)
                     .foregroundColor(self.viewModel.lifeState.labelColor(using: guidanceColors))
                 Spacer()
-                daysRemaining.map { (days) in
+                viewModel.lifeState.daysRemaining.map { (days) in
                     timeComponent(value: days, units: days == 1 ?
                                   LocalizedString("day", comment: "Unit for singular day in pod life remaining") :
                                     LocalizedString("days", comment: "Unit for plural days in pod life remaining"))
                 }
-                hoursRemaining.map { (hours) in
+                viewModel.lifeState.hoursRemaining.map { (hours) in
                     timeComponent(value: hours, units: hours == 1 ?
                                   LocalizedString("hour", comment: "Unit for singular hour in pod life remaining") :
                                     LocalizedString("hours", comment: "Unit for plural hours in pod life remaining"))
                 }
-                minutesRemaining.map { (minutes) in
+                viewModel.lifeState.minutesRemaining.map { (minutes) in
                     timeComponent(value: minutes, units: minutes == 1 ?
                                   LocalizedString("minute", comment: "Unit for singular minute in pod life remaining") :
                                     LocalizedString("minutes", comment: "Unit for plural minutes in pod life remaining"))
