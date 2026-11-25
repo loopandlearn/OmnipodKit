@@ -12,10 +12,11 @@ import Foundation
 /// LoopKit/pod development simulator, or could not be placed.
 ///
 /// A real Omnipod 5 proves itself during pairing: it shows Insulet's pod
-/// intermediate (CN=INS01PG1) in SPS2.1, its own certificate issued by that
-/// intermediate in SPS2, and signs the channel-binding transcript with the key
-/// in it. The simulator mirrors this with its own published CA, so the two are
-/// distinguishable. Pairing with anything but a genuine pod asks the user
+/// intermediate (CN=INS01PG1, issued by Insulet's root) in SPS2.1, its own
+/// certificate issued by that intermediate in SPS2, naming its role as a pod,
+/// and signs the channel-binding transcript with the key in it. Both
+/// certificates are needed. The simulator mirrors this with its own published
+/// CA, so the two are distinguishable. Pairing with anything but a genuine pod asks the user
 /// first, since it may mean the pairing is being intercepted; after that it
 /// is treated like a real pod. The simulator's key is public, so "simulated"
 /// only ever errs toward "this is a simulated pod", never the reverse for a
@@ -28,19 +29,23 @@ public enum O5PodAuthenticity: String, Equatable {
 
 enum O5PodIdentity {
 
-    /// Public keys of Insulet's pod intermediates. A genuine pod's certificate is
-    /// signed by one of these. Add a key here when pods turn up signed by a new
-    /// intermediate; the pairing log prints the key a non-genuine pod showed.
+    /// Public keys of Insulet's roots. A pod is genuine when the intermediate it
+    /// shows in SPS2.1 is signed by one of these and signs the pod's own
+    /// certificate, and that certificate names the pod role. The same root also
+    /// issues certificates for other devices, so the role is what makes it a pod.
     ///
     /// Keys are pinned rather than certificates: a certificate can be reissued
     /// around the same key, and os_log truncates the DER anyway.
-    static let insuletPodAnchorKeys: [Data] = [
-        // CN=INS01PG1, issued by CN=INS00PG1, captured from a real Omnipod 5 on 2026-10-27.
+    static let insuletPodRootKeys: [Data] = [
+        // CN=INS00PG1, the issuer of the pod intermediate CN=INS01PG1.
         Data(hexadecimalString: [
-            "ad2f3b7cc5b5971bea582dff282e08421416d92e2380dbb45802944138cde023",
-            "c5480d43ce04fda10b4980139a400903f581a3ef8a67186d719a79dc5492f441"
+            "8a16b9ea0025860d06e3a8412ced307eae3da04ca73dbd6e85c8ea3e9070a607",
+            "2f749ff6662c8b0702daf1974562c634a7e4da9324ceee75a22e27089d2e61df"
         ].joined())!
     ]
+
+    /// The role a pod's certificate names in its subject alternative names.
+    static let podRole = "devicetype:pod"
 
     /// The LoopKit/pod simulator's CA. Its signing key is published in that
     /// repository as a development marker, so this proves "simulated", not
@@ -61,19 +66,30 @@ enum O5PodIdentity {
         "0f7ceb276180aa38a2d1a74911157b3c5f901ac79618effd8def38"
     ].joined())!
 
-    /// Classifies a pod from the certificate it showed in SPS2.
+    /// Classifies a pod from the certificate it showed in SPS2, and the
+    /// intermediate it showed in SPS2.1.
     ///
     /// Never throws; anything that cannot be placed is unverified.
     ///
     /// Validity dates are deliberately ignored. A real pod was found pairing
     /// with a certificate nineteen months past its notAfter, so honouring
-    /// expiry here would flag pods in the field as suspect. This asks one
-    /// question only: who signed this certificate.
-    static func authenticity(leafCertificate: Data) -> O5PodAuthenticity {
+    /// expiry here would flag pods in the field as suspect. This asks two
+    /// questions only: who signed this certificate, and is it a pod's.
+    static func authenticity(leafCertificate: Data, intermediateCertificate: Data?) -> O5PodAuthenticity {
+        authenticity(leafCertificate: leafCertificate,
+                     intermediateCertificate: intermediateCertificate,
+                     rootKeys: insuletPodRootKeys)
+    }
+
+    /// As above, with the root keys given, so tests can use their own chain.
+    static func authenticity(leafCertificate: Data, intermediateCertificate: Data?,
+                             rootKeys: [Data]) -> O5PodAuthenticity {
         guard let signed = SignedCertificate(der: leafCertificate) else {
             return .unverified
         }
-        if insuletPodAnchorKeys.contains(where: signed.isSigned(byPublicKey:)) {
+        if let issuerKey = intermediateKey(intermediateCertificate, signedByOneOf: rootKeys),
+           signed.isSigned(byPublicKey: issuerKey),
+           hasPodRole(signed) {
             return .genuine
         }
         if let simulatorKey = O5CertificateStore.extractP256PublicKey(fromDERCert: simulatorAnchorCertificate),
@@ -81,6 +97,24 @@ enum O5PodIdentity {
             return .simulated
         }
         return .unverified
+    }
+
+    /// The public key of an intermediate certificate, if one of the root keys signed it.
+    /// The key is read from the signed body only, never from bytes outside it.
+    static func intermediateKey(_ certificate: Data?, signedByOneOf rootKeys: [Data]) -> Data? {
+        guard let certificate = certificate,
+              let signed = SignedCertificate(der: certificate),
+              rootKeys.contains(where: signed.isSigned(byPublicKey:))
+        else {
+            return nil
+        }
+        return O5CertificateStore.extractP256PublicKey(fromDERCert: signed.tbs)
+    }
+
+    /// Whether the certificate's only device role is the pod role.
+    static func hasPodRole(_ certificate: SignedCertificate) -> Bool {
+        guard let uris = certificate.subjectAlternativeNameURIs else { return false }
+        return uris.filter { $0.hasPrefix("devicetype:") } == [podRole]
     }
 }
 
@@ -118,7 +152,74 @@ struct SignedCertificate {
         return key.isValidSignature(sig, for: tbs)
     }
 
+    /// The URIs among the subject alternative names, read from the signed body
+    /// only. Empty when there are none; nil when the extensions cannot be parsed.
+    var subjectAlternativeNameURIs: [String]? {
+        // TBSCertificate ::= SEQUENCE { ..., extensions [3] EXPLICIT SEQUENCE OF Extension OPTIONAL }
+        guard let body = SignedCertificate.contents(of: tbs, at: tbs.startIndex, expecting: 0x30),
+              let fields = SignedCertificate.children(of: tbs, in: body)
+        else {
+            return nil
+        }
+        guard let extensionsField = fields.first(where: { $0.tag == 0xa3 }) else { return [] }
+        guard let wrapper = SignedCertificate.children(of: tbs, in: extensionsField.contents),
+              wrapper.count == 1, wrapper[0].tag == 0x30,
+              let extensions = SignedCertificate.children(of: tbs, in: wrapper[0].contents)
+        else {
+            return nil
+        }
+        var uris: [String]?
+        for ext in extensions {
+            // Extension ::= SEQUENCE { extnID OID, critical BOOLEAN DEFAULT FALSE, extnValue OCTET STRING }
+            guard ext.tag == 0x30,
+                  let parts = SignedCertificate.children(of: tbs, in: ext.contents),
+                  parts.count == 2 || (parts.count == 3 && parts[1].tag == 0x01),
+                  parts[0].tag == 0x06, parts[parts.count - 1].tag == 0x04
+            else {
+                return nil
+            }
+            guard tbs[parts[0].contents] == SignedCertificate.subjectAltNameOID else { continue }
+            // GeneralNames ::= SEQUENCE OF GeneralName; uniformResourceIdentifier is [6] IMPLICIT IA5String.
+            guard uris == nil,
+                  let value = SignedCertificate.children(of: tbs, in: parts[parts.count - 1].contents),
+                  value.count == 1, value[0].tag == 0x30,
+                  let names = SignedCertificate.children(of: tbs, in: value[0].contents)
+            else {
+                return nil
+            }
+            var found: [String] = []
+            for name in names where name.tag == 0x86 {
+                guard let uri = String(data: tbs[name.contents], encoding: .ascii) else { return nil }
+                found.append(uri)
+            }
+            uris = found
+        }
+        return uris ?? []
+    }
+
+    /// id-ce-subjectAltName, 2.5.29.17.
+    private static let subjectAltNameOID = Data([0x55, 0x1d, 0x11])
+
     // MARK: - Minimal DER
+
+    /// The elements directly inside a range, each as its tag and contents.
+    /// Nil unless they fill the range exactly.
+    private static func children(of data: Data, in range: Range<Data.Index>) -> [(tag: UInt8, contents: Range<Data.Index>)]? {
+        var result: [(tag: UInt8, contents: Range<Data.Index>)] = []
+        var index = range.lowerBound
+        while index < range.upperBound {
+            let tag = data[index]
+            guard tag & 0x1f != 0x1f, // no multi-byte tags in a certificate
+                  let contents = contents(of: data, at: index, expecting: tag),
+                  contents.upperBound <= range.upperBound
+            else {
+                return nil
+            }
+            result.append((tag: tag, contents: contents))
+            index = contents.upperBound
+        }
+        return result
+    }
 
     /// The range of one complete element, tag and length included.
     private static func element(in data: Data, at index: Data.Index, expecting tag: UInt8) -> Range<Data.Index>? {
