@@ -50,6 +50,37 @@ class O5AidCommandsTests: XCTestCase {
         XCTAssertEqual(String(data: O5CommLogFixtures.insulinHistoryRecvBody, encoding: .utf8), "0")
     }
 
+    func testTdiBinaryDataLayout() {
+        XCTAssertEqual(O5AidCommands.TdiCommand.defaultBinaryData, Data([0x00, 0x03, 0x00, 0x0E, 0x00]))
+        XCTAssertEqual(
+            O5AidCommands.TdiCommand.binaryData(totalDailyInsulin: 150, sufficientInsulinHistory: true),
+            Data([0x00, 0x03, 0x00, 0x96, 0x01])
+        )
+    }
+
+    func testDiaIsCountedInHalfHours() {
+        XCTAssertEqual(O5AidCommands.DiaCommand.defaultValue, "8") // 4 hours
+        XCTAssertEqual(O5AidCommands.DiaCommand.value(halfHours: 10), "10") // 5 hours
+        XCTAssertTrue(O5AidCommands.DiaCommand.validHalfHours.contains(8))
+    }
+
+    func testEgvThresholdsArePacked() {
+        XCTAssertEqual(O5AidCommands.EgvCommand.defaultValue, "3670015")
+        XCTAssertEqual(O5AidCommands.EgvCommand.defaultValue, O5CommLogFixtures.egvValue)
+        XCTAssertEqual(O5AidCommands.EgvCommand.value(low: 70, high: 250), String(0x004600FA))
+    }
+
+    func testAlgorithmInsulinHistoryRecordLayout() {
+        XCTAssertEqual(
+            O5AidCommands.AlgorithmInsulinHistoryCommand.record(timestamp: 0, algorithmPulses: 0, correctionPulses: 0, mealPulses: 0),
+            Data(count: O5AidCommands.AlgorithmInsulinHistoryCommand.bytesPerRecord)
+        )
+        XCTAssertEqual(
+            O5AidCommands.AlgorithmInsulinHistoryCommand.record(timestamp: 0x6912_3456, algorithmPulses: 3, correctionPulses: 20, mealPulses: 100),
+            Data([0x69, 0x12, 0x34, 0x56, 0x03, 0x14, 0x64])
+        )
+    }
+
     func testTargetBgProfile_payloadSize() {
         let (payload, _) = O5AidCommands.TargetBgProfileCommand.payload()
         XCTAssertEqual(payload.count, 204)

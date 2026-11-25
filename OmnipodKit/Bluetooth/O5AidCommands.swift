@@ -110,15 +110,23 @@ struct O5AidCommands {
         }
     }
 
-    /// Command 2: TDI (Therapy Delivery Information) configuration.
+    /// Command 2: TDI (Total Daily Insulin) configuration.
     /// Binary wire format: `S3.2=` + [0x00,0x03,0x00,0x0E,0x00] + `,G3.2` (15 bytes)
     /// Response: `3.2=` + [5 binary bytes echoed back]
     ///
-    /// The 5 data bytes: version(00), therapy type(03), delivery mode(00), bolus speed(0E=14U TDI), reserved(00).
+    /// The 5 data bytes: body length(0003), TDI in U/day(000E = 14U), flags(00; bit 0 = sufficient insulin history).
     struct TdiCommand {
         static let feature = "3"
         static let attribute = "2"
-        static let defaultBinaryData = Data([0x00, 0x03, 0x00, 0x0E, 0x00])
+        static let defaultBinaryData = binaryData(totalDailyInsulin: 14, sufficientInsulinHistory: false)
+
+        static func binaryData(totalDailyInsulin: UInt16, sufficientInsulinHistory: Bool) -> Data {
+            var data = Data()
+            data.appendBigEndian(UInt16(3))
+            data.appendBigEndian(totalDailyInsulin)
+            data.append(UInt8(sufficientInsulinHistory ? 0x01 : 0x00))
+            return data
+        }
 
         static func payload() -> (data: Data, responsePrefix: String) {
             let payload = O5AidCommands.setGetPayload(feature: feature, attribute: attribute, binaryData: defaultBinaryData)
@@ -158,11 +166,16 @@ struct O5AidCommands {
     /// Sends: `S3.9=8,G3.9`
     /// Response: `3.9=8`
     ///
-    /// Value "8" likely represents 8 half-hours = 4 hours DIA, but could be the raw value.
+    /// Value "8" is 8 half-hours = 4 hours DIA. Valid range is 4–12 (2–6 hours).
     struct DiaCommand {
         static let feature = "3"
         static let attribute = "9"
-        static let defaultValue = "8"
+        static let defaultValue = value(halfHours: 8)
+        static let validHalfHours: ClosedRange<Int> = 4...12
+
+        static func value(halfHours: Int) -> String {
+            return String(halfHours)
+        }
 
         static func payload(value: String = defaultValue) -> (data: Data, responsePrefix: String) {
             let payload = O5AidCommands.setGetPayload(feature: feature, attribute: attribute, data: value)
@@ -175,11 +188,16 @@ struct O5AidCommands {
     /// Sends: `S3.7=3670015,G3.7`
     /// Response: `3.7=3670015`
     ///
-    /// The value `3670015` is a bitfield or composite config value for CGM/EGV settings.
+    /// The value packs the low and high EGV thresholds in mg/dL as `high | (low << 16)`:
+    /// `3670015` = 0x0037FFFF = low 55, high 65535.
     struct EgvCommand {
         static let feature = "3"
         static let attribute = "7"
-        static let defaultValue = "3670015"
+        static let defaultValue = value(low: 55, high: 65535)
+
+        static func value(low: UInt16, high: UInt16) -> String {
+            return String(UInt32(high) | (UInt32(low) << 16))
+        }
 
         static func payload(value: String = defaultValue) -> (data: Data, responsePrefix: String) {
             let payload = O5AidCommands.setGetPayload(feature: feature, attribute: attribute, data: value)
@@ -193,12 +211,20 @@ struct O5AidCommands {
     /// Response: `ES2.1=0`
     ///
     /// The 0x00A8 prefix = 168 = 24 * 7 (byte count of the 24 history records).
-    /// Each record is 7 bytes. For initial setup with no history, all records are zeros.
+    /// Each record is 7 bytes: UTC timestamp(4-byte BE), then algorithm, correction and meal pulse counts(1 byte each).
+    /// For initial setup with no history, all records are zeros.
     struct AlgorithmInsulinHistoryCommand {
         static let feature = "2"
         static let attribute = "1"
         static let recordsPerBatch = 24
         static let bytesPerRecord = 7
+
+        static func record(timestamp: UInt32, algorithmPulses: UInt8, correctionPulses: UInt8, mealPulses: UInt8) -> Data {
+            var data = Data()
+            data.appendBigEndian(timestamp)
+            data.append(contentsOf: [algorithmPulses, correctionPulses, mealPulses])
+            return data
+        }
 
         static func payload(records: [Data]? = nil) -> (data: Data, responsePrefix: String) {
             let recordData: [Data]
