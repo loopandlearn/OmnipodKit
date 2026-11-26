@@ -53,6 +53,14 @@ func o5FaultAdvertisementUUID(_ pdmId: UInt32) -> CBUUID {
     return CBUUID(string: uuidString)
 }
 
+/// The prefix every O5 advertisement service UUID shares; the pdmId and a 1-byte status suffix follow it.
+let o5AdvertisementUUIDPrefix = "CE1F923D-C539-48EA-7300-0A"
+
+// An unpaired O5 advertises …FFFFFFFE followed by a status suffix 00–03 (normally 00).
+let o5UnpairedAdvertisementUUIDs: [CBUUID] = (0...3).map {
+    CBUUID(string: o5AdvertisementUUIDPrefix + String(format: "%08X%02X", UInt32(0xFFFFFFFE), UInt32($0)))
+}
+
 enum o5OmnipodServiceUUID: String, CBUUIDRawValue {
     case advertisement = "CE1F923D-C539-48EA-7300-0AFFFFFFFE00" // i.e., o5ServiceAdvertisementUUID(0xFFFFFFFE).uuidString
     case service =       "1A7E4024-E3ED-4464-8B7E-751E03D0DC5F" // Same as DASH

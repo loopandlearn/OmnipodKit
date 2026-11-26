@@ -141,6 +141,15 @@ class BluetoothManager: NSObject {
     /// once (captures the fault transition without flooding the device log).
     private var lastLoggedAdvKey: [String: String] = [:]
 
+    /// Last advert (suffix|name|mfg) logged per unpaired O5 with a suffix other than 00, so each pod is
+    /// logged once per pairing attempt.
+    private var lastLoggedUnpairedSuffixAdvKey: [String: String] = [:]
+
+    /// Whether this discovery scans for unpaired O5s on all four status suffixes (…FE00 to …FE03).
+    private var listensForAllUnpairedO5Suffixes: Bool {
+        discoveryModeEnabled && podType.isO5 && uuidPdmId == nil
+    }
+
     /// Isolated to `managerQueue`
     private var discoveryModeEnabled: Bool = false
 
@@ -846,6 +855,7 @@ class BluetoothManager: NSObject {
 
         // We will attempt to connect to all pairable devices when in discovery mode
         discoveryModeEnabled = true
+        lastLoggedUnpairedSuffixAdvKey.removeAll()
         connectionDelegate?.omnipodLogDeviceEvent("[pairing] discoverPods — scanning for a pairable pod")
         // Quiet any in-flight heartbeat probe / stale connect churn so it doesn't clobber discovery.
         delayedProbeInFlight = false
@@ -1211,10 +1221,16 @@ class BluetoothManager: NSObject {
             // Pairing: scan for the pod's main advertisement service so a new/unpaired pod is found.
             // MUST take precedence over the low-power alarm scan (which filters on C005/C00A and would
             // never see a pairing pod) and over scanningEnabled (pairing has to scan regardless).
-            services = [serviceUUID]
+            // An unpaired O5 can advertise …FE00 to …FE03.
+            if listensForAllUnpairedO5Suffixes {
+                services = o5UnpairedAdvertisementUUIDs
+            } else {
+                services = [serviceUUID]
+            }
             options = [CBCentralManagerScanOptionAllowDuplicatesKey: true]
-            log.default("Start scanning (discovery/pairing filter=%{public}@)", serviceUUID.uuidString)
-            connectionDelegate?.omnipodLogDeviceEvent("[pairing] scan started (filter=\(serviceUUID.uuidString))")
+            let filter = services?.map { $0.uuidString }.joined(separator: ",") ?? "-"
+            log.default("Start scanning (discovery/pairing filter=%{public}@)", filter)
+            connectionDelegate?.omnipodLogDeviceEvent("[pairing] scan started (filter=\(filter))")
             manager.scanForPeripherals(withServices: services, options: options)
             return
         }
@@ -1549,6 +1565,21 @@ extension BluetoothManager: CBCentralManagerDelegate {
         }
 
         if let podAdvertisement = PodAdvertisement(advertisementData, podType: podType) {
+            // Log an unpaired O5 with a suffix other than 00 once per pairing attempt, then pair it as usual.
+            if listensForAllUnpairedO5Suffixes, podAdvertisement.pairable,
+               let suffix = podAdvertisement.o5StatusSuffix, suffix != 0 {
+                let mfg = (advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data)?.hexadecimalString ?? "-"
+                let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "-"
+                let suffixHex = String(format: "%02X", suffix)
+                let advKey = "\(suffixHex)|\(name)|\(mfg)"
+                if lastLoggedUnpairedSuffixAdvKey[peripheral.identifier.uuidString] != advKey {
+                    lastLoggedUnpairedSuffixAdvKey[peripheral.identifier.uuidString] = advKey
+                    log.default("[pairing] unpaired O5 %{public}@ advertising …FFFFFFFE%{public}@: rssi=%{public}@ name=%{public}@ mfg=%{public}@",
+                                peripheral.identifier.uuidString, suffixHex, RSSI, name, mfg)
+                    connectionDelegate?.omnipodLogDeviceEvent("[pairing] unpaired O5 \(peripheral.identifier.uuidString) advertising …FFFFFFFE\(suffixHex): rssi=\(RSSI) name=\(name) mfg=\(mfg)")
+                }
+            }
+
             addPeripheral(peripheral, podAdvertisement: podAdvertisement)
 
             if discoveryModeEnabled {
@@ -1566,8 +1597,10 @@ extension BluetoothManager: CBCentralManagerDelegate {
             } else if autoConnectIDs.contains(peripheral.identifier.uuidString) && peripheral.state == .disconnected {
                 log.debug("Reconnecting to autoconnect device")
                 autoReconnect(peripheral)
+            } else if discoveryModeEnabled {
+                log.info("Ignoring paired peripheral: %{public}@", peripheral)
             } else {
-                log.info("Ignoring paired or unconnectable peripheral: %{public}@", peripheral)
+                log.info("Ignoring peripheral, not pairing and not ours: %{public}@", peripheral)
             }
         } else {
             log.info("Ignoring peripheral with unexpected advertisement data: %{public}@", advertisementData)
