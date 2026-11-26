@@ -63,8 +63,7 @@ struct PumpManagerDetailsView: View {
             .background(Color(UIColor.secondarySystemGroupedBackground).shadow(radius: 5))
         }
         .insetGroupedListStyle()
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
+        .uikitNavigationTitle(title, displayMode: .inline)
         .task {
             self.displayString = getPumpManagerDetails()
         }

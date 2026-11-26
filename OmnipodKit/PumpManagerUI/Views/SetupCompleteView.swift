@@ -85,7 +85,6 @@ struct SetupCompleteView: View {
             .background(Color(UIColor.systemBackground))
             .zIndex(1)
         }
-        .navigationTitle(LocalizedString("Setup Complete", comment: "Title of SetupCompleteView"))
         .navigationBarTitleDisplayMode(.automatic)
     }
     

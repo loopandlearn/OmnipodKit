@@ -62,8 +62,7 @@ struct ReadPodStatusView: View {
             .background(Color(UIColor.secondarySystemGroupedBackground).shadow(radius: 5))
         }
         .insetGroupedListStyle()
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
+        .uikitNavigationTitle(title, displayMode: .inline)
         .alert(isPresented: $alertIsPresented, content: { alert(error: error) })
         .task {
             await fetchDetailedStatus()

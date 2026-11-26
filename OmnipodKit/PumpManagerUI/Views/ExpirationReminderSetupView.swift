@@ -40,7 +40,6 @@ struct ExpirationReminderSetupView: View {
             }
             .padding()
         }
-        .navigationTitle(LocalizedString("Expiration Reminder", comment: "navigation title for Expiration Reminder"))
         .navigationBarTitleDisplayMode(.automatic)
         .navigationBarHidden(false)
         .toolbar {

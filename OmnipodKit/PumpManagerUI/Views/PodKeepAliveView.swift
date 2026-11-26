@@ -85,7 +85,7 @@ struct PodKeepAliveView: View {
 
         }
         .insetGroupedListStyle()
-        .navigationBarTitle(Text(title), displayMode: .automatic)
+        .uikitNavigationTitle(title)
     }
 
     private var contentWithCancel: some View {
