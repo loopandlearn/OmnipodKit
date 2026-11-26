@@ -44,7 +44,7 @@ struct DetailedStatus: PodInfo, Equatable {
         }
         self.podProgressStatus = PodProgressStatus(rawValue: encodedData[1])!
 
-        let bolusPulsesNotDeliveredWord = encodedData[3...4].toBigEndian(UInt16.self)
+        let bolusPulsesNotDelivered = encodedData[3...4].toBigEndian(UInt16.self)
         /// For some particular reset pod faults on at least the O5, this value can be an illegal $07ff.
         /// Use 0.0 instead of this illegal value to assume full bolus delivery before this apparent fault.
         if bolusPulsesNotDelivered != 0x07ff {
