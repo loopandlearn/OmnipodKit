@@ -277,4 +277,48 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         XCTAssertEqual(bolusStart + 80, bolus.finishTime)
     }
 
+    func testFaultBolusNotDeliveredLargerThanTheBolusCountsItDelivered() {
+        let activatedAt = Date().addingTimeInterval(.hours(-3))
+        podState.expiresAt = activatedAt + Pod.nominalPodLife
+        let bolusStart = activatedAt + .minutes(99.5)
+        podState.unfinalizedBolus = UnfinalizedDose(bolusAmount: 2, startTime: bolusStart, scheduledCertainty: .certain, insulinType: .novolog)
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        session.mockCurrentDate = activatedAt + .minutes(100.5)
+
+        // 0x18 fault at 100 minutes with a $7FF bolus not delivered word, more than the 2 U bolus
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0007ff0508001800640000006900001900000000")!)
+        mockTransport.addResponse(fault)
+
+        XCTAssertThrowsError(try session.getStatus())
+
+        let state = lastPodStateUpdate!
+        XCTAssertEqual(activatedAt + .minutes(100), state.deliveryStoppedAt)
+        let bolus = state.finalizedDoses.first { $0.doseType == .bolus }!
+        XCTAssertEqual(2, bolus.units, accuracy: 0.001)
+        XCTAssertEqual(activatedAt + .minutes(100), bolus.finishTime)
+    }
+
+    func testFaultAfterUnacknowledgedBolusSubtractsBolusNotDelivered() {
+        let activatedAt = Date().addingTimeInterval(.hours(-3))
+        podState.expiresAt = activatedAt + Pod.nominalPodLife
+        podState.setupProgress = .completed
+
+        // 0x18 empty reservoir fault at 100 minutes with 1.8 U (36 pulses) not delivered
+        let fault = try! PodInfoResponse(encodedData: Data(hexadecimalString: "0216020d0000240508001800640000006900001900000000")!)
+        let sequence = Int((fault.podInfo as! DetailedStatus).lastProgrammingMessageSeqNum)
+
+        // A 4 U bolus the pod received, but whose response was lost
+        let bolusStart = activatedAt + .minutes(98.5)
+        podState.unacknowledgedCommand = .program(.bolus(volume: 4, automatic: false), sequence, bolusStart)
+
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        session.mockCurrentDate = activatedAt + .minutes(105)
+        mockTransport.addResponse(fault)
+
+        XCTAssertThrowsError(try session.getStatus())
+
+        let bolus = lastPodStateUpdate!.finalizedDoses.first { $0.doseType == .bolus }!
+        XCTAssertEqual(2.2, bolus.units, accuracy: 0.01)
+    }
+
 }
