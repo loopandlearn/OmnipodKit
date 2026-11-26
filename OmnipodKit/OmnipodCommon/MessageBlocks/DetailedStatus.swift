@@ -44,7 +44,14 @@ struct DetailedStatus: PodInfo, Equatable {
         }
         self.podProgressStatus = PodProgressStatus(rawValue: encodedData[1])!
 
-        self.bolusNotDelivered = Double((Int(encodedData[3] & 0x3) << 8) | Int(encodedData[4])) / Pod.pulsesPerUnit
+        let bolusPulsesNotDelivered = (UInt(encodedData[3] & 0x3) << 8) | UInt(encodedData[4])
+        /// For some particular reset pod faults on at least the O5, this value can be an illegal $07ff.
+        /// Use 0.0 instead of this illegal value to assume full bolus delivery before this apparent fault.
+        if bolusPulsesNotDelivered != 0x07ff {
+            self.bolusNotDelivered = Double(bolusPulsesNotDelivered) / Pod.pulsesPerUnit
+        } else {
+            self.bolusNotDelivered = 0.0
+        }
 
         self.lastProgrammingMessageSeqNum = encodedData[5]
 
@@ -60,8 +67,8 @@ struct DetailedStatus: PodInfo, Equatable {
         }
 
         let faultTime = encodedData[9...10].toBigEndian(UInt16.self)
-        /// For pod reset faults, this value can be $ffff (Eros or O5) and $0000 for (DASH).
-        /// Never return any of these dubious values as a possible valid pod fault time.
+        /// For reset pod faults, this value can be $ffff (for Eros and O5) and $0000 (for DASH and O5).
+        /// Never return an illegal $ffff or a dubious $0000 value as a possible valid pod fault time.
         if faultTime != 0xffff && faultTime != 0 {
             self.faultEventTimeSinceActivation = TimeInterval(minutes: Double(faultTime))
         } else {
