@@ -277,6 +277,29 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         XCTAssertEqual(bolusStart + 80, bolus.finishTime)
     }
 
+    func testPrimeAfterThePodHasMovedOnSendsNoPrime() {
+        for progress: PodProgressStatus in [.basalInitialized, .insertingCannula, .aboveFiftyUnits] {
+            mockTransport = MockMessageTransport(address: address, messageNumber: 1)
+            podState.setupProgress = .settingInitialBasalSchedule
+            podState.primeFinishTime = Date().addingTimeInterval(.minutes(-2))
+            let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+
+            mockTransport.addResponse(StatusResponse(
+                deliveryStatus: .scheduledBasal,
+                podProgressStatus: progress,
+                timeActive: .minutes(5),
+                reservoirLevel: Pod.reservoirLevelAboveThresholdMagicNumber,
+                insulinDelivered: 2.6,
+                bolusNotDelivered: 0,
+                lastProgrammingMessageSeqNum: 3,
+                alerts: AlertSet(slots: [])))
+
+            XCTAssertEqual(0, try session.prime(), "\(progress)")
+            XCTAssertEqual(1, mockTransport.sentMessages.count, "\(progress)")
+            XCTAssertEqual(.settingInitialBasalSchedule, lastPodStateUpdate?.setupProgress ?? podState.setupProgress, "\(progress)")
+        }
+    }
+
     func testFaultBolusNotDeliveredLargerThanTheBolusCountsItDelivered() {
         let activatedAt = Date().addingTimeInterval(.hours(-3))
         podState.expiresAt = activatedAt + Pod.nominalPodLife

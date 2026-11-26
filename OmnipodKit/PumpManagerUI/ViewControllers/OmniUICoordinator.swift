@@ -431,6 +431,11 @@ class OmniUICoordinator: UINavigationController, PumpManagerOnboarding, Completi
                 return .o5KeySetup
             }
         }
+        if screen == .pairAndPrime, pumpManager.podCommState == .activating,
+           pumpManager.state.podState?.readyForCannulaInsertion == true && pumpManager.podAttachmentConfirmed
+        {
+            return .insertCannula
+        }
         guard screen == .podTypeSelected else { return screen }
         if pumpManager.podType.isEros {
             return .rileyLinkSetup
