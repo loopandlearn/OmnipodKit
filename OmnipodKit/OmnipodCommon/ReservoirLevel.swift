@@ -8,12 +8,22 @@
 //
 
 import Foundation
+import LoopKit
 
 enum ReservoirLevel: RawRepresentable, Equatable {
     typealias RawValue = Double
 
     case valid(Double)
     case aboveThreshold
+
+    var pumpReservoirLevel: LoopKit.ReservoirLevel {
+        switch self {
+        case .valid(let units):
+            return .measured(units: units)
+        case .aboveThreshold:
+            return .aboveThreshold(units: Pod.maximumReservoirReading)
+        }
+    }
 
     var percentage: Double {
         switch self {

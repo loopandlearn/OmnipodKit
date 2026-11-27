@@ -252,8 +252,6 @@ class OmniSettingsViewModel: ObservableObject {
         return nil
     }
 
-    let reservoirVolumeFormatter = QuantityFormatter(for: .internationalUnit)
-
     var didFinish: (() -> Void)?
 
     var navigateTo: ((OmniUIScreen) -> Void)?
@@ -486,17 +484,7 @@ class OmniSettingsViewModel: ObservableObject {
     }
 
     func reservoirText(for level: ReservoirLevel) -> String {
-        switch level {
-        case .aboveThreshold:
-            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: Pod.maximumReservoirReading)
-            let thresholdString = reservoirVolumeFormatter.string(from: quantity, includeUnit: false) ?? ""
-            let unitString = reservoirVolumeFormatter.localizedUnitStringWithPlurality(forValue: Pod.maximumReservoirReading, avoidLineBreaking: true)
-            return String(format: LocalizedString("%1$@+ %2$@", comment: "Format string for reservoir level above max measurable threshold. (1: measurable reservoir threshold) (2: units)"),
-                          thresholdString, unitString)
-        case .valid(let value):
-            let quantity = LoopQuantity(unit: .internationalUnit, doubleValue: value)
-            return reservoirVolumeFormatter.string(from: quantity) ?? ""
-        }
+        level.pumpReservoirLevel.formatted()
     }
 
     var suspendResumeActionText: String {
