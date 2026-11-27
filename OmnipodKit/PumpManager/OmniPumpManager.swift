@@ -602,7 +602,8 @@ extension OmniPumpManager {
             basalDeliveryState: basalDeliveryState(for: state, at: date),
             bolusState: bolusState(for: state, at: date),
             insulinType: state.insulinType,
-            deliveryIsUncertain: state.podState?.needsCommsRecovery == true
+            deliveryIsUncertain: state.podState?.needsCommsRecovery == true,
+            reservoirLevel: state.reservoirLevel?.pumpReservoirLevel
         )
     }
 
