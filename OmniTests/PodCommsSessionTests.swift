@@ -61,8 +61,30 @@ class PodCommsSessionTests: XCTestCase, PodCommsSessionDelegate {
         podState = PodState(address: address, firmwareVersion: "2.7.0", iFirmwareVersion: "2.7.0", lotNo: 43620, lotSeq: 560313, insulinType: .novolog, podType: dashType, ltk: fakeLtk, bleIdentifier: "0000-0000")
     }
 
+    var podStateUpdates: [PodState] = []
+
     func podCommsSession(_ podCommsSession: PodCommsSession, didChange state: PodState) {
         lastPodStateUpdate = state
+        podStateUpdates.append(state)
+    }
+
+    func testSetupUnitsDeliveredIsSetWhenSetupCompletes() throws {
+        podState.setupProgress = .cannulaInserting
+        let session = PodCommsSession(podState: podState, transport: mockTransport, delegate: self)
+        mockTransport.addResponse(StatusResponse(
+            deliveryStatus: .scheduledBasal,
+            podProgressStatus: .aboveFiftyUnits,
+            timeActive: .minutes(60),
+            reservoirLevel: Pod.reservoirLevelAboveThresholdMagicNumber,
+            insulinDelivered: 2.95,
+            bolusNotDelivered: 0,
+            lastProgrammingMessageSeqNum: 5,
+            alerts: AlertSet(slots: [])))
+
+        try session.checkInsertionCompleted()
+
+        let completed = try XCTUnwrap(podStateUpdates.first { $0.setupProgress == .completed })
+        XCTAssertEqual(completed.setupUnitsDelivered, 2.95)
     }
 
     func testBolusFinishedEarlyOnPodIsMarkedNonMutable() {

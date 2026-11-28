@@ -302,14 +302,18 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 }
             }
 
-            if oldValue.podState?.setupProgress != newValue.podState?.setupProgress, newValue.podState?.setupProgress == .completed {
+            if Self.isPodChange(from: oldValue.podState, to: newValue.podState) {
                 let podType = newValue.podType
+                let isPaired = newValue.podState?.isSetupComplete == true
+                let replacement = newValue.podState.map { Self.componentReplacement(newPod: $0, previousPod: newValue.previousPodState) }
                 self.pumpDelegate.notify() { (delegate) in
                     let date = Date()
                     let title = String(format: LocalizedString("Pod Change (%@)", comment: "Pump event title for a newly paired pod (1: pod type)"), podType.description)
-                    let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump))
+                    let event = NewPumpEvent(date: date, dose: nil, raw: "Pod Change \(date)".data(using: .utf8)!, title: title, type: .replaceComponent(componentType: .pump), componentReplacement: replacement)
                     try? await delegate?.pumpManager(self, hasNewPumpEvents: [event], lastReconciliation: self.lastSync, replacePendingEvents: false)
-                    delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
+                    if isPaired {
+                        delegate?.deviceManager(self, recordAnalyticsEvent: "Pod Paired", properties: ["podType": podType.briefName])
+                    }
                 }
             }
         }
@@ -1204,15 +1208,7 @@ extension OmniPumpManager {
 
         let podType = state.podType
         setState { state in
-            // Don't wipe out the previous PodState when switching pod types
-            if let podState = state.podState {
-                state.previousPodState = podState
-                /// If deliveryStoppedAt hasn't been already set during pod fault handling or pod deactivation
-                /// (always the case for a simulator), set deliveryStoppedAt with the current time
-                if podState.deliveryStoppedAt == nil {
-                    state.previousPodState?.deliveryStoppedAt = Date()
-                }
-            }
+            state.previousPodState = Self.previousPod(retiring: state.podState, current: state.previousPodState)
 
             switch podType {
             case erosType:
@@ -3659,5 +3655,81 @@ extension OmniPumpManager {
         if !found {
             log.error("@@@ acknowledge alert %{public}@ not found!", alertIdentifier)
         }
+    }
+}
+
+extension OmniPumpManager {
+    /// A pod that completed setup or faulted. A pod abandoned during setup isn't kept as the previous pod or reported.
+    static func isNotable(_ pod: PodState) -> Bool {
+        return pod.isSetupComplete || pod.isFaulted
+    }
+
+    /// The previous pod after `podState` is retired. It's unchanged when switching pod types (no pod) or when the pod was abandoned during setup.
+    static func previousPod(retiring podState: PodState?, current previous: PodState?) -> PodState? {
+        guard var retired = podState, isNotable(retired) else {
+            return previous
+        }
+        // Not already set by fault handling or deactivation (always the case for a simulator)
+        if retired.deliveryStoppedAt == nil {
+            retired.deliveryStoppedAt = Date()
+        }
+        return retired
+    }
+
+    /// A Pod Change is reported when a pod completes setup, or faults before completing it
+    static func isPodChange(from old: PodState?, to new: PodState?) -> Bool {
+        guard let new else {
+            return false
+        }
+        if new.isSetupComplete {
+            return old?.setupProgress != new.setupProgress
+        }
+        return new.isFaulted && old?.isFaulted != true
+    }
+
+    static func componentReplacement(newPod: PodState, previousPod: PodState?) -> ComponentReplacement {
+        let previous = previousPod.flatMap { isNotable($0) ? previousComponent(for: $0) : nil }
+        // A pod that didn't complete setup may not have primed, and never inserted its cannula
+        var primes: [ComponentReplacement.Prime] = []
+        if newPod.isSetupComplete {
+            let cannulaUnits = Pod.cannulaInsertionUnits + Pod.cannulaInsertionUnitsExtra
+            var primeUnits = Pod.primeUnits
+            if let setupUnitsDelivered = newPod.setupUnitsDelivered, setupUnitsDelivered >= cannulaUnits {
+                primeUnits = setupUnitsDelivered - cannulaUnits
+            }
+            primes = [
+                .init(target: .tubing, volume: primeUnits),
+                .init(target: .cannula, volume: cannulaUnits)
+            ]
+        }
+        return ComponentReplacement(
+            previous: previous,
+            primes: primes,
+            expirationDate: newPod.expiresAt ?? newPod.activatedAt.map { $0 + Pod.nominalPodLife },
+            componentIdentifier: "\(newPod.lotNo)-\(newPod.lotSeq)"
+        )
+    }
+
+    static func previousComponent(for previousPod: PodState) -> ComponentReplacement.PreviousComponent {
+        let reason: ComponentReplacement.Reason
+        if let fault = previousPod.fault?.faultEventCode {
+            if fault.faultType == .exceededMaximumPodLife80Hrs {
+                reason = .expired
+            } else {
+                let code = String(format: "0x%02X", fault.rawValue)
+                reason = fault.isOcclusion ? .occlusion(code: code) : .fault(code: code)
+            }
+        } else if previousPod.isFaulted {
+            reason = .fault(code: nil)
+        } else if let stopped = previousPod.deliveryStoppedAt, let expiresAt = previousPod.expiresAt {
+            reason = stopped >= expiresAt ? .expired : .userInitiated
+        } else {
+            reason = .unknown
+        }
+        var remainingUnits = previousPod.lastInsulinMeasurements?.reservoirLevel
+        if remainingUnits == Pod.reservoirLevelAboveThresholdMagicNumber {
+            remainingUnits = nil
+        }
+        return .init(stopDate: previousPod.deliveryStoppedAt, remainingUnits: remainingUnits, reason: reason)
     }
 }

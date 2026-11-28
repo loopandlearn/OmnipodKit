@@ -610,8 +610,9 @@ class PodCommsSession: MessageTransportDelegate {
 
     private func markSetupProgressCompleted(statusResponse: StatusResponse) {
         if (podState.setupProgress != .completed) {
-            podState.setupProgress = .completed
+            // Set before completing setup, so the Pod Change it triggers has the measured prime
             podState.setupUnitsDelivered = statusResponse.insulinDelivered // stash the current insulin delivered value as the baseline
+            podState.setupProgress = .completed
             log.info("Total setup units delivered: %@", String(describing: statusResponse.insulinDelivered))
         }
     }
