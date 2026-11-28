@@ -10,10 +10,12 @@
 import Foundation
 
 class Nonce {
+    static let prefixLength = 8
+
     let prefix: Data
     
     init (prefix: Data) {
-        guard prefix.count == 8 else { fatalError("Nonce prefix should be 8 bytes long") }
+        guard prefix.count == Self.prefixLength else { fatalError("Nonce prefix should be 8 bytes long") }
         self.prefix = prefix
     }
 

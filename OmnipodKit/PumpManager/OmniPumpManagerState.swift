@@ -22,6 +22,17 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
     // XXX still needs be declared public with the current Trio implementation
     public private(set) var podState: PodState?
 
+    /// Control of the pod is released to another controller (ExclusiveDeviceControl). Persisted,
+    /// so a relaunch does not take it back.
+    var podConnectionReleased: Bool = false
+
+    /// Built from another controller's export (DeviceConfigurationSharing).
+    var configuredByAnotherController: Bool = false
+
+    /// Control was released with a bolus or temp basal in flight. The other controller owns those
+    /// records from then on, so taking control drops this manager's copies.
+    var inFlightDosesInheritedAway: Bool = false
+
     // State should only be modifiable by PodComms
     mutating func updatePodStateFromPodComms(_ podState: PodState?) {
         self.podState = podState
@@ -332,6 +343,10 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
 
         self.podAttachmentConfirmed = rawValue["podAttachmentConfirmed"] as? Bool ?? false
 
+        self.podConnectionReleased = rawValue["podConnectionReleased"] as? Bool ?? false
+        self.configuredByAnotherController = rawValue["configuredByAnotherController"] as? Bool ?? false
+        self.inFlightDosesInheritedAway = rawValue["inFlightDosesInheritedAway"] as? Bool ?? false
+
         self.initialConfigurationCompleted = rawValue["initialConfigurationCompleted"] as? Bool ?? true
 
         self.acknowledgedTimeOffsetAlert = rawValue["acknowledgedTimeOffsetAlert"] as? Bool ?? false
@@ -384,6 +399,9 @@ public struct OmniPumpManagerState: RawRepresentable, Equatable {
             "confirmationBeeps": confirmationBeeps.rawValue,
             "activeAlerts": activeAlerts.map { $0.rawValue },
             "podAttachmentConfirmed": podAttachmentConfirmed,
+            "podConnectionReleased": podConnectionReleased,
+            "configuredByAnotherController": configuredByAnotherController,
+            "inFlightDosesInheritedAway": inFlightDosesInheritedAway,
             "acknowledgedTimeOffsetAlert": acknowledgedTimeOffsetAlert,
             "alertsWithPendingAcknowledgment": alertsWithPendingAcknowledgment.map { $0.rawValue },
             "initialConfigurationCompleted": initialConfigurationCompleted,

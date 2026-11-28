@@ -8651,6 +8651,9 @@
         }
       }
     },
+    "Another device is using the pod" : {
+      "comment" : "Error message when the pod shows another controller has run it since this one"
+    },
     "Are you sure you want to cancel Pod setup?" : {
       "comment" : "Alert title for cancel pairing modal",
       "extractionState" : "manual",
